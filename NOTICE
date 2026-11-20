@@ -1,0 +1,11 @@
+KaryoForge
+Copyright 2026 OpenKaryon contributors
+
+The technical documentation is adapted from the project's existing Apache-2.0
+KaryoForge documentation. This source snapshot contains documentation and original
+developer/audit tools, not the reference IDE implementation or its dependencies.
+
+IntelliJ IDEA, JetBrains and referenced language/runtime products belong to
+their respective owners. No JetBrains, Gradle, Python, R, LSP4IJ, HTSJDK or
+other runtime binaries are distributed by this bootstrap. Dependency notices
+will be retained and expanded when corresponding code or assets are transferred.

@@ -1,0 +1,21 @@
+# Local evidence, profiles and build output are not public source.
+work/
+outputs/
+build/
+out/
+.gradle/
+.intellijPlatform/
+.idea/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+*.jfr
+
+# Local environment configuration and secrets.
+.env
+.env.*
+!.env.example
+*.key
+*.p12
+*.pfx

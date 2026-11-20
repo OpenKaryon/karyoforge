@@ -1,0 +1,2546 @@
+{
+  "schemaVersion": 2,
+  "evidence": "static-reference-audit; no runtime acceptance",
+  "identifierProjection": {
+    "publicNamespace": "org.openkaryon.karyoforge",
+    "paths": "namespace aliases, not public implementation paths",
+    "hashes": "unmodified reference file bytes",
+    "sourceNamespace": "derived locally from the supplied plugin descriptor"
+  },
+  "platformPins": {
+    "pluginVersion": "0.1.0-SNAPSHOT",
+    "platformVersion": "2025.2.6.3",
+    "pluginSinceBuild": "252.28539.97",
+    "pluginUntilBuild": "252.28539.97",
+    "pythonPluginVersion": "252.28539.97",
+    "lspPluginVersion": "0.21.0",
+    "rPluginVersion": "252.28539.97"
+  },
+  "descriptors": [
+    {
+      "path": "src/main/resources/META-INF/openkaryon-maven.xml",
+      "sha256": "2a2920c0541b68147788aaa37f4cde2c171dddfe933414b049ff1a1359dc0ebb"
+    },
+    {
+      "path": "src/main/resources/META-INF/openkaryon-yaml.xml",
+      "sha256": "a29bdf91190009369cfe86ffc366f69e3a25f60a851336b59b54656d79d43ce3"
+    },
+    {
+      "path": "src/main/resources/META-INF/plugin.xml",
+      "sha256": "edf741831a9e188d230199089c520914bd7f00f06768b621574308e6e768cfaf"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "PythonCore",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "R4Intellij",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "com.intellij.modules.lang",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "com.intellij.modules.platform",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "com.redhat.devtools.lsp4ij",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "org.jetbrains.idea.maven",
+      "optional": true,
+      "descriptor": "openkaryon-maven.xml"
+    },
+    {
+      "id": "org.jetbrains.plugins.terminal",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "org.jetbrains.plugins.textmate",
+      "optional": false,
+      "descriptor": ""
+    },
+    {
+      "id": "org.jetbrains.plugins.yaml",
+      "optional": true,
+      "descriptor": "openkaryon-yaml.xml"
+    }
+  ],
+  "registrations": [
+    {
+      "descriptor": "openkaryon-maven.xml",
+      "namespace": "org.openkaryon.karyoforge",
+      "kind": "buildSettingsInitializer",
+      "identity": "org.openkaryon.karyoforge.settings.MavenBuildSettingsInitializer",
+      "owner": "org.openkaryon.karyoforge.settings.MavenBuildSettingsInitializer",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.settings.MavenBuildSettingsInitializer"
+      }
+    },
+    {
+      "descriptor": "openkaryon-yaml.xml",
+      "namespace": "com.intellij",
+      "kind": "fileType",
+      "identity": "YAML",
+      "owner": "platform descriptor",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "extensions": "cwl",
+        "name": "YAML"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.go",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Go",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Go",
+        "id": "openkaryon.pack.go",
+        "name": "KaryoForge Go"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.rust",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Rust",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Rust",
+        "id": "openkaryon.pack.rust",
+        "name": "KaryoForge Rust"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.c-cpp",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$CCpp",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$CCpp",
+        "id": "openkaryon.pack.c-cpp",
+        "name": "KaryoForge C / C++"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.csharp",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$CSharp",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$CSharp",
+        "id": "openkaryon.pack.csharp",
+        "name": "KaryoForge C#"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.php",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Php",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Php",
+        "id": "openkaryon.pack.php",
+        "name": "KaryoForge PHP"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.makefile",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Makefile",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Makefile",
+        "id": "openkaryon.pack.makefile",
+        "name": "KaryoForge Makefile"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.m68k",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$M68k",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$M68k",
+        "id": "openkaryon.pack.m68k",
+        "name": "KaryoForge Motorola 68k (optional server)"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.fortran",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Fortran",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Fortran",
+        "id": "openkaryon.pack.fortran",
+        "name": "KaryoForge Fortran"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.haskell",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Haskell",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Haskell",
+        "id": "openkaryon.pack.haskell",
+        "name": "KaryoForge Haskell"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.julia",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Julia",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Julia",
+        "id": "openkaryon.pack.julia",
+        "name": "KaryoForge Julia"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.wdl",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Wdl",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Wdl",
+        "id": "openkaryon.pack.wdl",
+        "name": "KaryoForge WDL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.pack.cwl",
+      "owner": "org.openkaryon.karyoforge.languages.PackFactories$Cwl",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.languages.PackFactories$Cwl",
+        "id": "openkaryon.pack.cwl",
+        "name": "KaryoForge CWL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Go",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Go",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Go",
+        "languageId": "go",
+        "patterns": "*.go",
+        "serverId": "openkaryon.pack.go"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Rust",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Rust",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Rust",
+        "languageId": "rust",
+        "patterns": "*.rs",
+        "serverId": "openkaryon.pack.rust"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+        "languageId": "c",
+        "patterns": "*.c;*.i",
+        "serverId": "openkaryon.pack.c-cpp"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$CCpp",
+        "languageId": "cpp",
+        "patterns": "*.cpp;*.cc;*.cxx;*.c++;*.cppm;*.ccm;*.cxxm;*.c++m;*.hpp;*.hh;*.hxx;*.h++;*.h;*.ii;*.ino;*.inl;*.ipp;*.ixx;*.tpp;*.txx;*.hpp.in;*.h.in",
+        "serverId": "openkaryon.pack.c-cpp"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$CSharp",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$CSharp",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$CSharp",
+        "languageId": "csharp",
+        "patterns": "*.cs;*.csx;*.cake",
+        "serverId": "openkaryon.pack.csharp"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Php",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Php",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Php",
+        "languageId": "php",
+        "patterns": "*.php;*.php4;*.php5;*.phtml;*.ctp",
+        "serverId": "openkaryon.pack.php"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Makefile",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Makefile",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Makefile",
+        "languageId": "makefile",
+        "patterns": "Makefile;makefile;GNUmakefile;OCamlMakefile;*.mak;*.mk",
+        "serverId": "openkaryon.pack.makefile"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$M68k",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$M68k",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$M68k",
+        "languageId": "m68k",
+        "patterns": "*.m68k;*.68k;*.asm68k",
+        "serverId": "openkaryon.pack.m68k"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Fortran",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Fortran",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Fortran",
+        "languageId": "fortran",
+        "patterns": "*.f90;*.F90;*.f95;*.F95;*.f03;*.F03;*.f08;*.F08;*.f18;*.F18;*.fpp;*.FPP;*.pf;*.PF;*.fypp;*.FYPP;*.f;*.F;*.f77;*.F77;*.for;*.FOR",
+        "serverId": "openkaryon.pack.fortran"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Haskell",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Haskell",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Haskell",
+        "languageId": "haskell",
+        "patterns": "*.hs;*.hsig;*.hs-boot",
+        "serverId": "openkaryon.pack.haskell"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Julia",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Julia",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Julia",
+        "languageId": "julia",
+        "patterns": "*.jl",
+        "serverId": "openkaryon.pack.julia"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Wdl",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Wdl",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Wdl",
+        "languageId": "wdl",
+        "patterns": "*.wdl",
+        "serverId": "openkaryon.pack.wdl"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "fileNamePatternMapping",
+      "identity": "org.openkaryon.karyoforge.languages.PackMatchers$Cwl",
+      "owner": "org.openkaryon.karyoforge.languages.PackMatchers$Cwl",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.languages.PackMatchers$Cwl",
+        "languageId": "cwl",
+        "patterns": "*.cwl",
+        "serverId": "openkaryon.pack.cwl"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "server",
+      "identity": "openkaryon.nextflow",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowLanguageServerFactory",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "factoryClass": "org.openkaryon.karyoforge.nextflow.NextflowLanguageServerFactory",
+        "id": "openkaryon.nextflow",
+        "name": "KaryoForge Nextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.redhat.devtools.lsp4ij",
+      "kind": "languageMapping",
+      "identity": "org.openkaryon.karyoforge.nextflow.ConfiguredNextflowMatcher",
+      "owner": "org.openkaryon.karyoforge.nextflow.ConfiguredNextflowMatcher",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "documentMatcher": "org.openkaryon.karyoforge.nextflow.ConfiguredNextflowMatcher",
+        "language": "OpenKaryonNextflow",
+        "languageId": "nextflow",
+        "serverId": "openkaryon.nextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Databases",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseToolWindowFactory",
+      "policy": "module:databases",
+      "rule": "Explicit module/use or active-operation management.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.database.DatabaseToolWindowFactory",
+        "id": "KaryoForge Databases"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "applicationConfigurable",
+      "identity": "org.openkaryon.karyoforge.databases",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseProfilesConfigurable",
+      "policy": "module:databases",
+      "rule": "Application-scoped provider; preserve profiles.",
+      "attributes": {
+        "displayName": "KaryoForge Databases",
+        "id": "org.openkaryon.karyoforge.databases",
+        "instance": "org.openkaryon.karyoforge.database.DatabaseProfilesConfigurable",
+        "parentId": "org.openkaryon.karyoforge.settings"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileType",
+      "identity": "org.openkaryon.karyoforge.database.sql.SqlFileType",
+      "owner": "org.openkaryon.karyoforge.database.sql.SqlFileType",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "extensions": "sql",
+        "fieldName": "INSTANCE",
+        "implementationClass": "org.openkaryon.karyoforge.database.sql.SqlFileType",
+        "language": "OpenKaryonSQL",
+        "name": "OpenKaryon SQL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.parserDefinition",
+      "identity": "org.openkaryon.karyoforge.database.sql.SqlParserDefinition",
+      "owner": "org.openkaryon.karyoforge.database.sql.SqlParserDefinition",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.database.sql.SqlParserDefinition",
+        "language": "OpenKaryonSQL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.syntaxHighlighterFactory",
+      "identity": "org.openkaryon.karyoforge.database.sql.SqlSyntaxHighlighterFactory",
+      "owner": "org.openkaryon.karyoforge.database.sql.SqlSyntaxHighlighterFactory",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.database.sql.SqlSyntaxHighlighterFactory",
+        "language": "OpenKaryonSQL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "completion.contributor",
+      "identity": "org.openkaryon.karyoforge.database.sql.SqlCompletionContributor",
+      "owner": "org.openkaryon.karyoforge.database.sql.SqlCompletionContributor",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.database.sql.SqlCompletionContributor",
+        "language": "OpenKaryonSQL"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "gotoDeclarationHandler",
+      "identity": "org.openkaryon.karyoforge.database.sql.SqlGotoDeclarationHandler",
+      "owner": "org.openkaryon.karyoforge.database.sql.SqlGotoDeclarationHandler",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.database.sql.SqlGotoDeclarationHandler"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileTypeOverrider",
+      "identity": "org.openkaryon.karyoforge.biology.viewer.BiologicalTextFileTypeOverrider",
+      "owner": "org.openkaryon.karyoforge.biology.viewer.BiologicalTextFileTypeOverrider",
+      "policy": "common-file",
+      "rule": "Passive file handling; never role-gate common viewers.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.viewer.BiologicalTextFileTypeOverrider",
+        "order": "first"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileTypeOverrider",
+      "identity": "org.openkaryon.karyoforge.biology.genomic.GenomeBinaryFileTypeOverrider",
+      "owner": "org.openkaryon.karyoforge.biology.genomic.GenomeBinaryFileTypeOverrider",
+      "policy": "common-file",
+      "rule": "Passive file handling; never role-gate common viewers.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.genomic.GenomeBinaryFileTypeOverrider",
+        "order": "first"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileIconProvider",
+      "identity": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileIconProvider",
+      "owner": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileIconProvider",
+      "policy": "common-file",
+      "rule": "Passive file handling; never role-gate common viewers.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileIconProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileEditorProvider",
+      "owner": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileEditorProvider",
+      "policy": "common-file",
+      "rule": "Keep registered in every role; load on matching file use.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.viewer.BiologicalFileEditorProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Console",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Console",
+      "policy": "contextual:databases",
+      "rule": "Explicit console/table or retained active work.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Console"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Table",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Table",
+      "policy": "contextual:databases",
+      "rule": "Explicit console/table or retained active work.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Table"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "editorTabTitleProvider",
+      "identity": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Titles",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Titles",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Titles"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileIconProvider",
+      "identity": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Icons",
+      "owner": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Icons",
+      "policy": "contextual:databases",
+      "rule": "Explicit database virtual files.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.database.DatabaseEditorProviders$Icons"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.biology.genomic.GenomeFileEditorProvider",
+      "owner": "org.openkaryon.karyoforge.biology.genomic.GenomeFileEditorProvider",
+      "policy": "common-file",
+      "rule": "Keep registered in every role; load on matching file use.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.genomic.GenomeFileEditorProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.biology.variant.VariantFilterEditorProvider",
+      "owner": "org.openkaryon.karyoforge.biology.variant.VariantFilterEditorProvider",
+      "policy": "common-file",
+      "rule": "Keep registered in every role; load on matching file use.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.biology.variant.VariantFilterEditorProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "textmate.bundleProvider",
+      "identity": "org.openkaryon.karyoforge.languages.M68kBundleProvider",
+      "owner": "org.openkaryon.karyoforge.languages.M68kBundleProvider",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.languages.M68kBundleProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "textmate.bundleProvider",
+      "identity": "org.openkaryon.karyoforge.languages.ScienceGrammarProvider",
+      "owner": "org.openkaryon.karyoforge.languages.ScienceGrammarProvider",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.languages.ScienceGrammarProvider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "applicationConfigurable",
+      "identity": "org.openkaryon.karyoforge.language.packs",
+      "owner": "org.openkaryon.karyoforge.languages.LanguagePacksConfigurable",
+      "policy": "language-focus",
+      "rule": "Selected language/workflow; application settings stay stable.",
+      "attributes": {
+        "displayName": "KaryoForge Language Packs",
+        "id": "org.openkaryon.karyoforge.language.packs",
+        "instance": "org.openkaryon.karyoforge.languages.LanguagePacksConfigurable",
+        "parentId": "org.openkaryon.karyoforge.settings"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "projectConfigurable",
+      "identity": "org.openkaryon.karyoforge.project.imports",
+      "owner": "org.openkaryon.karyoforge.settings.ProjectImportConfigurable",
+      "policy": "common",
+      "rule": "Shared defaults/local project settings; remove generic Python prose.",
+      "attributes": {
+        "displayName": "KaryoForge Project",
+        "id": "org.openkaryon.karyoforge.project.imports",
+        "instance": "org.openkaryon.karyoforge.settings.ProjectImportConfigurable",
+        "parentId": "org.openkaryon.karyoforge.settings"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileTypeOverrider",
+      "identity": "org.openkaryon.karyoforge.notebook.NotebookJsonFileTypeOverrider",
+      "owner": "org.openkaryon.karyoforge.notebook.NotebookJsonFileTypeOverrider",
+      "policy": "common-file",
+      "rule": "Passive file handling; never role-gate common viewers.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.notebook.NotebookJsonFileTypeOverrider",
+        "order": "first"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileTypeOverrider",
+      "identity": "org.openkaryon.karyoforge.languages.HaskellFileTypeOverrider",
+      "owner": "org.openkaryon.karyoforge.languages.HaskellFileTypeOverrider",
+      "policy": "language-focus",
+      "rule": "Passive file ownership; no runtime launch.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.languages.HaskellFileTypeOverrider"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileEditorProvider",
+      "identity": "org.openkaryon.karyoforge.notebook.NotebookFileEditorProvider",
+      "owner": "org.openkaryon.karyoforge.notebook.NotebookFileEditorProvider",
+      "policy": "common-file",
+      "rule": "Keep registered in every role; load on matching file use.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.notebook.NotebookFileEditorProvider",
+        "order": "first"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Agents",
+      "owner": "org.openkaryon.karyoforge.agents.AgentToolWindowFactory",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use or active-operation management.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.agents.AgentToolWindowFactory",
+        "id": "KaryoForge Agents"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Remote",
+      "owner": "org.openkaryon.karyoforge.remote.RemoteToolWindowFactory",
+      "policy": "module:remote-hpc",
+      "rule": "Explicit module/use or active-operation management.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.remote.RemoteToolWindowFactory",
+        "id": "KaryoForge Remote"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge DAG",
+      "owner": "org.openkaryon.karyoforge.dag.PipelineDagToolWindowFactory",
+      "policy": "contextual",
+      "rule": "Explicit DOT action; no unconditional stripe.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.dag.PipelineDagToolWindowFactory",
+        "id": "KaryoForge DAG"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Environments",
+      "owner": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+      "policy": "remove",
+      "rule": "Do not migrate placeholder registrations.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+        "id": "KaryoForge Environments",
+        "secondary": "true"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Genome",
+      "owner": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+      "policy": "remove",
+      "rule": "Do not migrate placeholder registrations.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+        "id": "KaryoForge Genome",
+        "secondary": "true"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Sequences",
+      "owner": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+      "policy": "remove",
+      "rule": "Do not migrate placeholder registrations.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+        "id": "KaryoForge Sequences",
+        "secondary": "true"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Molecular Structure",
+      "owner": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+      "policy": "remove",
+      "rule": "Do not migrate placeholder registrations.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+        "id": "KaryoForge Molecular Structure",
+        "secondary": "true"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "toolWindow",
+      "identity": "KaryoForge Variants",
+      "owner": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+      "policy": "remove",
+      "rule": "Do not migrate placeholder registrations.",
+      "attributes": {
+        "anchor": "right",
+        "factoryClass": "org.openkaryon.karyoforge.preview.ComingSoonToolWindowFactory",
+        "id": "KaryoForge Variants",
+        "secondary": "true"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "applicationConfigurable",
+      "identity": "org.openkaryon.karyoforge.remote.hosts",
+      "owner": "org.openkaryon.karyoforge.remote.RemoteHostsConfigurable",
+      "policy": "module:remote-hpc",
+      "rule": "Application-scoped provider; preserve hosts.",
+      "attributes": {
+        "displayName": "KaryoForge Remote Hosts",
+        "id": "org.openkaryon.karyoforge.remote.hosts",
+        "instance": "org.openkaryon.karyoforge.remote.RemoteHostsConfigurable",
+        "parentId": "org.openkaryon.karyoforge.settings"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "configurationType",
+      "identity": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Nextflow",
+      "owner": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Nextflow",
+      "policy": "contextual",
+      "rule": "Preserve saved run data; offer creation for selected workflow.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Nextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "configurationType",
+      "identity": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Snakemake",
+      "owner": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Snakemake",
+      "policy": "contextual",
+      "rule": "Preserve saved run data; offer creation for selected workflow.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Snakemake"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "configurationType",
+      "identity": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$RScript",
+      "owner": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$RScript",
+      "policy": "contextual",
+      "rule": "Preserve saved run data; offer creation for selected workflow.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$RScript"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "configurationType",
+      "identity": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Jupyter",
+      "owner": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Jupyter",
+      "policy": "contextual",
+      "rule": "Preserve saved run data; offer creation for selected workflow.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Jupyter"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "configurationType",
+      "identity": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Shell",
+      "owner": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Shell",
+      "policy": "contextual",
+      "rule": "Preserve saved run data; offer creation for selected workflow.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificConfigurationTypes$Shell"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "programRunner",
+      "identity": "org.openkaryon.karyoforge.run.ScientificProgramRunner",
+      "owner": "org.openkaryon.karyoforge.run.ScientificProgramRunner",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.run.ScientificProgramRunner"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "fileType",
+      "identity": "org.openkaryon.karyoforge.nextflow.NextflowFileType",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowFileType",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "extensions": "nf",
+        "fieldName": "INSTANCE",
+        "fileNames": "nextflow.config",
+        "implementationClass": "org.openkaryon.karyoforge.nextflow.NextflowFileType",
+        "language": "OpenKaryonNextflow",
+        "name": "OpenKaryon Nextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.parserDefinition",
+      "identity": "org.openkaryon.karyoforge.nextflow.NextflowParserDefinition",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowParserDefinition",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.nextflow.NextflowParserDefinition",
+        "language": "OpenKaryonNextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.syntaxHighlighterFactory",
+      "identity": "org.openkaryon.karyoforge.nextflow.NextflowSyntaxHighlighterFactory",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowSyntaxHighlighterFactory",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.nextflow.NextflowSyntaxHighlighterFactory",
+        "language": "OpenKaryonNextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.psiStructureViewFactory",
+      "identity": "com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory",
+      "owner": "com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory",
+        "language": "OpenKaryonNextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.commenter",
+      "identity": "org.openkaryon.karyoforge.nextflow.NextflowCommenter",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowCommenter",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.nextflow.NextflowCommenter",
+        "language": "OpenKaryonNextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.braceMatcher",
+      "identity": "org.openkaryon.karyoforge.nextflow.NextflowBraceMatcher",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowBraceMatcher",
+      "policy": "language-focus",
+      "rule": "Preserve passive editing; separate optional provider linkage.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.nextflow.NextflowBraceMatcher",
+        "language": "OpenKaryonNextflow"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "applicationConfigurable",
+      "identity": "org.openkaryon.karyoforge.languages",
+      "owner": "org.openkaryon.karyoforge.nextflow.NextflowLanguageConfigurable",
+      "policy": "language-focus",
+      "rule": "Selected language/workflow; application settings stay stable.",
+      "attributes": {
+        "displayName": "KaryoForge Languages",
+        "id": "org.openkaryon.karyoforge.languages",
+        "instance": "org.openkaryon.karyoforge.nextflow.NextflowLanguageConfigurable",
+        "parentId": "org.openkaryon.karyoforge.settings"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "postStartupActivity",
+      "identity": "org.openkaryon.karyoforge.settings.OpenKaryonStartup",
+      "owner": "org.openkaryon.karyoforge.settings.OpenKaryonStartup",
+      "policy": "infrastructure",
+      "rule": "Defaults or bounded suggestions; no module auto-selection.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.settings.OpenKaryonStartup"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "postStartupActivity",
+      "identity": "org.openkaryon.karyoforge.setup.ProjectSetupStartup",
+      "owner": "org.openkaryon.karyoforge.setup.ProjectSetupStartup",
+      "policy": "infrastructure",
+      "rule": "Defaults or bounded suggestions; no module auto-selection.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.setup.ProjectSetupStartup"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "notificationGroup",
+      "identity": "KaryoForge Project Setup",
+      "owner": "platform descriptor",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "id": "KaryoForge Project Setup"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "editorNotificationProvider",
+      "identity": "org.openkaryon.karyoforge.python.PythonInterpreterBanner",
+      "owner": "org.openkaryon.karyoforge.python.PythonInterpreterBanner",
+      "policy": "contextual",
+      "rule": "Python files only; merge with explicit setup.",
+      "attributes": {
+        "implementation": "org.openkaryon.karyoforge.python.PythonInterpreterBanner"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.inspectionSuppressor",
+      "identity": "org.openkaryon.karyoforge.python.MissingInterpreterSuppressor",
+      "owner": "org.openkaryon.karyoforge.python.MissingInterpreterSuppressor",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.python.MissingInterpreterSuppressor",
+        "language": "Python"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "applicationConfigurable",
+      "identity": "org.openkaryon.karyoforge.settings",
+      "owner": "org.openkaryon.karyoforge.settings.OpenKaryonConfigurable",
+      "policy": "common",
+      "rule": "Shared defaults/local project settings; remove generic Python prose.",
+      "attributes": {
+        "displayName": "KaryoForge",
+        "id": "org.openkaryon.karyoforge.settings",
+        "instance": "org.openkaryon.karyoforge.settings.OpenKaryonConfigurable",
+        "parentId": "tools"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.inspectionSuppressor",
+      "identity": "org.openkaryon.karyoforge.settings.SpellingSuppressor",
+      "owner": "org.openkaryon.karyoforge.settings.SpellingSuppressor",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.settings.SpellingSuppressor",
+        "language": ""
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "com.intellij",
+      "kind": "lang.inspectionSuppressor",
+      "identity": "org.openkaryon.karyoforge.settings.NoiseInspectionSuppressor",
+      "owner": "org.openkaryon.karyoforge.settings.NoiseInspectionSuppressor",
+      "policy": "infrastructure",
+      "rule": "Preserve existing behavior and scoped ownership.",
+      "attributes": {
+        "implementationClass": "org.openkaryon.karyoforge.settings.NoiseInspectionSuppressor",
+        "language": ""
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "listener",
+      "kind": "listener",
+      "identity": "org.openkaryon.karyoforge.settings.OpenKaryonProjectListener",
+      "owner": "org.openkaryon.karyoforge.settings.OpenKaryonProjectListener",
+      "policy": "infrastructure",
+      "rule": "Preserve reversible defaults; audit early loading.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.settings.OpenKaryonProjectListener",
+        "topic": "com.intellij.openapi.project.ProjectManagerListener"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "listener",
+      "kind": "listener",
+      "identity": "org.openkaryon.karyoforge.settings.LightStartupDefaults",
+      "owner": "org.openkaryon.karyoforge.settings.LightStartupDefaults",
+      "policy": "infrastructure",
+      "rule": "Preserve reversible defaults; audit early loading.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.settings.LightStartupDefaults",
+        "topic": "com.intellij.ide.AppLifecycleListener"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "extensionPoint",
+      "kind": "extensionPoint",
+      "identity": "org.openkaryon.karyoforge.settings.BuildSettingsInitializer",
+      "owner": "org.openkaryon.karyoforge.settings.BuildSettingsInitializer",
+      "policy": "infrastructure",
+      "rule": "Preserve reversible defaults; audit early loading.",
+      "attributes": {
+        "dynamic": "true",
+        "interface": "org.openkaryon.karyoforge.settings.BuildSettingsInitializer",
+        "name": "buildSettingsInitializer"
+      }
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.ExplainSql",
+      "owner": "org.openkaryon.karyoforge.database.ExplainSqlAction",
+      "policy": "contextual",
+      "rule": "Explicit file/language/workflow use; no persisted module change.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.database.ExplainSqlAction",
+        "id": "OpenKaryon.ExplainSql"
+      },
+      "placements": [
+        {
+          "anchor": "last",
+          "group-id": "EditorPopupMenu"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.RunSql",
+      "owner": "org.openkaryon.karyoforge.database.RunSqlAction",
+      "policy": "contextual",
+      "rule": "Explicit file/language/workflow use; no persisted module change.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.database.RunSqlAction",
+        "id": "OpenKaryon.RunSql"
+      },
+      "placements": [
+        {
+          "anchor": "last",
+          "group-id": "EditorPopupMenu"
+        }
+      ],
+      "shortcuts": [
+        {
+          "first-keystroke": "ctrl ENTER",
+          "keymap": "$default"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.WorkflowPalette",
+      "owner": "org.openkaryon.karyoforge.integrations.WorkflowPaletteAction",
+      "policy": "common",
+      "rule": "Shared entry; filter its children through the resolver.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.integrations.WorkflowPaletteAction",
+        "id": "OpenKaryon.WorkflowPalette"
+      },
+      "placements": [
+        {
+          "anchor": "before",
+          "group-id": "ToolsMenu",
+          "relative-to-action": "OpenKaryon.Tools"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "group",
+      "identity": "OpenKaryon.Tools",
+      "owner": "platform descriptor",
+      "policy": "common",
+      "rule": "Shared entry; filter its children through the resolver.",
+      "attributes": {
+        "id": "OpenKaryon.Tools"
+      },
+      "placements": [
+        {
+          "anchor": "last",
+          "group-id": "ToolsMenu"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.SetUpProject",
+      "owner": "org.openkaryon.karyoforge.setup.ProjectSetupAction",
+      "policy": "common",
+      "rule": "Shared entry; filter its children through the resolver.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.setup.ProjectSetupAction",
+        "id": "OpenKaryon.SetUpProject"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.Databases",
+      "owner": "org.openkaryon.karyoforge.database.ShowDatabasesAction",
+      "policy": "module:databases",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.database.ShowDatabasesAction",
+        "id": "OpenKaryon.Databases"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.WorkspaceLanguageRecommendations",
+      "owner": "org.openkaryon.karyoforge.languages.WorkspaceLanguageRecommendationsAction",
+      "policy": "contextual",
+      "rule": "Explicit file/language/workflow use; no persisted module change.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.languages.WorkspaceLanguageRecommendationsAction",
+        "id": "OpenKaryon.WorkspaceLanguageRecommendations"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.NewStudy",
+      "owner": "org.openkaryon.karyoforge.biology.template.NewStudyAction",
+      "policy": "module:bioinformatics",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.biology.template.NewStudyAction",
+        "id": "OpenKaryon.NewStudy"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.ClaudeVoice",
+      "owner": "org.openkaryon.karyoforge.integrations.OfficialClaudeActions$VoiceHelp",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.integrations.OfficialClaudeActions$VoiceHelp",
+        "id": "OpenKaryon.ClaudeVoice"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.OpenOfficialClaude",
+      "owner": "org.openkaryon.karyoforge.integrations.OfficialClaudeActions$Open",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.integrations.OfficialClaudeActions$Open",
+        "id": "OpenKaryon.OpenOfficialClaude"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.NewNotebook",
+      "owner": "org.openkaryon.karyoforge.notebook.NewNotebookAction",
+      "policy": "common",
+      "rule": "Shared entry; filter its children through the resolver.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.notebook.NewNotebookAction",
+        "id": "OpenKaryon.NewNotebook"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.ConfigurePythonInterpreter",
+      "owner": "org.openkaryon.karyoforge.python.ConfigurePythonInterpreterAction",
+      "policy": "contextual",
+      "rule": "Explicit file/language/workflow use; no persisted module change.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.python.ConfigurePythonInterpreterAction",
+        "id": "OpenKaryon.ConfigurePythonInterpreter"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.Agents",
+      "owner": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Show",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Show",
+        "id": "OpenKaryon.Agents"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.OpenPipelineDag",
+      "owner": "org.openkaryon.karyoforge.dag.OpenPipelineDagAction",
+      "policy": "contextual",
+      "rule": "Explicit file/language/workflow use; no persisted module change.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.dag.OpenPipelineDagAction",
+        "id": "OpenKaryon.OpenPipelineDag"
+      },
+      "parentGroup": "OpenKaryon.Tools"
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.Agent.Claude",
+      "owner": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Claude",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Claude",
+        "id": "OpenKaryon.Agent.Claude"
+      },
+      "placements": [
+        {
+          "anchor": "before",
+          "group-id": "MainToolbarRight",
+          "relative-to-action": "SearchEverywhere"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.Agent.Codex",
+      "owner": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Codex",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Codex",
+        "id": "OpenKaryon.Agent.Codex"
+      },
+      "placements": [
+        {
+          "anchor": "before",
+          "group-id": "MainToolbarRight",
+          "relative-to-action": "SearchEverywhere"
+        }
+      ]
+    },
+    {
+      "descriptor": "plugin.xml",
+      "namespace": "actions",
+      "kind": "action",
+      "identity": "OpenKaryon.Agent.Pi",
+      "owner": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Pi",
+      "policy": "module:console-agents",
+      "rule": "Explicit module/use; retain active controls.",
+      "attributes": {
+        "class": "org.openkaryon.karyoforge.agents.AgentLaunchActions$Pi",
+        "id": "OpenKaryon.Agent.Pi"
+      },
+      "placements": [
+        {
+          "anchor": "before",
+          "group-id": "MainToolbarRight",
+          "relative-to-action": "SearchEverywhere"
+        }
+      ]
+    }
+  ],
+  "directProviderImports": [
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/LanguagePacksConfigurable.java",
+      "line": 18,
+      "symbol": "com.redhat.devtools.lsp4ij.LanguageServerManager"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 6,
+      "symbol": "com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 7,
+      "symbol": "com.redhat.devtools.lsp4ij.LanguageServerFactory"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 8,
+      "symbol": "com.redhat.devtools.lsp4ij.ServerStatus"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 9,
+      "symbol": "com.redhat.devtools.lsp4ij.client.LanguageClientImpl"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 10,
+      "symbol": "com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 11,
+      "symbol": "com.redhat.devtools.lsp4ij.server.StreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackMatchers.java",
+      "line": 5,
+      "symbol": "com.redhat.devtools.lsp4ij.AbstractDocumentMatcher"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceMappedConnectionProvider.java",
+      "line": 5,
+      "symbol": "com.redhat.devtools.lsp4ij.server.CannotStartProcessException"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceMappedConnectionProvider.java",
+      "line": 6,
+      "symbol": "com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/ConfiguredNextflowMatcher.java",
+      "line": 4,
+      "symbol": "com.redhat.devtools.lsp4ij.AbstractDocumentMatcher"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageConfigurable.java",
+      "line": 9,
+      "symbol": "com.redhat.devtools.lsp4ij.LanguageServerManager"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 5,
+      "symbol": "com.redhat.devtools.lsp4ij.LanguageServerFactory"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 6,
+      "symbol": "com.redhat.devtools.lsp4ij.ServerStatus"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 7,
+      "symbol": "com.redhat.devtools.lsp4ij.client.LanguageClientImpl"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 8,
+      "symbol": "com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 9,
+      "symbol": "com.redhat.devtools.lsp4ij.server.StreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookCellPanel.java",
+      "line": 16,
+      "symbol": "com.jetbrains.python.PythonFileType"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookFileEditor.java",
+      "line": 37,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkUtil"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/ConfigurePythonInterpreterAction.java",
+      "line": 18,
+      "symbol": "com.jetbrains.python.configuration.PythonInterpreterConfigurable"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/ConfigurePythonInterpreterAction.java",
+      "line": 19,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkUtil"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/PythonInterpreterBanner.java",
+      "line": 16,
+      "symbol": "com.jetbrains.python.PythonFileType"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/PythonInterpreterBanner.java",
+      "line": 17,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkUtil"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/ProjectSetupAssessment.java",
+      "line": 8,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkUtil"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "line": 12,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkType"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "line": 13,
+      "symbol": "com.jetbrains.python.sdk.PythonSdkUtil"
+    }
+  ],
+  "persistentComponents": [
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/agents/AgentSettings.java",
+      "component": "OpenKaryonAgents",
+      "scope": "project",
+      "storage": [
+        "StoragePathMacros.WORKSPACE_FILE"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/variant/VariantFilterPresets.java",
+      "component": "org.openkaryon.karyoforge.variantFilters",
+      "scope": "application",
+      "storage": [
+        "openkaryon-variant-filters.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/DatabaseProfilesService.java",
+      "component": "OpenKaryonDatabases",
+      "scope": "application",
+      "storage": [
+        "openkaryon-databases.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/LanguagePackSettings.java",
+      "component": "OpenKaryonLanguagePacks",
+      "scope": "application",
+      "storage": [
+        "openkaryon-language-packs.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageSettings.java",
+      "component": "OpenKaryonLanguages",
+      "scope": "application",
+      "storage": [
+        "openkaryon-languages.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookSettings.java",
+      "component": "OpenKaryonNotebooks",
+      "scope": "project",
+      "storage": [
+        "StoragePathMacros.WORKSPACE_FILE"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteProfilesService.java",
+      "component": "org.openkaryon.karyoforge.remote.profiles",
+      "scope": "application",
+      "storage": [
+        "openkaryon-remote.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmJobService.java",
+      "component": "org.openkaryon.karyoforge.remote.slurm",
+      "scope": "project",
+      "storage": [
+        "StoragePathMacros.WORKSPACE_FILE"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/OpenKaryonSettings.java",
+      "component": "org.openkaryon.karyoforge.settings",
+      "scope": "application",
+      "storage": [
+        "openkaryon.xml"
+      ]
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/ProjectImportDefaults.java",
+      "component": "OpenKaryonProjectDefaults",
+      "scope": "project",
+      "storage": [
+        "StoragePathMacros.WORKSPACE_FILE"
+      ]
+    }
+  ],
+  "runtimeConstructionSites": [
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/genomic/IsolatedGenomicQuery.java",
+      "line": 55,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/genomic/IsolatedGenomicQuery.java",
+      "line": 81,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/LoopbackHttpProxy.java",
+      "line": 31,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/LoopbackHttpProxy.java",
+      "line": 56,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/LoopbackHttpProxy.java",
+      "line": 57,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/ReadOnlyClickHouseAdapter.java",
+      "line": 59,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 16,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 28,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 29,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 33,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 36,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 50,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 51,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 52,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 53,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 58,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "line": 62,
+      "symbol": "Socket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/transport/SshTunnel.java",
+      "line": 25,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/transport/SshTunnel.java",
+      "line": 37,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/transport/SshTunnel.java",
+      "line": 54,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/transport/SshTunnel.java",
+      "line": 55,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/MappedLspFrames.java",
+      "line": 63,
+      "symbol": "OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 28,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 37,
+      "symbol": "OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 54,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "line": 57,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceMappedConnectionProvider.java",
+      "line": 15,
+      "symbol": "OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceMappedConnectionProvider.java",
+      "line": 24,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 19,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "line": 21,
+      "symbol": "OSProcessStreamConnectionProvider"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerClient.java",
+      "line": 24,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerClient.java",
+      "line": 28,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerClient.java",
+      "line": 45,
+      "symbol": "HttpClient"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 13,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 14,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 37,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 169,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 182,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 187,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 191,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 194,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 202,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 203,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "line": 284,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterWebSocketCodec.java",
+      "line": 11,
+      "symbol": "WebSocket"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/KernelDiscovery.java",
+      "line": 21,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/NotebookKernel.java",
+      "line": 205,
+      "symbol": "ProcessBuilder"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteProcessRunner.java",
+      "line": 28,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 39,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 43,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 47,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 52,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 57,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 61,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 66,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 83,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "line": 88,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmJobService.java",
+      "line": 85,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmProcessHandler.java",
+      "line": 88,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmProcessHandler.java",
+      "line": 110,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 27,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 32,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 40,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 54,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 55,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "line": 60,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/EnvironmentDiscovery.java",
+      "line": 76,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "line": 28,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "line": 29,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "line": 212,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "line": 214,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "line": 215,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandLineState.java",
+      "line": 24,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificContainerProcessHandler.java",
+      "line": 68,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "line": 121,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "line": 133,
+      "symbol": "GeneralCommandLine"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "line": 140,
+      "symbol": "GeneralCommandLine"
+    }
+  ],
+  "dynamicRegistrationSites": [],
+  "sourceFingerprints": [
+    {
+      "path": "build.gradle.kts",
+      "sha256": "9fd51ce7951ec1ffc0bd44796f92d5b74b0f00a8bb218ba62c265835181da9e7"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "a5693a9f9a1603d63bd754d09fadc56012c13ed2562dfa2211a77efcbd4f0124"
+    },
+    {
+      "path": "gradle.properties",
+      "sha256": "06c935ffa1719051993ae0b05cee5f34171d4c41dd295a1bf22379d75a044620"
+    },
+    {
+      "path": "settings.gradle.kts",
+      "sha256": "0085ae628ea2affb0c397be74154fd002dad2cf7243b3a27ef4229b4d0550288"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/agents/AgentLaunchActions.java",
+      "sha256": "b72b0a91db6c3626532350216fb767a221d4e1743d0a9bc504a6a08b7a5b40a6"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/agents/AgentSettings.java",
+      "sha256": "8a83d98448f0da18cf6554620bdb29e42fc191b731fb299ee2be4f8f533f13b7"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/agents/AgentToolWindowFactory.java",
+      "sha256": "2ae226506034e1e6eb1b733202965a0e83ff5f722132e56b3be0fe565581609a"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/genomic/GenomeBinaryFileTypeOverrider.java",
+      "sha256": "f213e4778cd67fb3dd1ba9c08a0f0cebddfbcc6a0c9188ef4c2fdc5775f3e0e7"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/genomic/GenomeFileEditorProvider.java",
+      "sha256": "7645f38c54d268d9c9a617d5beaba3d003c5fd787d14c92a508789266e3002dd"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/genomic/IsolatedGenomicQuery.java",
+      "sha256": "901855ce78a1de77d1f4340fe331678532a2eea0636eea110dc70c60817a8c0c"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/template/NewStudyAction.java",
+      "sha256": "a05ad782f4d82983089e27c97f8d66dba9c0391c792c08bb5b98633ccec772a4"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/variant/VariantFilterEditorProvider.java",
+      "sha256": "9ef3151f09231f2a01d91a0f06be6d3168b0dccc16319797c043cad21c7cc425"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/variant/VariantFilterPresets.java",
+      "sha256": "df54bffe2f44426927417ab5e44908798c2a6169b067fc21330a137623282274"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/viewer/BiologicalFileEditorProvider.java",
+      "sha256": "a2fdd88c7244790d11212c0f8f9b0eb97b16a7733ce0d912a47373eaffb12eb4"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/viewer/BiologicalFileIconProvider.java",
+      "sha256": "bafa14c509c1b5754f5effb9e51ae2c741b33e7e4c6f85c8a224e7f068d52711"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/biology/viewer/BiologicalTextFileTypeOverrider.java",
+      "sha256": "d733b45cba3bb1b89ed09ddd205fbf2f8bfe166e5367e22f1cb39bbf27a7f989"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/dag/OpenPipelineDagAction.java",
+      "sha256": "f92501b7b66c91777383cabc2bdfcb9fdd20be80e02826b4d74f2595daab930c"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/dag/PipelineDagToolWindowFactory.java",
+      "sha256": "853fce3b3a11ee0762d4ba96c8d100cff42a838a8902091459e53ddacb0820fa"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/LoopbackHttpProxy.java",
+      "sha256": "bd7a5fe98f148bfc5f1c8968d471fd5ce476c4d26410d492b80db08c2316bb9a"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/clickhouse/ReadOnlyClickHouseAdapter.java",
+      "sha256": "2118c48fea6e155d77ba4780de0c9b6899892642732ea6db0a4bbcbcf5efd420"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/DatabaseEditorProviders.java",
+      "sha256": "2b9d7d7c36efb5a02d17103f92e5894d9761af788ccdc4ab0f2df30765e63d74"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/DatabaseProfilesConfigurable.java",
+      "sha256": "17d4842f0fd07a553f38a09d5146d6a51e46ae88170c64a2dfc8e8c5eb07aabf"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/DatabaseProfilesService.java",
+      "sha256": "440096e5260b735b9d68fffb4e69ad111b8140f9243922c258f84b6ea42b0894"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/DatabaseToolWindowFactory.java",
+      "sha256": "03a97fb5df2a2218e7cf512f40a5e207ae82581cec9e2ce6df288e7022630b6c"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/driver/ForwardSocketFactory.java",
+      "sha256": "abd6b852cf0e29494a94896cefbc93030b7dc498911de3b0b1b12577ce6ec992"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/ExplainSqlAction.java",
+      "sha256": "9ffe0078146d5582ba967bb3861937189699069522857043aac1bfeebc7ba67d"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/RunSqlAction.java",
+      "sha256": "68f50071691c9092e8c5949228a1c4ea186af20c6143574aafe6e64109aa402b"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/ShowDatabasesAction.java",
+      "sha256": "765b74eee4a03437db4c7f86cc35df319adb65341b50d7291b7e5c7f2373847e"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/sql/SqlCompletionContributor.java",
+      "sha256": "9ef8e13bc5f62e576a8c31ac56480606b9bb4cb15a10924c6a9fc9c41881154b"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/sql/SqlFileType.java",
+      "sha256": "648ebd3cc108ad5a59b63f8aa8097b2a34011f0716ef4b16ba170c87c8d93d12"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/sql/SqlGotoDeclarationHandler.java",
+      "sha256": "f3fba982873954d381d44407d90ff98171b5b8f063fb5220ea810da2d8ab8c59"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/sql/SqlParserDefinition.java",
+      "sha256": "70db2978bd909cb0243547c537427a62af779c42fcff1ad5f1ca162009ce7630"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/sql/SqlSyntaxHighlighterFactory.java",
+      "sha256": "f7ed908b4554d60dc2617ab1a9f4ccba410ec8102764f7ab888d67960e06fa3c"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/database/transport/SshTunnel.java",
+      "sha256": "8c953f01be3ddf995e2b7a0660cd6f2a3530904e9d5f8fee839de85ae8817c34"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/integrations/OfficialClaudeActions.java",
+      "sha256": "bdd176106a245e5a3010d5c8f36a45c1f54d1b315082e032a6bb43f6e0aadee5"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/integrations/WorkflowPaletteAction.java",
+      "sha256": "ab77ceb2fdca29d6190a0fc013c81002870fd9720f1dac38f0090aef61eeaf40"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/HaskellFileTypeOverrider.java",
+      "sha256": "46a96dcc8c6ada78e20c19b74722fd6b696a37dbd9f60c4630b6c8c1cb9f77f9"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/LanguagePacksConfigurable.java",
+      "sha256": "e9352508354da9a422debd75263554a943907cb3d08c480c79e9e29b76b16e85"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/LanguagePackSettings.java",
+      "sha256": "cae94f87e30d023e87de845268d26ae88ef98d5e186a0137baa33986aaf8c6bc"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/M68kBundleProvider.java",
+      "sha256": "483a91952ed6b2bc9d2182bc99220f7adb3842ecabd31748dd481b669704bb03"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/MappedLspFrames.java",
+      "sha256": "4f762aa2d6b4c56d14547b4e3e8879e4963cf89d15bc301206094e15f1f9f780"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackFactories.java",
+      "sha256": "b594572e7c03e97b0b44301a13b2bee1cd5586a76335f330bb71a6d3e3413dd6"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/PackMatchers.java",
+      "sha256": "464a564f62d54e985b800044164fe2f89f4bf00d21032756090b51d060263066"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/ScienceGrammarProvider.java",
+      "sha256": "75d36b5339eba87aaf0bcbf0df7fed415c1469a9665c1eeb94d48ae814bf816c"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceLanguageRecommendationsAction.java",
+      "sha256": "53fa8ffa9e54230866bc63a47d055bbddec217416eea02a48b8e9355d24b8a4a"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/languages/WorkspaceMappedConnectionProvider.java",
+      "sha256": "e70980caf9e975db1b12679680bae723cfa088eb64b53dec8f22080274387d6e"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/ConfiguredNextflowMatcher.java",
+      "sha256": "319ec7a7e79f557e8cdaadf4c1884046e195494d7d19d9bcc38d5b8c68c8ff16"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowBraceMatcher.java",
+      "sha256": "5534c736bf90fc516ec114c857e8de0f51f3faa4a23dab12132614670ba6cd7e"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowCommenter.java",
+      "sha256": "a9fe00cf53965c4621baeb4b4b32a2e7648d3d534f58b52795cbfd1aaafa7b11"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowFileType.java",
+      "sha256": "3c13323f061eaa97303d18bc06ab59ce7f068df34906c42c7b171a61992784bb"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageConfigurable.java",
+      "sha256": "64d0ad2f36261f52ee724c1c89702a0f81c367f844404d297070c80ed9b21a2d"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageServerFactory.java",
+      "sha256": "6dba0c0288b16cc85016cca6c8f91a8338c023abff9d5c94f07700e5011d97a2"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowLanguageSettings.java",
+      "sha256": "ec733c9a71eca46785b75f4226bad730a59642815038a38bdbaca56ffbb2a863"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowParserDefinition.java",
+      "sha256": "ef84cb0a616c770a2dbef43b84841a9876cfedcfda225d4ab1809e4124c5b91a"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/nextflow/NextflowSyntaxHighlighterFactory.java",
+      "sha256": "f6931c1d0e8a74b61b676ed61a57bc9658c92a75b173bbdda256161df24ba559"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerClient.java",
+      "sha256": "19d9c55a17ee323dd31a597ec0af900014b5dafc2c8ca8f95bf84d1a94cfe4d4"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterServerKernel.java",
+      "sha256": "ac3aafb5e2482ef6bc3892035a8a8728c2d951dceffcbcd5a89526f40c307567"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/JupyterWebSocketCodec.java",
+      "sha256": "e0804da0c5c7e1c5a818e325a18086f7b1d176e7458feeb04f87336786dcb30b"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/KernelDiscovery.java",
+      "sha256": "b655021641795236c0dc8000f6d9f2b8b9313fdc0c5ef2529ceb929321644eed"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/kernel/NotebookKernel.java",
+      "sha256": "514bd5d8ae9fd95a921f49fb490c7207e902674447781dae7abbedf25badbe53"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NewNotebookAction.java",
+      "sha256": "b39ff598de76404d25b66279fe5576b89507d379a2551255111449ade0ad0fac"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookCellPanel.java",
+      "sha256": "96c4436b29989fe75cdbcb3cea10bcca1e5557239b3590b3aa874985819db6be"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookFileEditor.java",
+      "sha256": "919a2e3b6647dcea9dcd859d92690bfd7cd454193458f898afee4c7aa280954a"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookFileEditorProvider.java",
+      "sha256": "2dea4619702f120f6602e1fd7f08481fa65971a170362a2356d125dc4afe8f84"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookJsonFileTypeOverrider.java",
+      "sha256": "593aeb91e29ece4c3c9f925670455bb044827bd7ef0dc558290c8148f367d5e9"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/notebook/NotebookSettings.java",
+      "sha256": "8786ccbd3d49a74e0893476b6cd3d4b96cd0635cb3bf8bc893be2a8875c273b4"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/preview/ComingSoonToolWindowFactory.java",
+      "sha256": "2b59468e36abcb114fddba354652f7955f2393cec263b7bd2bac852e84936f70"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/ConfigurePythonInterpreterAction.java",
+      "sha256": "78fc8c89e5cd6046a7ef9527b0c15a5d6c80f2ff1073fe18fa3bab73032d0077"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/MissingInterpreterSuppressor.java",
+      "sha256": "0c463f3384fa9bbad87ef7346d78742fdbd94fa892af7955c3bb68580e9114e2"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/python/PythonInterpreterBanner.java",
+      "sha256": "fbdf5924fe309b667e78576af371baae27c654eac3b7a1104ea91decaba34a50"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteHostsConfigurable.java",
+      "sha256": "d2759e764fc8d8b01ef3aee46609e5d5de0902a9eb8b302e72f459ceafcf3d51"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteProcessRunner.java",
+      "sha256": "c86f46484e0c8314d434cfaa9b7973563a7f7c76de1dab98aa9192061af0fb13"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteProfilesService.java",
+      "sha256": "8e6a003cea9101fe376bce8fce4a8cfdb9757bdada2ac0d4127ac12bf9b5b318"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/RemoteToolWindowFactory.java",
+      "sha256": "e6b116905956defb2107036377c45c766d43bd50847a5f84bf310fcfa01301dd"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmCommandBuilder.java",
+      "sha256": "439f78f7786a95876c8ae1177dbf27b6b6a15806dd78c7e0382b3653df393076"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmJobService.java",
+      "sha256": "88911b55b951e9b9cd6f8be1bab67a7e22a6eb7df65de8a2d59aaf2f943fd548"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SlurmProcessHandler.java",
+      "sha256": "4ba97bbd133868cd510e197127d9fb8b996386901730d1d2f876d811de227691"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/remote/SshCommandBuilder.java",
+      "sha256": "c8c344512be48f870e1f74c1e9d1dadad402617633e16e70e120d356cc416449"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/EnvironmentDiscovery.java",
+      "sha256": "eab51842f558ec39c0e86a93fe181398aad2b2bd95cc254b995e7417173c91a3"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandBuilder.java",
+      "sha256": "c74e59195c8cea96632a9bb83b3debe29a601e31e3607b880fc75dc8a1b51e13"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificCommandLineState.java",
+      "sha256": "2b60b0008105709d9b397d146b06b921047f1fb964632a73eb65f2d975057512"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificConfigurationTypes.java",
+      "sha256": "6627409feddad7af6cc5656351cfdb74e971ee3290bf3bd8d57e86e1f1fa6d28"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificContainerProcessHandler.java",
+      "sha256": "15154d61c21e49b05ad5427252d9e1d306803109fc971a8c088255edb6d88ef8"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/run/ScientificProgramRunner.java",
+      "sha256": "ff41e17bc8bd36113db9f1764bfdd7688fc155771597dafa26f910a855d1f751"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/BuildSettingsInitializer.java",
+      "sha256": "39731342374f6db4a3fe942b57ee00281e184dc3a15f03f59c610b6172a5f66f"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/LightStartupDefaults.java",
+      "sha256": "56d292d0d61de1336c93c748ea1a5c010bedb0ad8b8b72100eb2aecf6c8fe4bc"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/MavenBuildSettingsInitializer.java",
+      "sha256": "f3b0c59285b60d8f9a555ec8d02afd7f0698aa2f0fa674427e02e71b390357c1"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/NoiseInspectionSuppressor.java",
+      "sha256": "4b968a05d1c6d0e6421c8d53759c717e8271ec9c6c12959ecb1c00c6b53e48df"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/OpenKaryonConfigurable.java",
+      "sha256": "7e404b83665080d679b0ccdbb2f6fb5c560cf940c901a7109b07ed8b90f47efa"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/OpenKaryonProjectListener.java",
+      "sha256": "b7530afea8086c82dc17ed3713fc2e7f27abcb4ba0b9eff9abf42a41d5a7575f"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/OpenKaryonSettings.java",
+      "sha256": "03a65dc52e03e0dd447754936bd54430a403ccff9207261aa8a7717b6b496b3f"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/OpenKaryonStartup.java",
+      "sha256": "fa3ad56f172d1833a61c769378898bb35d631530eb2d24d1d9087f96dada5067"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/ProjectImportConfigurable.java",
+      "sha256": "c5e2240beccf55ed7ff124caed9378bd2460ae70efd00d5e893aeadc7df8e154"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/ProjectImportDefaults.java",
+      "sha256": "595f09a47754f246baebd94b9e8f3f6ada1fdb1bc2634b7295174eb8682c1901"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/settings/SpellingSuppressor.java",
+      "sha256": "ce735434875d967fc98cfb2ab20eeb9ce4b8b3ae489a0cffaa8635f44b48c0ef"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/ProjectSetupAction.java",
+      "sha256": "e05ff8cd8d93dc0ad0bb51cf6442805932994c2c7de9ac606ddd817ef780b7c5"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/ProjectSetupAssessment.java",
+      "sha256": "34a200ab49facb7ede4c7e969603676e320b7dcacac9c6bf15dd1bfc178abcef"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/ProjectSetupStartup.java",
+      "sha256": "908d3167822f740952b5391254e9484f1d7d41b2146a13d3cb4023caf11fd9f2"
+    },
+    {
+      "path": "src/main/java/org/openkaryon/karyoforge/setup/PythonInterpreters.java",
+      "sha256": "97c6b679a22b81fea4b0fc6100aab05da9571eabfdafc7288a6bf20e5cdf0320"
+    },
+    {
+      "path": "src/main/resources/META-INF/openkaryon-maven.xml",
+      "sha256": "2a2920c0541b68147788aaa37f4cde2c171dddfe933414b049ff1a1359dc0ebb"
+    },
+    {
+      "path": "src/main/resources/META-INF/openkaryon-yaml.xml",
+      "sha256": "a29bdf91190009369cfe86ffc366f69e3a25f60a851336b59b54656d79d43ce3"
+    },
+    {
+      "path": "src/main/resources/META-INF/plugin.xml",
+      "sha256": "edf741831a9e188d230199089c520914bd7f00f06768b621574308e6e768cfaf"
+    }
+  ]
+}
