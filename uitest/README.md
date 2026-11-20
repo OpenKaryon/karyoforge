@@ -88,3 +88,15 @@ from official PyPI into ignored build output and generates two small fixture
 wheels. GUI installs use `--no-index` and that transferred wheelhouse. Fixture
 preparation never installs packages into the controller's Python. The generated
 manifest records input file hashes; no wheel binaries are committed.
+
+## Python project installation
+
+`PythonProjectInstallUiTest` installs the owned standard project through the
+native file chooser and public installation dialog. A source edit must be
+visible after an editable install and remain invisible after an ordinary wheel
+install. The scenario selects a declared extra, keeps build isolation enabled
+and verifies that the selected interpreter survives both operations.
+
+A separate scenario selects tool-only TOML and checks that the visible error
+rejects it without changing the file, installing the fixture or replacing the
+module interpreter. These cases use the same offline backend as native tests.
