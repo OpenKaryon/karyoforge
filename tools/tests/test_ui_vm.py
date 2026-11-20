@@ -1,9 +1,12 @@
 """Transport boundaries and result integrity; never opens an IDE on the controller."""
 
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 SPEC = importlib.util.spec_from_file_location("ui_vm", Path(__file__).resolve().parents[1] / "ui_vm.py")
@@ -60,6 +63,68 @@ class GuiControllerTest(unittest.TestCase):
             (root / "junit").mkdir()
             (root / "junit/TEST-nested.xml").write_text('<testsuites tests="1"><testsuite tests="1"><testcase/></testsuite></testsuites>')
             self.assertEqual(1, ui_vm.assert_junit_passed(root))
+
+    def test_runtime_cache_identity_survives_gradle_refreshing_file_timestamps(self):
+        with tempfile.TemporaryDirectory(prefix="forge-stable-runtime-") as folder:
+            root = Path(folder)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            library = runtime / "fixture.jar"
+            library.write_bytes(b"owned runtime fixture")
+            first = ui_vm.archive_tree(runtime, root / "first.zip")
+            os.utime(library, (1700000000, 1700000000))
+            second = ui_vm.archive_tree(runtime, root / "second.zip")
+            self.assertEqual(ui_vm.digest(first), ui_vm.digest(second))
+            library.write_bytes(b"changed runtime fixture")
+            third = ui_vm.archive_tree(runtime, root / "third.zip")
+            self.assertNotEqual(ui_vm.digest(first), ui_vm.digest(third))
+
+    def test_vmware_diagnostics_redact_credentials_and_subprocess_arguments(self):
+        with tempfile.TemporaryDirectory(prefix="forge-vmware-test-") as folder:
+            root = Path(folder)
+            vmx, executable = root / "test.vmx", root / "vmrun.exe"
+            vmx.touch()
+            executable.touch()
+            with patch.dict(os.environ, {"KARYOFORGE_UI_GUEST_PASSWORD": "guest-secret",
+                                         "KARYOFORGE_UI_VM_PASSWORD": "vm-secret"}):
+                vm = ui_vm.VmwareConnection(vmx, "guest", executable)
+            failure = subprocess.CompletedProcess([], 1, stdout="guest-secret vm-secret", stderr="")
+            with patch.object(ui_vm.subprocess, "run", return_value=failure):
+                with self.assertRaises(RuntimeError) as caught:
+                    vm.copy("host.zip", "C:/owned/guest.zip")
+            self.assertNotIn("guest-secret", str(caught.exception))
+            self.assertNotIn("vm-secret", str(caught.exception))
+            with patch.object(ui_vm.subprocess, "run", side_effect=subprocess.TimeoutExpired(vm.prefix, 1)):
+                with self.assertRaises(RuntimeError) as caught:
+                    vm.powershell("Get-Date", timeout=1)
+            self.assertNotIn("secret", str(caught.exception))
+
+    def test_vmware_requires_external_credentials_and_existing_inputs(self):
+        with tempfile.TemporaryDirectory(prefix="forge-vmware-inputs-") as folder:
+            root = Path(folder)
+            vmx, executable = root / "test.vmx", root / "vmrun.exe"
+            with self.assertRaises(ValueError):
+                ui_vm.VmwareConnection(vmx, "guest", executable)
+            vmx.touch()
+            executable.touch()
+            with patch.dict(os.environ, {"KARYOFORGE_UI_GUEST_PASSWORD": ""}):
+                with self.assertRaisesRegex(ValueError, "process environment"):
+                    ui_vm.VmwareConnection(vmx, "guest", executable)
+
+    def test_vmware_file_operations_use_native_guest_paths(self):
+        with tempfile.TemporaryDirectory(prefix="forge-vmware-paths-") as folder:
+            root = Path(folder)
+            vmx, executable = root / "test.vmx", root / "vmrun.exe"
+            vmx.touch()
+            executable.touch()
+            with patch.dict(os.environ, {"KARYOFORGE_UI_GUEST_PASSWORD": "test-only"}):
+                vm = ui_vm.VmwareConnection(vmx, "guest", executable)
+            with patch.object(vm, "_call") as call:
+                vm.copy("D:/controller/input.zip", "C:/owned/guest.zip")
+                call.assert_called_once_with("copyFileFromHostToGuest", "D:/controller/input.zip", "C:\\owned\\guest.zip", timeout=1800)
+                call.reset_mock()
+                vm.copy("C:/owned/results.zip", "D:/controller/results.zip", download=True)
+                call.assert_called_once_with("copyFileFromGuestToHost", "C:\\owned\\results.zip", "D:/controller/results.zip", timeout=1800)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -81,7 +82,11 @@ def archive_tree(directory: Path, output: Path) -> Path:
             if file.is_symlink():
                 raise ValueError("GUI input symlinks require review: " + str(file))
             if file.is_file():
-                archive.write(file, validate_member(file.relative_to(directory).as_posix()))
+                # Gradle Sync can refresh mtimes without changing a runtime JAR.
+                # Stable ZIP metadata keeps that runtime's verified VM cache reusable.
+                entry = zipfile.ZipInfo(validate_member(file.relative_to(directory).as_posix()), (1980, 1, 1, 0, 0, 0))
+                entry.external_attr = 0o100644 << 16
+                archive.writestr(entry, file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=1)
     return output
 
 
@@ -116,7 +121,72 @@ class VmConnection:
         subprocess.run([self.scp, *self.options, "-P", str(self.port), *arguments], check=True, timeout=1800)
 
 
-def preflight(vm: VmConnection, controller: str) -> dict:
+class VmwareConnection:
+    """VMware Tools transport; credentials are read from the process environment only."""
+
+    def __init__(self, vmx: Path, user: str, vmrun: Path):
+        if not vmx.is_file() or vmx.suffix.lower() != ".vmx" or not vmrun.is_file():
+            raise ValueError("VMware transport requires an existing VMX and vmrun executable")
+        if not user or any(character in user for character in "\0\r\n"):
+            raise ValueError("VMware transport requires the exact guest account name")
+        self.guest_password = os.getenv("KARYOFORGE_UI_GUEST_PASSWORD", "")
+        self.vm_password = os.getenv("KARYOFORGE_UI_VM_PASSWORD", "")
+        if not self.guest_password:
+            raise ValueError("Set KARYOFORGE_UI_GUEST_PASSWORD in the controller process environment")
+        self.vmx = str(vmx.resolve())
+        self.prefix = [str(vmrun.resolve()), "-T", "ws"]
+        if self.vm_password:
+            self.prefix += ["-vp", self.vm_password]
+        self.prefix += ["-gu", user, "-gp", self.guest_password]
+
+    def _call(self, operation: str, *arguments: str, timeout: int = 45) -> None:
+        try:
+            result = subprocess.run([*self.prefix, operation, self.vmx, *arguments],
+                                    capture_output=True, text=True, errors="replace", timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired):
+            # subprocess exceptions contain argv, including passwords. Never propagate them.
+            raise RuntimeError(f"VMware {operation} could not complete within its transport limit") from None
+        if result.returncode:
+            detail = (result.stderr or result.stdout)[-2000:]
+            for secret in (self.guest_password, self.vm_password):
+                if secret:
+                    detail = detail.replace(secret, "[redacted]")
+            raise RuntimeError(f"VMware {operation} failed ({result.returncode}): {detail}")
+
+    def powershell(self, script: str, timeout: int = 45) -> str:
+        remote = "C:/Users/Public/KaryoForgeUiTransport/" + uuid.uuid4().hex + ".json"
+        wrapper = """
+        $ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
+        $result = try {
+            $output = & { SCRIPT } | Out-String -Width 4096
+            @{ok=$true; output=$output}
+        } catch { @{ok=$false; output=($_ | Out-String -Width 4096)} }
+        $destination=DESTINATION
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+        [IO.File]::WriteAllText($destination, ($result | ConvertTo-Json -Compress), (New-Object Text.UTF8Encoding($false)))
+        """.replace("DESTINATION", ps_string(remote)).replace("SCRIPT", script)
+        encoded = base64.b64encode(wrapper.encode("utf-16-le")).decode("ascii")
+        self._call("runProgramInGuest", "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+                   "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded, timeout=timeout)
+        with tempfile.TemporaryDirectory(prefix="karyoforge-vmware-") as folder:
+            local = Path(folder) / "response.json"
+            self.copy(remote, str(local), download=True)
+            result = json.loads(local.read_text(encoding="utf-8-sig"))
+        self._call("deleteFileInGuest", remote.replace("/", "\\"))
+        if not result["ok"]:
+            raise RuntimeError("VM PowerShell failed: " + result["output"][-4000:])
+        return result["output"].strip()
+
+    def copy(self, source: str, destination: str, *, download: bool = False) -> None:
+        operation = "copyFileFromGuestToHost" if download else "copyFileFromHostToGuest"
+        if download:
+            source = source.replace("/", "\\")
+        else:
+            destination = destination.replace("/", "\\")
+        self._call(operation, source, destination, timeout=1800)
+
+
+def preflight(vm: VmConnection | VmwareConnection, controller: str) -> dict:
     script = """
     $system = Get-CimInstance Win32_ComputerSystem
     $os = Get-CimInstance Win32_OperatingSystem
@@ -128,7 +198,7 @@ def preflight(vm: VmConnection, controller: str) -> dict:
     return json.loads(vm.powershell(script))
 
 
-def sync_archive(vm: VmConnection, archive: Path, remote_root: str, kind: str) -> str:
+def sync_archive(vm: VmConnection | VmwareConnection, archive: Path, remote_root: str, kind: str) -> str:
     checksum = digest(archive)
     target = remote_root + "/cache/" + kind + "-" + checksum
     marker = target + "/.karyoforge-ui-cache.json"
@@ -138,7 +208,9 @@ def sync_archive(vm: VmConnection, archive: Path, remote_root: str, kind: str) -
         return target
     upload = remote_root + "/incoming/" + kind + "-" + checksum + ".zip"
     vm.powershell(f"New-Item -ItemType Directory -Force -Path {ps_string(remote_root + '/incoming')} | Out-Null")
+    print(f"Transferring VM {kind} archive ({archive.stat().st_size // (1024 * 1024)} MiB)", flush=True)
     vm.copy(str(archive), upload)
+    print(f"Verifying and unpacking VM {kind} archive", flush=True)
     unpack = (ROOT / "uitest/unpack-cache.ps1").read_text(encoding="utf-8")
     vm.powershell("& {" + unpack + "} -Archive " + ps_string(upload) + " -Target " + ps_string(target)
                   + " -Expected " + ps_string(checksum) + " -Root " + ps_string(remote_root), timeout=1200)
@@ -148,7 +220,10 @@ def sync_archive(vm: VmConnection, archive: Path, remote_root: str, kind: str) -
 def run(args: argparse.Namespace) -> int:
     if os.name != "nt":
         raise ValueError("The distribution GUI controller currently requires a Windows host")
-    vm = VmConnection(args.host, args.user, Path(args.key).expanduser(), args.port, args.ssh, args.scp)
+    if args.transport == "vmware":
+        vm = VmwareConnection(Path(args.vmx).expanduser(), args.user, Path(args.vmrun))
+    else:
+        vm = VmConnection(args.host, args.user, Path(args.key).expanduser(), args.port, args.ssh, args.scp)
     controller = os.environ.get("COMPUTERNAME", "")
     if not controller:
         raise ValueError("The controller computer identity is unavailable")
@@ -176,6 +251,8 @@ def run(args: argparse.Namespace) -> int:
     shutil.copytree(bundle / "classes", payload / "classes", dirs_exist_ok=True)
     if (bundle / "fixtures").is_dir():
         shutil.copytree(bundle / "fixtures", payload / "fixtures", dirs_exist_ok=True)
+    if (bundle / "test-plugins").is_dir():
+        shutil.copytree(bundle / "test-plugins", payload / "test-plugins", dirs_exist_ok=True)
     for script in bundle.glob("*.ps1"):
         shutil.copyfile(script, payload / script.name)
     payload_archive = archive_tree(payload, transfer / "payload.zip")
@@ -189,7 +266,8 @@ def run(args: argparse.Namespace) -> int:
     if any(not re.fullmatch(re.escape(PUBLIC_PACKAGE) + r"[A-Za-z0-9_]+", name) for name in selectors):
         raise ValueError("GUI selectors must name public GUI test classes")
     request = {"runId": run_id, "controller": controller, "ide": home, "runtime": libraries,
-               "payload": source, "python": args.python, "select": selectors, "timeoutMinutes": args.timeout}
+               "payload": source, "python": args.python, "select": selectors, "timeoutMinutes": args.timeout,
+               "ideMemoryMb": args.ide_memory}
     request_json = json.dumps(request, ensure_ascii=True)
     (local / "request.json").write_text(request_json + "\n", encoding="utf-8")
     task = "OpenKaryon.KaryoForge.Ui." + run_id
@@ -206,6 +284,7 @@ def run(args: argparse.Namespace) -> int:
     Register-ScheduledTask -TaskName {ps_string(task)} -Action $action -Principal $principal -Settings $settings -ErrorAction Stop | Out-Null
     Start-ScheduledTask -TaskName {ps_string(task)}
     """
+    print(f"Starting GUI run {run_id} in the VM's interactive desktop", flush=True)
     vm.powershell(start)
     deadline = time.monotonic() + args.timeout * 60
     code = None
@@ -236,6 +315,9 @@ def run(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--transport", choices=("ssh", "vmware"), default=os.getenv("KARYOFORGE_UI_TRANSPORT", "ssh"))
+    parser.add_argument("--vmx", default=os.getenv("KARYOFORGE_UI_VMX", ""))
+    parser.add_argument("--vmrun", default=str(Path(os.getenv("ProgramFiles", "C:/Program Files")) / "VMware/VMware Workstation/vmrun.exe"))
     parser.add_argument("--host", default=os.getenv("KARYOFORGE_UI_HOST", ""))
     parser.add_argument("--user", default=os.getenv("KARYOFORGE_UI_USER", ""))
     parser.add_argument("--key", default=os.getenv("KARYOFORGE_UI_KEY", ""))
@@ -244,6 +326,7 @@ def main() -> int:
     parser.add_argument("--python", default=os.getenv("KARYOFORGE_UI_PYTHON", ""))
     parser.add_argument("--select", default="")
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--ide-memory", type=int, default=1024, help="IDE heap limit in MiB (default: 1024)")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--ssh", default="ssh")
     parser.add_argument("--scp", default="scp")
@@ -251,6 +334,8 @@ def main() -> int:
     try:
         if not 1 <= args.timeout <= 240:
             raise ValueError("The GUI timeout must be between 1 and 240 minutes")
+        if not 768 <= args.ide_memory <= 4096:
+            raise ValueError("The IDE heap must be between 768 and 4096 MiB")
         return run(args)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, ET.ParseError) as error:
         print("GUI acceptance failed: " + str(error), file=sys.stderr)

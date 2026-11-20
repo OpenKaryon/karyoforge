@@ -251,6 +251,8 @@ tasks.register<Sync>("uiTestBundle") {
     into(layout.buildDirectory.dir("ui-test-bundle"))
     from(gui.runtimeClasspath.filter { it.isFile && it.name.endsWith(".jar") }) { into("runtime") }
     from(gui.output) { into("classes") }
+    // Driver's server bridge is installed only into each owned GUI test profile.
+    from(sdkDirectory.map { it.resolve("plugins/performanceTesting") }) { into("test-plugins/performanceTesting") }
     from("uitest") { include("*.ps1") }
     from(layout.buildDirectory.dir("ui-test-fixtures")) { into("fixtures") }
 }
