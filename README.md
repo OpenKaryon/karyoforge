@@ -5,13 +5,15 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 
 ## Available in this repository
 
-This source snapshot provides a minimal IntelliJ plugin foundation, a native
-platform integration test, reference-registration auditing and local validation
-commands. Its plugin identity is `org.openkaryon.karyoforge`; it contributes no
-specialized editors, presets, tool windows or runtime workflows yet. The
-reference implementation is supplied separately when running its audit.
+This source snapshot provides reversible spell-checking preferences, a pinned
+IntelliJ plugin foundation, native integration tests, reference-registration
+auditing and local validation commands. The plugin identity is
+`org.openkaryon.karyoforge`. Specialized editors, usage presets and workflow
+execution are not included. The reference implementation is supplied separately
+when running its audit.
 
 - [Architecture and package ownership](docs/ARCHITECTURE.md)
+- [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
 - [Executed local validation](docs/VALIDATION.md)
 - [Reference interface and dependency audit](docs/REFERENCE_AUDIT.md)

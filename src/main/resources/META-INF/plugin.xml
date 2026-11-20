@@ -4,9 +4,16 @@
     <vendor url="https://github.com/OpenKaryon">OpenKaryon</vendor>
     <description><![CDATA[
         <p>KaryoForge is an OpenKaryon workbench built on IntelliJ IDEA Community.</p>
-        <p>This distribution provides the pinned plugin foundation. Additional
-        editing and workflow features are documented when they are available.</p>
+        <p>Reversible spell-checking preferences preserve existing inspection
+        profiles and leave code and error diagnostics unchanged.</p>
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable parentId="tools" id="org.openkaryon.karyoforge.settings"
+                                 displayName="KaryoForge"
+                                 instance="org.openkaryon.karyoforge.settings.EditingSettingsConfigurable"/>
+        <lang.inspectionSuppressor language=""
+                                  implementationClass="org.openkaryon.karyoforge.settings.SpellingInspectionSuppressor"/>
+    </extensions>
 </idea-plugin>

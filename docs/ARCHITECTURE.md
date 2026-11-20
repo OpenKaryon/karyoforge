@@ -9,12 +9,17 @@ extension points and namespaced component identifiers use the same root.
 Product names remain KaryoForge; upstream plugin IDs and namespaces remain
 unchanged. Source packages do not depend on a country-specific namespace.
 
-The repository currently contains a minimal platform plugin descriptor, a native
-platform integration test, developer/audit tooling and technical records.
+The repository currently implements reversible spelling preferences in `settings`,
+with a common settings page and spelling-only inspection overlay. It also contains
+the pinned platform foundation, native integration tests and developer/audit tools.
 The boundaries below define ownership
 for application code; they are not claims that those features are implemented
 in this source snapshot. Create directories together with working code rather
 than empty scaffolding.
+
+`settings.EditorPreferences` owns application editing state independently of
+usage roles and workflow modules. Its settings page refreshes diagnostics only
+after Apply, and its inspection overlay does not rewrite inspection profiles.
 
 | Package below the project namespace | Responsibility |
 | --- | --- |

@@ -9,9 +9,10 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 16 synthetic Python tool tests |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless platform test | One test passed, no failures/errors/skips; verifies plugin loading, identity and exact platform build |
+| Native headless integration tests | Five tests passed, no failures/errors/skips: platform identity plus four editing-preference cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
-| Archive contents | Correct plugin ID, vendor, version, exact build bounds and license/notice resources |
+| Archive contents | Correct identity/build bounds/notices; four project classes under the public namespace |
+| Settings search index | Generated successfully; includes `org.openkaryon.karyoforge.settings` |
 
 The strict verifier configuration treats incompatible APIs, invalid packaging,
 missing dependencies, internal APIs and override-only API usage as failures.
@@ -20,6 +21,9 @@ warnings remain visible and the final plugin verdict is Compatible. The native
 test compilation reports a deprecated test API and the test JVM emits a class
 data-sharing warning for the platform classloader; neither is a passing claim
 for unexecuted behavior.
+Headless settings-index generation also retains stock shared-index, theme/grid
+and local recent-projects IPC warnings. It completed successfully without using
+the owner's normal IDE profile. These warnings are not hidden by editing SDK JARs.
 
 ## Verified build inputs
 
@@ -39,6 +43,10 @@ A subsequent `make build` of the unchanged minimal plugin took 12.3 seconds
 including Make/Gradle startup, with most tasks up-to-date. The cached native
 platform test command completed in 12 seconds. These are individual observations,
 not performance guarantees for larger feature sets or clean compilation.
+Those foundation measurements refer to source revision `98f28f7`. With editing
+preferences present, an observed plugin/structure/index build took 35 seconds,
+the native test command 26 seconds including compilation, and verification
+50 seconds. These are separate single-run observations on the cached SDK.
 
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
@@ -46,8 +54,9 @@ Raw local diagnostics and cache paths are not committed as product evidence.
 
 ## Scope
 
-This plugin snapshot contains the platform foundation, without specialized
-editors, presets or workflow execution. The checks do not establish interactive
+This plugin snapshot contains the platform foundation and reversible spelling
+preferences, without specialized viewers, presets or workflow execution.
+The checks do not establish interactive
 GUI acceptance, Linux/macOS runtime behavior, full installer packaging or the
 reference implementation's notebook/genomic behavior. Historical reference
 reports remain separate from these executed public-plugin checks.

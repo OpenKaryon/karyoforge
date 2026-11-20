@@ -59,7 +59,9 @@ native wrapper for the host OS.
 
 `make check` covers source/audit tools. `make test-ide` loads the public plugin
 in the headless platform test environment and checks its ID, enabled state and
-the exact platform build. It does not use the owner's regular IDE configuration.
+the exact platform build. Editing tests also exercise the registered spelling
+overlay, state round-trip and settings Apply/Reset/disposal behavior. The test
+environment does not use the owner's regular IDE configuration.
 `make run` is an explicit interactive action, with development configuration,
 plugins, caches and logs below `.intellijPlatform`; close its IDE to end the task.
 The plugin ZIP is written under `build/distributions`. Structure checks inspect

@@ -17,10 +17,12 @@ repositories {
 }
 
 dependencies {
+    compileOnly("org.jetbrains:annotations:26.0.2")
     testImplementation("junit:junit:4.13.2")
     intellijPlatform {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
         testFramework(TestFrameworkType.Platform, providers.gradleProperty("platformBuild").get())
+        testBundledModule("intellij.spellchecker")
         javaCompiler(providers.gradleProperty("platformBuild").get())
         pluginVerifier("1.410")
     }
