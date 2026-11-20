@@ -35,6 +35,19 @@ object VmIde {
         return directory
     }
 
+    fun fixtureProject(name: String): Path {
+        val destination = project(name)
+        require(Files.isRegularFile(fixtures.resolve("manifest.json"))) { "Build the pinned offline GUI fixtures first" }
+        Files.walk(fixtures).use { files ->
+            files.forEach { source ->
+                val target = destination.resolve(fixtures.relativize(source).toString())
+                if (Files.isDirectory(source)) target.createDirectories()
+                else Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+        return destination
+    }
+
     fun context(name: String, project: Path): IDETestContext {
         require(project.toAbsolutePath().normalize().startsWith(root.resolve("projects")))
         val home = Path.of(property("ide"))

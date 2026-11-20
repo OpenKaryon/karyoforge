@@ -74,3 +74,17 @@ and standard Driver fixtures, with no production-only test hooks.
 
 These scenarios have been compiled on the controller. Their VM execution is
 pending a supported, accessible Windows test guest; Windows 7 is unsuitable.
+
+## Dependency scenarios and offline inputs
+
+`PythonDependenciesUiTest` installs and upgrades a small owned wheel through
+requirements, opens Python Packages, removes that fixture through the native
+action, checks visible pip failure details and cancels an owned slow build.
+Its Python child must exit after Stop, and the module's interpreter must remain
+selected after success, failure and cancellation.
+
+`prepareUiFixtures` downloads the versions in `tools/python-test-requirements.txt`
+from official PyPI into ignored build output and generates two small fixture
+wheels. GUI installs use `--no-index` and that transferred wheelhouse. Fixture
+preparation never installs packages into the controller's Python. The generated
+manifest records input file hashes; no wheel binaries are committed.

@@ -238,13 +238,19 @@ for ((taskName, mode) in listOf("packageWindows" to "installer", "zipWindows" to
     }
 }
 
+val prepareUiFixtures = tasks.register<Exec>("prepareUiFixtures") {
+    inputs.files("tools/gui_fixtures.py", "tools/python-test-requirements.txt", "src/test/resources/python/local_build_backend.py")
+    outputs.dir(layout.buildDirectory.dir("ui-test-fixtures"))
+    doFirst { commandLine(providers.gradleProperty("pythonCommand").orElse("python").get(), "tools/gui_fixtures.py") }
+}
+
 tasks.register<Sync>("uiTestBundle") {
     description = "Compile the VM-only GUI suite and its isolated test runtime; do not launch an IDE locally."
     val gui = sourceSets["uiTest"]
-    dependsOn(gui.classesTaskName)
+    dependsOn(gui.classesTaskName, prepareUiFixtures)
     into(layout.buildDirectory.dir("ui-test-bundle"))
     from(gui.runtimeClasspath.filter { it.isFile && it.name.endsWith(".jar") }) { into("runtime") }
     from(gui.output) { into("classes") }
     from("uitest") { include("*.ps1") }
-    from("uitest/fixtures") { into("fixtures") }
+    from(layout.buildDirectory.dir("ui-test-fixtures")) { into("fixtures") }
 }
