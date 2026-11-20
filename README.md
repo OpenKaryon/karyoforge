@@ -5,13 +5,15 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 
 ## Available in this repository
 
-This source snapshot provides a reference-registration audit tool, public
-namespace projection, local validation commands and technical documentation.
-It does not contain the IDE runtime implementation or an installable product.
-The reference implementation is supplied separately when running its audit.
+This source snapshot provides a minimal IntelliJ plugin foundation, a native
+platform integration test, reference-registration auditing and local validation
+commands. Its plugin identity is `org.openkaryon.karyoforge`; it contributes no
+specialized editors, presets, tool windows or runtime workflows yet. The
+reference implementation is supplied separately when running its audit.
 
 - [Architecture and package ownership](docs/ARCHITECTURE.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
+- [Executed local validation](docs/VALIDATION.md)
 - [Reference interface and dependency audit](docs/REFERENCE_AUDIT.md)
 - [Runtime baseline evidence and measurement protocol](docs/RUNTIME_BASELINE.md)
 - [Generated reference inventory](docs/audit/reference-inventory.json)
@@ -19,12 +21,16 @@ The reference implementation is supplied separately when running its audit.
 
 ## Local commands
 
-Python 3.10 or newer and GNU Make are sufficient for the available source checks.
-No third-party Python dependencies are required.
+Python 3.10 or newer and GNU Make run the source checks without third-party
+Python dependencies. Install JDK 21 and set `JAVA_HOME` to build the plugin.
+The checked-in verified Gradle wrapper obtains the pinned build tool itself.
 
 ```sh
 make help
 make check
+make build
+make test-ide
+make verify
 make audit-reference-check REFERENCE_DIR="/path/to/reference-ide"
 ```
 
@@ -32,11 +38,11 @@ make audit-reference-check REFERENCE_DIR="/path/to/reference-ide"
 without Make, use `python tools/tasks.py help` and the equivalent task name.
 Set `PYTHON` to select another Python executable.
 
-`make build`, `make verify`, `make test-ide`, `make package-windows` and
-`make package-linux` expose the IDE build interfaces. They fail with a precise
-missing-prerequisite message in this snapshot because the Gradle application
-definition, wrapper and installer scripts are not present. They do not report
-a successful IDE build or create substitute product archives.
+`make build` creates the plugin ZIP under `build/distributions`; `make run`
+opens a separate development IDE profile. The first build downloads Gradle,
+the pinned IntelliJ Community distribution and verification/test dependencies.
+Later builds reuse their caches. `make package-windows` and `make package-linux`
+still fail explicitly because full-product installer scripts are not included.
 
 All project-owned packages use `org.openkaryon.karyoforge`. Reference audit
 identifiers are explicitly projected into that namespace; their fingerprints

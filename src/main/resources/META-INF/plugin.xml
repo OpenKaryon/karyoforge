@@ -1,0 +1,12 @@
+<idea-plugin>
+    <id>org.openkaryon.karyoforge</id>
+    <name>KaryoForge</name>
+    <vendor url="https://github.com/OpenKaryon">OpenKaryon</vendor>
+    <description><![CDATA[
+        <p>KaryoForge is an OpenKaryon workbench built on IntelliJ IDEA Community.</p>
+        <p>This distribution provides the pinned plugin foundation. Additional
+        editing and workflow features are documented when they are available.</p>
+    ]]></description>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+</idea-plugin>

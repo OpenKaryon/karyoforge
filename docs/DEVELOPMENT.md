@@ -7,11 +7,22 @@ reference IDE checkout unless one is explicitly requested. `tools/tasks.py`
 provides the same interface without Make and does not invoke a shell for
 user-supplied reference paths. Paths containing spaces are passed as one argument.
 
-IDE compilation requires the application's Gradle definition, pinned wrapper,
-Java 21 and platform dependencies. Packaging also requires the corresponding
-installer scripts and their documented host tools. Those IDE build inputs are
-not present in this repository snapshot. Missing inputs cause a nonzero exit;
-source validation is not substituted for an IDE build.
+Plugin compilation uses JDK 21, Gradle 9.1.0 and IntelliJ Platform Gradle Plugin
+2.19.0. It targets IntelliJ IDEA Community 2025.2.6.3, exactly IC-252.28539.97.
+The checked-in wrapper selects the smaller Gradle binary distribution and checks
+its official SHA-256. The task runner independently checks the bootstrap JAR
+against Gradle's published wrapper checksum before executing it.
+
+Set `JAVA_HOME` to an installed JDK 21. The first invocation downloads Gradle and
+the pinned platform; later invocations reuse the standard Gradle user cache.
+`GRADLE_USER_HOME` can select another local cache directory. No machine path,
+proxy setting or credential belongs in the checked-in build configuration.
+The build uses direct official JetBrains repositories, disables tooling update
+checks and does not request platform sources during project import by default.
+
+Full-product packaging requires installer scripts and their documented host
+tools, which are not included in this snapshot. Missing inputs cause a nonzero
+exit; source validation is not substituted for a product installer build.
 
 ## Commands
 
@@ -27,11 +38,15 @@ source validation is not substituted for an IDE build.
 | `build` | Delegate to Gradle `buildPlugin verifyPluginStructure`; fail if build prerequisites are absent |
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
 | `test-ide` | Delegate to Gradle `test`; fail if build prerequisites are absent |
+| `run` | Launch the development IDE with a separate sandbox configuration |
 | `package-windows` | Run `installer/build-installer.ps1`; fail if it is absent |
 | `package-linux` | Run `installer/build-linux.ps1`; fail if it is absent |
 
 ```sh
 make check
+make build
+make test-ide
+make verify
 make audit-reference REFERENCE_DIR="/path/with spaces/reference-ide"
 make audit-reference-check REFERENCE_DIR="/path/with spaces/reference-ide"
 ```
@@ -41,6 +56,17 @@ pass an executable path rather than an executable-plus-shell-options expression.
 On Windows, invoke GNU Make from PowerShell normally. No Bash installation is
 needed for the source checks. Packaging scripts use PowerShell; Gradle uses its
 native wrapper for the host OS.
+
+`make check` covers source/audit tools. `make test-ide` loads the public plugin
+in the headless platform test environment and checks its ID, enabled state and
+the exact platform build. It does not use the owner's regular IDE configuration.
+`make run` is an explicit interactive action, with development configuration,
+plugins, caches and logs below `.intellijPlatform`; close its IDE to end the task.
+The plugin ZIP is written under `build/distributions`. Structure checks inspect
+that ZIP; Plugin Verifier 1.410 checks the exact pinned platform offline after
+the declared tools/platform inputs have been downloaded. Reports live under
+`build/reports`. Neither test execution nor archive creation is a GUI acceptance
+claim. This minimal plugin adds no automatic startup workflow or external service.
 
 The task runner never commits or pushes. Audit/lint/tool tests make no network
 requests. Gradle and installer commands may obtain explicitly declared build

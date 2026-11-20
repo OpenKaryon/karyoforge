@@ -9,8 +9,9 @@ extension points and namespaced component identifiers use the same root.
 Product names remain KaryoForge; upstream plugin IDs and namespaces remain
 unchanged. Source packages do not depend on a country-specific namespace.
 
-The repository currently contains developer/audit tooling and technical records.
-It has no runtime source packages yet. The boundaries below define ownership
+The repository currently contains a minimal platform plugin descriptor, a native
+platform integration test, developer/audit tooling and technical records.
+The boundaries below define ownership
 for application code; they are not claims that those features are implemented
 in this source snapshot. Create directories together with working code rather
 than empty scaffolding.

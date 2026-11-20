@@ -2,6 +2,9 @@
 
 Recorded: 2026-11-20. Static/provider evidence exists; fresh application startup,
 viewer execution and resource measurements have not been recorded on this host.
+This describes the reference application's viewer/runtime baseline. Executed
+public-plugin foundation checks are recorded separately in
+[local validation](VALIDATION.md).
 
 ## Observed prerequisites
 

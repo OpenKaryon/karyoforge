@@ -5,16 +5,19 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMESPACE = "org.openkaryon.karyoforge"
+WRAPPER_SHA256 = "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3"
 IGNORED = {".git", ".idea", ".gradle", ".intellijPlatform", ".venv",
            "__pycache__", "build", "out", "work", "outputs"}
 HELP = """KaryoForge local commands:
@@ -29,6 +32,7 @@ HELP = """KaryoForge local commands:
   make build                    Gradle buildPlugin and verifyPluginStructure
   make verify                   Strict Gradle plugin compatibility verification
   make test-ide                 Gradle IDE integration tests
+  make run                      Launch a separate development IDE profile
   make package-windows          Windows installer script
   make package-linux            Linux package script
 
@@ -51,7 +55,7 @@ def source_files(root: Path):
 def lint(root: Path) -> None:
     checked = 0
     for path in source_files(root):
-        if path.suffix not in {".py", ".md", ".json"} and path.name not in {
+        if path.suffix not in {".py", ".md", ".json", ".java", ".kt", ".kts", ".xml", ".properties"} and path.name not in {
                 "Makefile", "NOTICE", ".gitattributes", ".gitignore"}:
             continue
         text = path.read_text(encoding="utf-8-sig")
@@ -64,6 +68,8 @@ def lint(root: Path) -> None:
             ast.parse(text, filename=str(label))
         if path.suffix == ".json":
             json.loads(text)
+        if path.suffix == ".xml":
+            ET.fromstring(text)
         if path.suffix == ".md":
             if re.search(r"\b(?:[PB]\d+(?:\.\d+)?|C[1-4](?:-C?[1-4])?)\b", text):
                 raise ValueError(f"Delivery-stage code in documentation: {label}")
@@ -99,6 +105,12 @@ def audit(root: Path) -> None:
         if (relative.startswith(("/", "\\")) or ".." in Path(relative).parts
                 or ":" in relative or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])):
             raise ValueError("Invalid reference fingerprint")
+    descriptor = root / "src/main/resources/META-INF/plugin.xml"
+    if descriptor.is_file():
+        plugin = ET.fromstring(descriptor.read_text(encoding="utf-8"))
+        if plugin.findtext("id") != NAMESPACE or plugin.findtext("vendor") != "OpenKaryon":
+            raise ValueError("Public plugin identity or vendor does not match project conventions")
+        verify_wrapper(root)
     for path in source_files(root):
         if path.suffix not in {".py", ".md", ".json", ".java", ".kt", ".xml", ".kts"}:
             continue
@@ -112,6 +124,12 @@ def audit(root: Path) -> None:
     print(f"Public audit passed: {len(identities)} classified registrations; namespace {NAMESPACE}.")
 
 
+def verify_wrapper(root: Path) -> None:
+    wrapper = root / "gradle/wrapper/gradle-wrapper.jar"
+    if not wrapper.is_file() or hashlib.sha256(wrapper.read_bytes()).hexdigest() != WRAPPER_SHA256:
+        raise ValueError("Gradle wrapper JAR does not match the verified official Gradle 9.1.0 artifact")
+
+
 def gradle_command(root: Path, tasks: list[str]) -> list[str]:
     wrapper = root / ("gradlew.bat" if os.name == "nt" else "gradlew")
     required = [root / "build.gradle.kts", root / "settings.gradle.kts", wrapper,
@@ -120,6 +138,7 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
     missing = [path.relative_to(root).as_posix() for path in required if not path.is_file()]
     if missing:
         raise ValueError("IDE build is unavailable; missing: " + ", ".join(missing))
+    verify_wrapper(root)
     return ([str(wrapper)] if os.name == "nt" else ["sh", str(wrapper)]) + [
         "--no-daemon", "--console=plain", *tasks]
 
@@ -143,9 +162,9 @@ def execute(task: str, root: Path, reference: str = "", output: str = "") -> int
                    "--output", output or "docs/audit/reference-inventory.json"]
         if task.endswith("-check"):
             command.append("--check")
-    elif task in {"build", "verify", "test-ide"}:
+    elif task in {"build", "verify", "test-ide", "run"}:
         tasks = {"build": ["buildPlugin", "verifyPluginStructure"],
-                 "verify": ["verifyPlugin"], "test-ide": ["test"]}[task]
+                 "verify": ["verifyPlugin"], "test-ide": ["test"], "run": ["runIde"]}[task]
         command = gradle_command(root, tasks)
     elif task in {"package-windows", "package-linux"}:
         name = "build-installer.ps1" if task == "package-windows" else "build-linux.ps1"
@@ -166,7 +185,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         return execute(args.task, ROOT, args.reference, args.output)
-    except (OSError, ValueError, SyntaxError, KeyError) as error:
+    except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2
 

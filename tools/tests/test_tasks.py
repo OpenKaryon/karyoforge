@@ -1,6 +1,7 @@
 """Checks for real failure behavior and safe task argument forwarding."""
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -93,12 +94,31 @@ class TasksTest(unittest.TestCase):
             path.write_text("fixture\n", encoding="utf-8")
         with patch.object(TASKS.subprocess, "run") as run:
             run.return_value.returncode = 7
-            self.assertEqual(7, TASKS.execute("build", self.root))
+            fixture_hash = hashlib.sha256((self.root / "gradle/wrapper/gradle-wrapper.jar").read_bytes()).hexdigest()
+            with patch.object(TASKS, "WRAPPER_SHA256", fixture_hash):
+                self.assertEqual(7, TASKS.execute("build", self.root))
             command = run.call_args.args[0]
             self.assertIn(str(self.root / wrapper), command)
             self.assertEqual(["buildPlugin", "verifyPluginStructure"], command[-2:])
             self.assertEqual(self.root, run.call_args.kwargs["cwd"])
             self.assertNotIn("shell", run.call_args.kwargs)
+
+    def test_tampered_wrapper_is_rejected_before_gradle_execution(self):
+        directory = self.root / "gradle/wrapper"
+        directory.mkdir(parents=True)
+        (directory / "gradle-wrapper.jar").write_bytes(b"unexpected binary")
+        with self.assertRaisesRegex(ValueError, "verified official"):
+            TASKS.verify_wrapper(self.root)
+
+    def test_plugin_identity_is_validated_independently_of_reference_aliases(self):
+        self.write_report(self.report())
+        meta = self.root / "src/main/resources/META-INF"
+        meta.mkdir(parents=True)
+        (meta / "plugin.xml").write_text(
+            "<idea-plugin><id>example.wrong</id><vendor>OpenKaryon</vendor></idea-plugin>\n",
+            encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "identity or vendor"):
+            TASKS.audit(self.root)
 
     def test_reference_is_required_and_forwarded_without_shell_interpolation(self):
         with self.assertRaisesRegex(ValueError, "REFERENCE_DIR"):

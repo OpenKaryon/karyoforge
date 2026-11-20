@@ -2,10 +2,17 @@ KaryoForge
 Copyright 2026 OpenKaryon contributors
 
 The technical documentation is adapted from the project's existing Apache-2.0
-KaryoForge documentation. This source snapshot contains documentation and original
-developer/audit tools, not the reference IDE implementation or its dependencies.
+KaryoForge documentation. This source snapshot contains an original plugin
+foundation, platform test and developer/audit tools, not the reference runtime.
 
 IntelliJ IDEA, JetBrains and referenced language/runtime products belong to
-their respective owners. No JetBrains, Gradle, Python, R, LSP4IJ, HTSJDK or
-other runtime binaries are distributed by this bootstrap. Dependency notices
-will be retained and expanded when corresponding code or assets are transferred.
+their respective owners. No IntelliJ, Python, R, LSP4IJ or HTSJDK runtime binaries
+are committed to this source repository. IntelliJ and verification/test libraries
+are obtained separately for development; they are not bundled in the plugin ZIP.
+
+Gradle Wrapper 9.1.0 scripts and bootstrap JAR are distributed as build tooling
+under Apache-2.0, preserving their original notices. Their source is the Gradle
+project's v9.1.0 tag: https://github.com/gradle/gradle/tree/v9.1.0
+The JAR SHA-256 is 76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3,
+as published at https://services.gradle.org/distributions/gradle-9.1.0-wrapper.jar.sha256.
+The Gradle distribution itself is downloaded separately and is not committed.
