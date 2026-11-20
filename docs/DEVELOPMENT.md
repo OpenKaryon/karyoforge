@@ -20,9 +20,10 @@ proxy setting or credential belongs in the checked-in build configuration.
 The build uses direct official JetBrains repositories, disables tooling update
 checks and does not request platform sources during project import by default.
 
-Full-product packaging requires installer scripts and their documented host
-tools, which are not included in this snapshot. Missing inputs cause a nonzero
-exit; source validation is not substituted for a product installer build.
+Windows x64 standalone packaging uses the pinned SDK archives, PythonCore and
+portable NSIS/rcedit build tools. Checksums are verified before extraction or
+execution. See [Windows distribution](WINDOWS_DISTRIBUTION.md) for commands,
+outputs and profile locations. Linux packaging is not implemented.
 
 ## Commands
 
@@ -42,7 +43,10 @@ exit; source validation is not substituted for a product installer build.
 | `branding` | Build a resource-only KaryoForge application branding JAR |
 | `test-branding` | Check native branded metadata, both splash images and small SVG rendering in a fresh headless JVM |
 | `run` | Launch the branded development IDE with a separate sandbox configuration |
-| `package-windows` | Run `installer/build-installer.ps1`; fail if it is absent |
+| `dist-windows` | Assemble the standalone Windows IDE with bundled Java/PythonCore |
+| `zip-windows` | Create the portable Windows application ZIP and checksum |
+| `verify-dist-windows` | Check standalone headless startup with a disposable profile |
+| `package-windows` | Run source checks and compile the per-user Windows installer and checksum |
 | `package-linux` | Run `installer/build-linux.ps1`; fail if it is absent |
 
 ```sh
@@ -57,8 +61,8 @@ make audit-reference-check REFERENCE_DIR="/path/with spaces/reference-ide"
 `AUDIT_OUTPUT` selects the output JSON file. `PYTHON` selects a Python executable;
 pass an executable path rather than an executable-plus-shell-options expression.
 On Windows, invoke GNU Make from PowerShell normally. No Bash installation is
-needed for the source checks. Packaging scripts use PowerShell; Gradle uses its
-native wrapper for the host OS.
+needed for the source checks. Windows packaging uses Python and portable NSIS;
+Gradle uses its native wrapper for the host OS.
 
 `make check` covers source/audit tools. `make test-ide` loads the public plugin
 in the headless platform test environment and checks its ID, enabled state and

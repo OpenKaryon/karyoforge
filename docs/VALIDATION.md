@@ -7,12 +7,14 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 | Check | Result |
 | --- | --- |
-| Source lint, tool tests and namespace/inventory audit | Passed; 21 Python tool tests, including branding input boundaries |
+| Source lint, tool tests and namespace/inventory audit | Passed; 28 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
 | Native headless integration tests | 14 tests passed, no failures/errors/skips: platform, editing, Python editor/module ownership and four native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Product branding | Native product/vendor/build metadata, both splash images and 16/32 px SVG rendering checked in a fresh headless JVM |
+| Standalone Windows IDE | Bundled Java startup passed with 187 configurables, including KaryoForge and Python Integrated Tools |
+| Windows installer | NSIS 3.13 compiled the per-user EXE; adjacent SHA-256 matches the completed executable |
 | Settings search index | Generated successfully; includes `org.openkaryon.karyoforge.settings` |
 
 The strict verifier configuration treats incompatible APIs, invalid packaging,
@@ -62,6 +64,15 @@ A heavy multi-module fixture checked preservation of project/other-module Java
 SDKs, cancellation and non-Python rejection. Strict verification resolved the
 pinned PythonCore locally and downloaded zero dependency bytes during the check.
 
+The Windows distribution was assembled from the pinned SDK/PythonCore archives
+with an explicit bundled-plugin allowlist. Its packaged Java started the native
+headless settings-index command in a disposable profile, reported KaryoForge
+IC-252.28539.97 and loaded both PythonCore and the public plugin. The generated
+indices contain their actual settings IDs. The per-user installer compiled with
+NSIS 3.13 using zlib compression and is 627,537,314 bytes. Native launcher resource
+metadata reports KaryoForge/OpenKaryon; the local executable is unsigned.
+Setup and uninstall were not run on the owner's Windows installation.
+
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 Raw local diagnostics and cache paths are not committed as product evidence.
@@ -72,6 +83,6 @@ This plugin snapshot contains the platform foundation, reversible spelling
 preferences and native Python editing/run/test/debug integration, without
 specialized viewers, presets or workflow execution.
 The checks do not establish interactive
-GUI acceptance, Linux/macOS runtime behavior, full installer packaging or the
+GUI acceptance, installer/uninstaller interaction, Linux/macOS runtime behavior or the
 reference implementation's notebook/genomic behavior. Historical reference
 reports remain separate from these executed public-plugin checks.

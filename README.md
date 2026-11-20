@@ -13,6 +13,7 @@ execution are not included. The reference implementation is supplied separately
 when running its audit.
 
 - [Architecture and package ownership](docs/ARCHITECTURE.md)
+- [Windows distribution and installer](docs/WINDOWS_DISTRIBUTION.md)
 - [Product branding](docs/BRANDING.md)
 - [Python development](docs/PYTHON.md)
 - [Editing preferences](docs/EDITING.md)
@@ -47,8 +48,10 @@ opens a separate development IDE profile with KaryoForge application branding.
 `make branding` builds its resource overlay; `make test-branding` checks native
 metadata, splash resources and SVG scaling without opening a window. The first build downloads Gradle,
 the pinned IntelliJ Community distribution, PythonCore and verification/test dependencies.
-Later builds reuse their caches. `make package-windows` and `make package-linux`
-still fail explicitly because full-product installer scripts are not included.
+Later builds reuse their caches. On Windows x64, `make package-windows` builds
+a standalone IDE installer with bundled Java/PythonCore; `make zip-windows`
+creates a portable application ZIP. See the Windows distribution guide for
+output paths and separate user profiles. Linux packaging is not implemented.
 
 All project-owned packages use `org.openkaryon.karyoforge`. Reference audit
 identifiers are explicitly projected into that namespace; their fingerprints

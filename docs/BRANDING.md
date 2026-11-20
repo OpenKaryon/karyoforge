@@ -47,9 +47,10 @@ reset so bootstrap preserves that order. The development sandbox remains separat
 from normal IDE settings and plugins. The same approved artwork appears as the
 KaryoForge plugin icon in the plugin package.
 
-Full-product native launcher/installer packaging is not provided by this build.
-The committed ICO is available as final artwork; the Gradle development launch
-does not rewrite `idea64.exe` or its Windows executable resources.
+Standalone Windows packaging applies the final ICO and product resource strings
+to the staged `bin/karyoforge.exe`, preserving the SDK cache. It bundles the same
+branding resource overlay. See [Windows distribution](WINDOWS_DISTRIBUTION.md).
+The Gradle development launch continues to use the cached native launcher.
 
 ## Validation
 

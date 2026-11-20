@@ -37,11 +37,15 @@ HELP = """KaryoForge local commands:
   make branding                 Build the resource-only product branding JAR
   make test-branding            Check native product identity, splash and SVG scaling
   make run                      Launch a separate development IDE profile
-  make package-windows          Windows installer script
+  make dist-windows             Assemble the standalone Windows x64 IDE
+  make zip-windows              Create a portable Windows x64 ZIP
+  make verify-dist-windows      Headless startup check of the standalone IDE
+  make package-windows          Build the per-user Windows x64 installer EXE
   make package-linux            Linux package script
 
 Set PYTHON to the desired Python executable. IDE targets require their checked-in
-build definition, wrapper and packaging scripts; missing prerequisites fail.
+build definition and wrapper; missing prerequisites fail. Windows packaging
+obtains its pinned portable build tools; Linux packaging requires its own script.
 No target commits or pushes changes. Gradle may resolve declared dependencies.
 """
 
@@ -176,15 +180,19 @@ def execute(task: str, root: Path, reference: str = "", output: str = "", python
         if not selected.is_file():
             raise ValueError("PYTHON_EXECUTABLE must name an existing interpreter file")
         command = gradle_command(root, ["test", "-PpythonRuntimeTests=true", f"-PpythonExecutable={selected}"])
-    elif task in {"build", "verify", "test-ide", "branding", "test-branding", "run"}:
+    elif task in {"build", "verify", "test-ide", "branding", "test-branding", "run",
+                  "dist-windows", "zip-windows", "verify-dist-windows", "package-windows"}:
         tasks = {"build": ["buildPlugin", "verifyPluginStructure"],
                  "verify": ["verifyPlugin"], "test-ide": ["test"], "branding": ["brandingJar"],
-                 "test-branding": ["verifyBranding"], "run": ["runIde"]}[task]
-        if task in {"branding", "test-branding", "run"}:
+                 "test-branding": ["verifyBranding"], "run": ["runIde"],
+                 "dist-windows": ["stageWindows"], "zip-windows": ["zipWindows"],
+                 "verify-dist-windows": ["verifyWindows"], "package-windows": ["packageWindows"]}[task]
+        if task in {"branding", "test-branding", "run", "dist-windows", "zip-windows",
+                    "verify-dist-windows", "package-windows"}:
             tasks.append(f"-PpythonCommand={sys.executable}")
         command = gradle_command(root, tasks)
-    elif task in {"package-windows", "package-linux"}:
-        name = "build-installer.ps1" if task == "package-windows" else "build-linux.ps1"
+    elif task == "package-linux":
+        name = "build-linux.ps1"
         script = root / "installer" / name
         if not script.is_file():
             raise ValueError(f"Packaging is unavailable; missing installer/{name}")

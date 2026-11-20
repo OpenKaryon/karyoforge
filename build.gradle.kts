@@ -1,3 +1,4 @@
+import groovy.json.JsonOutput
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -151,4 +152,54 @@ tasks.register<JavaExec>("verifyBranding") {
         systemProperty("idea.home.path", sdkDirectory.get().absolutePath)
     }
     args(providers.gradleProperty("platformBuild").get())
+}
+
+val windowsInputs = layout.buildDirectory.file("windows/inputs.json")
+val windowsInputsTask = tasks.register("prepareWindowsInputs") {
+    dependsOn(tasks.named("buildPlugin"), tasks.named("verifyPluginStructure"), brandingJar)
+    outputs.file(windowsInputs)
+    // Record resolved inputs on every invocation; paths stay in ignored build output.
+    outputs.upToDateWhen { false }
+    doLast {
+        val cache = gradle.gradleUserHomeDir.resolve("caches/modules-2/files-2.1")
+        val platformVersion = providers.gradleProperty("platformVersion").get()
+        val pythonVersion = providers.gradleProperty("pythonPluginVersion").get()
+        val data = mapOf(
+            "schemaVersion" to 1,
+            "pluginVersion" to project.version.toString(),
+            "platformVersion" to platformVersion,
+            "platformBuild" to providers.gradleProperty("platformBuild").get(),
+            "pythonPluginVersion" to pythonVersion,
+            "pluginArchive" to tasks.named<Zip>("buildPlugin").get().archiveFile.get().asFile.absolutePath,
+            "brandingArchive" to brandingJar.get().archiveFile.get().asFile.absolutePath,
+            "platformArchives" to fileTree(cache.resolve("idea/ideaIC/$platformVersion")) { include("**/*.zip") }.files.map { it.absolutePath },
+            "pythonArchives" to fileTree(cache.resolve("com.jetbrains.plugins/PythonCore/$pythonVersion")) { include("**/*.zip") }.files.map { it.absolutePath },
+        )
+        windowsInputs.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(JsonOutput.prettyPrint(JsonOutput.toJson(data)) + "\n")
+        }
+    }
+}
+val stageWindows = tasks.register<Exec>("stageWindows") {
+    dependsOn(windowsInputsTask)
+    inputs.file(windowsInputs)
+    inputs.file("tools/windows_distribution.py")
+    inputs.file("installer/windows-artifacts.json")
+    inputs.file(tasks.named<Zip>("buildPlugin").flatMap { it.archiveFile })
+    inputs.file(brandingJar.flatMap { it.archiveFile })
+    outputs.dir(layout.buildDirectory.dir("windows/app"))
+    doFirst {
+        commandLine(providers.gradleProperty("pythonCommand").orElse("python").get(),
+            "tools/windows_distribution.py", "stage", "--inputs", windowsInputs.get().asFile.absolutePath)
+    }
+}
+for ((taskName, mode) in listOf("packageWindows" to "installer", "zipWindows" to "zip", "verifyWindows" to "verify")) {
+    tasks.register<Exec>(taskName) {
+        dependsOn(stageWindows)
+        doFirst {
+            commandLine(providers.gradleProperty("pythonCommand").orElse("python").get(),
+                "tools/windows_distribution.py", mode, "--inputs", windowsInputs.get().asFile.absolutePath)
+        }
+    }
 }

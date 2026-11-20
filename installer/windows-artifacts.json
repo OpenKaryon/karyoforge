@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "platformVersion": "2025.2.6.3",
+  "platformBuild": "252.28539.97",
+  "pythonPluginVersion": "252.28539.97",
+  "artifacts": {
+    "platform": {
+      "name": "ideaIC-2025.2.6.3.win.zip",
+      "url": "https://download.jetbrains.com/idea/ideaIC-2025.2.6.3.win.zip",
+      "sha256": "ee3bb2bf315298da0758f5d72ee97a9c5e017f22d129c12db80b69a392f4673e"
+    },
+    "python": {
+      "name": "python-ce-252.28539.97.zip",
+      "url": "https://plugins.jetbrains.com/plugin/download?pluginId=PythonCore&version=252.28539.97",
+      "sha256": "7001e8fd19b93e732b6c9ec3af7f24950f419e0e6c0d9dea621086cc4b2a092c"
+    },
+    "rcedit": {
+      "name": "rcedit-x64-2.0.0.exe",
+      "url": "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe",
+      "sha256": "3e7801db1a5edbec91b49a24a094aad776cb4515488ea5a4ca2289c400eade2a"
+    },
+    "nsis": {
+      "name": "nsis-3.13.zip",
+      "url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip",
+      "sha256": "ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8"
+    }
+  },
+  "bundledPlugins": [
+    "copyright",
+    "editorconfig-plugin",
+    "java",
+    "java-ide-customization",
+    "java-decompiler",
+    "json",
+    "markdown",
+    "platform-ijent-impl",
+    "platform-images",
+    "platform-langInjection",
+    "properties",
+    "sh",
+    "terminal",
+    "textmate",
+    "toml",
+    "vcs-git",
+    "vcs-git-commit-modal",
+    "yaml"
+  ]
+}

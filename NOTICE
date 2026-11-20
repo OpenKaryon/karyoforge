@@ -17,6 +17,13 @@ for development; they are not bundled in the KaryoForge plugin ZIP. PythonCore
 JetBrains Marketplace: https://plugins.jetbrains.com/plugin/7322-python-community-edition
 Its source and license notices belong to the JetBrains intellij-community project.
 
+The standalone Windows package includes the pinned IntelliJ Community platform,
+its JetBrains Runtime and PythonCore. Original upstream license and legal files
+are preserved alongside the OpenKaryon notices; the source license does not
+relicense third-party components. NSIS 3.13 supplies the installer engine under
+its original license terms, retained in the installed NSIS-COPYING.txt.
+rcedit 2.0.0 (Electron, MIT) is a build-only tool and is not bundled in the IDE.
+
 Gradle Wrapper 9.1.0 scripts and bootstrap JAR are distributed as build tooling
 under Apache-2.0, preserving their original notices. Their source is the Gradle
 project's v9.1.0 tag: https://github.com/gradle/gradle/tree/v9.1.0
