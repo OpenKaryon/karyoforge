@@ -27,6 +27,7 @@ dependencies {
         plugin("PythonCore", providers.gradleProperty("pythonPluginVersion").get())
         testFramework(TestFrameworkType.Platform, providers.gradleProperty("platformBuild").get())
         testBundledModule("intellij.spellchecker")
+        bundledPlugin("org.toml.lang")
         testBundledPlugin("com.intellij.java")
         javaCompiler(providers.gradleProperty("platformBuild").get())
         pluginVerifier("1.410")

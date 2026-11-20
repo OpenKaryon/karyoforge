@@ -367,6 +367,70 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
         }
     }
 
+    public void testStandardProjectEditableAndRegularInstallWithSrcLayoutAndExtra() throws Exception {
+        Path root = Path.of(sourceRoot.getPath());
+        var lifetime = Disposer.newDisposable();
+        try {
+            Path target = root.resolve("project install environment");
+            var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+            Path executable = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    VirtualEnvironmentCreation.create(getProject(), lifetime, Path.of(interpreter.getHomePath()), target, indicator)), 60_000);
+            PythonSdkUpdater.setEnabledInTests(true);
+            com.intellij.openapi.projectRoots.Sdk sdk;
+            try {
+                sdk = ExistingPythonEnvironments.prepare(executable);
+                assertNotNull(sdk);
+                Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() ->
+                        com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance().removeJdk(sdk)));
+            } finally {
+                PythonSdkUpdater.setEnabledInTests(false);
+            }
+            PythonInterpreters.assign(getModule(), sdk);
+            var environment = PythonDependencyOperations.selected(getModule());
+            Path project = Files.createDirectory(root.resolve("standard src project"));
+            Path source = Files.createDirectories(project.resolve("src")).resolve("karyoforge_project_fixture.py");
+            Files.writeString(source, "VALUE = 'original source'\n");
+            Path backend = Files.createDirectory(project.resolve("build_backend"));
+            try (var resource = getClass().getResourceAsStream("/python/local_build_backend.py")) {
+                assertNotNull(resource);
+                Files.copy(resource, backend.resolve("local_backend.py"));
+            }
+            Path file = Files.writeString(project.resolve("pyproject.toml"), """
+                    [build-system]
+                    requires = []
+                    build-backend = "local_backend"
+                    backend-path = ["build_backend"]
+                    [project]
+                    name = "karyoforge-project-fixture"
+                    version = "1.0.0"
+                    [project.optional-dependencies]
+                    validation = ["pip"]
+                    """);
+            var metadata = StandardPythonProject.read(getProject(), file);
+            assertEquals(List.of("validation"), metadata.extras());
+            for (boolean editable : new boolean[]{true, false}) {
+                var arguments = new java.util.ArrayList<>(metadata.arguments(editable, List.of("validation"), true));
+                arguments.add("--no-index");
+                PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                    PythonDependencyOperations.run(getProject(), lifetime, environment, project, arguments,
+                            "Standard project acceptance", indicator);
+                    return true;
+                }), 60_000);
+                Files.writeString(source, editable ? "VALUE = 'changed editable source'\n" : "VALUE = 'changed after regular install'\n");
+                var command = PythonEnvironmentProcess.command(executable, root, List.of("-I", "-c",
+                        "import karyoforge_project_fixture as package;print(package.VALUE)"));
+                var output = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                        new CapturingProcessHandler(command).runProcess(15_000)), 20_000);
+                assertEquals(output.getStderr(), 0, output.getExitCode());
+                assertEquals("changed editable source", output.getStdout().trim());
+            }
+            assertSame(sdk, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
     private PythonRunConfiguration scriptConfiguration() {
         var configuration = (PythonRunConfiguration) PythonConfigurationType.getInstance().getFactory().createTemplateConfiguration(getProject());
         configuration.setUseModuleSdk(false);

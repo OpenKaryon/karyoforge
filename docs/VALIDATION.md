@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 34 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments project workflows, dependency guards and eight native Python runtime cases |
+| Native headless integration tests | 39 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments project workflows, dependency guards standard project metadata and nine native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -86,9 +86,9 @@ strict verifier reported Compatible without deprecated project API usages.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Twenty-six native tests are available without runtime opt-in, including
+AppData directories. Thirty native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 34 tests, including the eight process
+explicit-runtime invocation passed all 39 tests, including the nine process
 and debugger acceptance cases.
 
 Creation acceptance created a real environment, ran its bundled pip and assigned
@@ -111,6 +111,14 @@ wheel produced a real pip failure without changing the module SDK. Base-Python
 and missing-file guards passed. The final package boundary passed targeted tests
 and strict verification after replacing internal provider calls with its public
 compatibility bridge; deprecation diagnostics remain visible.
+
+Standard project acceptance used real offline pip with a dependency-free owned
+PEP 517/660 backend. Both editable and ordinary installations included a declared
+extra and a `src` module. A source edit was visible immediately in editable mode;
+after an ordinary install, another source edit did not change the installed copy.
+Native metadata tests covered tables, inline/dotted keys, quoted extra names,
+unterminated strings and rejection of tool-only configuration. Strict verification
+accepted the explicit TOML dependency without internal API usage.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 

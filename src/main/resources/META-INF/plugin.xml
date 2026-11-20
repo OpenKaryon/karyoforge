@@ -13,6 +13,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
     <depends>PythonCore</depends>
+    <depends>org.toml.lang</depends>
     <extensions defaultExtensionNs="com.intellij">
         <applicationConfigurable parentId="tools" id="org.openkaryon.karyoforge.settings"
                                  displayName="KaryoForge"
@@ -37,6 +38,9 @@
             <action id="org.openkaryon.karyoforge.python.installRequirements" text="Install Python Requirements..."
                     description="Install an explicitly chosen requirements file into the module virtual environment"
                     class="org.openkaryon.karyoforge.languages.python.InstallPythonRequirementsAction"/>
+            <action id="org.openkaryon.karyoforge.python.installProject" text="Install Python Project..."
+                    description="Install a standard Python project with optional editable mode and chosen extras"
+                    class="org.openkaryon.karyoforge.languages.python.InstallPythonProjectAction"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </group>
     </actions>

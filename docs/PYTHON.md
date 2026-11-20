@@ -132,6 +132,34 @@ are internal APIs and are deliberately not linked by KaryoForge. Strict API
 verification remains enabled, and this boundary is covered by real install,
 uninstall and failure checks against the exact supported provider build.
 
+## Standard project installation
+
+**Tools > KaryoForge > Install Python Project...** reads a chosen `pyproject.toml`
+with the bundled TOML parser. It accepts standard `[project]` metadata or an
+explicit `[build-system]` backend with its requirements. Inline/dotted TOML keys
+are supported. A file containing only `[tool.*]` configuration is rejected;
+project names written inside strings are not metadata. Opening the file does
+not install anything or execute build code.
+
+The install dialog identifies the project directory and interpreter, offers
+editable installation and lists only declared `[project.optional-dependencies]`
+extras. It retains pip's build isolation by default. Disable isolation only when
+the required build backend is already installed in that environment. Metadata
+is checked again before execution, including whether the selected extras still
+exist. Invalid metadata or an unavailable backend produces an explicit error.
+
+The selected module must use a local virtual environment. Pip owns build backend
+execution, dependency resolution, standard wheels and editable wheels. A `src`
+layout works through that project's backend and installed editable path; changing
+source files is visible without reinstalling in editable mode. Ordinary installs
+retain the installed copy until another install. KaryoForge does not rewrite
+`pyproject.toml`, add another dependency lock format or run a tool-specific manager.
+
+The operation shares the requirements action's output, Stop, environment guards
+and native package refresh. Error dialogs include a bounded tail of process
+output; the complete output remains in Run. Cancellation is not a package
+rollback. Build backends can create their normal artifacts in the source project.
+
 ## Run, test and debug
 
 Use the native **Run > Edit Configurations...** dialog for a Python script path

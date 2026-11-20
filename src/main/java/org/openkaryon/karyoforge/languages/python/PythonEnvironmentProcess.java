@@ -48,6 +48,16 @@ public final class PythonEnvironmentProcess {
         indicator.checkCanceled();
         var process = new KillableColoredProcessHandler(command);
         process.setShouldDestroyProcessRecursively(true);
+        var tail = new StringBuilder();
+        process.addProcessListener(new com.intellij.execution.process.ProcessAdapter() {
+            @Override public void onTextAvailable(com.intellij.execution.process.ProcessEvent event,
+                                                  com.intellij.openapi.util.Key outputType) {
+                synchronized (tail) {
+                    tail.append(event.getText());
+                    if (tail.length() > 8_192) tail.delete(0, tail.length() - 8_192);
+                }
+            }
+        });
         try {
             ApplicationManager.getApplication().invokeAndWait(() -> {
                 if (project.isDisposed() || indicator.isCanceled()) return;
@@ -82,8 +92,10 @@ public final class PythonEnvironmentProcess {
             }
             indicator.checkCanceled();
             if (!Integer.valueOf(0).equals(process.getExitCode())) {
-                throw new ExecutionException(title + " failed (exit code " + process.getExitCode()
-                        + "). Review the output in Run.");
+                synchronized (tail) {
+                    throw new ExecutionException(title + " failed (exit code " + process.getExitCode()
+                            + "). Review the output in Run.\n\n" + tail);
+                }
             }
         } finally {
             if (!process.isStartNotified()) process.startNotify();

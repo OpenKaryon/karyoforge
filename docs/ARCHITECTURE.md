@@ -61,6 +61,11 @@ Explicit environment creation uses CPython's standard `venv` module through an
 owned background process. The module owns the native Run console lifetime, Stop
 cancels that process tree, and completion preserves any newer interpreter choice.
 Existing directories are never overwritten or automatically removed.
+Dependency operations invoke the selected virtual environment's pip with explicit
+inputs and native console ownership. Standard project metadata is read through
+the pinned TOML provider; pip retains responsibility for PEP 517/660 backend
+execution and editable installation. PythonCore's public compatibility bridge
+owns installed-package refresh; internal provider APIs remain excluded.
 See [Python development](PYTHON.md) for supported interactions and acceptance.
 
 ## Usage roles and capability boundaries
