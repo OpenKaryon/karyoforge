@@ -37,6 +37,7 @@ public final class PythonInterpreterNotification implements EditorNotificationPr
             if (localEnvironment) {
                 panel.createActionLabel("Use project environment...", () -> UseProjectPythonEnvironmentAction.choose(module));
             }
+            panel.createActionLabel("Create environment...", () -> CreatePythonEnvironmentAction.choose(module));
             panel.createActionLabel("Choose interpreter...", () -> ChoosePythonInterpreterAction.choose(module));
             return panel;
         };

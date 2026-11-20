@@ -31,6 +31,9 @@
             <action id="org.openkaryon.karyoforge.python.useProjectEnvironment" text="Use Project Python Environment..."
                     description="Choose an existing local virtual environment for a module"
                     class="org.openkaryon.karyoforge.languages.python.UseProjectPythonEnvironmentAction"/>
+            <action id="org.openkaryon.karyoforge.python.createEnvironment" text="Create Python Environment..."
+                    description="Create a local virtual environment and assign it to a module"
+                    class="org.openkaryon.karyoforge.languages.python.CreatePythonEnvironmentAction"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </group>
     </actions>

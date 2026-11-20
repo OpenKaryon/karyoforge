@@ -50,6 +50,27 @@ and cancellation leave the module's current interpreter unchanged.
 Other modules and the project SDK retain their existing settings. Native SDK
 persistence remains responsible for the saved interpreter definition.
 
+## Creating a local environment
+
+Use **Tools > KaryoForge > Create Python Environment...** or the missing-interpreter
+banner. Choose a local base Python executable and a new absolute environment
+directory; the default is `.venv` under the module's first content root. The parent
+directory must already exist. Existing targets, including empty directories, are
+rejected. The action runs CPython's isolated `venv` module with its bundled pip;
+it does not download packages or change the base interpreter.
+
+Creation runs in the background with output in the native Run window. Stop in
+Run or cancel the background task to stop that operation's process tree. Failure
+or cancellation preserves the module interpreter. A partial environment directory
+is kept for inspection and must be removed manually or a different target chosen
+before retrying. KaryoForge never recursively deletes an environment directory.
+
+After successful creation, native Python SDK setup registers the environment.
+It is assigned only to the chosen module, and only if the user has not changed
+that module's interpreter while creation was running. Cancelling SDK setup keeps
+the created environment available for explicit later selection. Existing terminal
+and console sessions are not restarted.
+
 ## Run, test and debug
 
 Use the native **Run > Edit Configurations...** dialog for a Python script path

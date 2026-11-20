@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 23 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments and five native Python runtime cases |
+| Native headless integration tests | 27 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments creation and seven native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -85,10 +85,17 @@ strict verifier reported Compatible without deprecated project API usages.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Eighteen native tests are available without runtime opt-in, including
+AppData directories. Twenty native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 23 tests, including the five process
+explicit-runtime invocation passed all 27 tests, including the seven process
 and debugger acceptance cases.
+
+Creation acceptance created a real environment, ran its bundled pip and assigned
+its native SDK only when the original module selection was still current. A
+cancellable owned Python process exited after cancellation. Console resources
+were disposed explicitly by their owner; native test teardown found no leaked
+editors. Validation rejects pre-existing directories and missing parents before
+starting a process. Interrupted directories are preserved for manual inspection.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 

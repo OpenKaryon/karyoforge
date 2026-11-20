@@ -219,6 +219,79 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
         }
     }
 
+    public void testCreateRealEnvironmentWithBundledPipAndNativeSdk() throws Exception {
+        var lifetime = Disposer.newDisposable();
+        Path target = Path.of(sourceRoot.getPath()).resolve("created environment");
+        var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+        try {
+            Path executable = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    VirtualEnvironmentCreation.create(getProject(), lifetime, Path.of(interpreter.getHomePath()), target, indicator)), 60_000);
+            var pip = PythonEnvironmentProcess.command(executable, target, List.of("-I", "-m", "pip", "--version"));
+            var output = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    new CapturingProcessHandler(pip).runProcess(15_000)), 20_000);
+            assertEquals(output.getStderr(), 0, output.getExitCode());
+            assertTrue(output.getStdout(), output.getStdout().contains(target.toString()));
+            PythonSdkUpdater.setEnabledInTests(true);
+            try {
+                var sdk = ExistingPythonEnvironments.prepare(executable);
+                assertNotNull(sdk);
+                Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() ->
+                        com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance().removeJdk(sdk)));
+                assertFalse(VirtualEnvironmentCreation.assignIfUnchanged(getModule(), null, sdk));
+                assertSame(interpreter, PythonSdkUtil.findPythonSdk(getModule()));
+                assertTrue(VirtualEnvironmentCreation.assignIfUnchanged(getModule(), interpreter, sdk));
+                assertSame(sdk, PythonSdkUtil.findPythonSdk(getModule()));
+            } finally {
+                PythonSdkUpdater.setEnabledInTests(false);
+            }
+        } finally {
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    public void testCancellingAnOwnedEnvironmentProcessTerminatesItsChild() throws Exception {
+        var lifetime = Disposer.newDisposable();
+        Path root = Path.of(sourceRoot.getPath());
+        Path pid = root.resolve("owned-process.pid");
+        var command = PythonEnvironmentProcess.command(Path.of(interpreter.getHomePath()), root, List.of("-I", "-c",
+                "import os,time,pathlib;pathlib.Path('owned-process.pid').write_text(str(os.getpid()));time.sleep(120)"));
+        var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+        var future = AppExecutorUtil.getAppExecutorService().submit(() -> {
+            try {
+                PythonEnvironmentProcess.run(getProject(), lifetime, command, "Cancellation acceptance", indicator);
+                fail("Cancelled operations must not succeed");
+            } catch (com.intellij.openapi.progress.ProcessCanceledException expected) {
+                return true;
+            }
+            return false;
+        });
+        try {
+            PlatformTestUtil.waitWithEventsDispatching("Owned Python child starts", () -> Files.exists(pid), 20);
+            long child = Long.parseLong(Files.readString(pid));
+            indicator.cancel();
+            assertTrue(PlatformTestUtil.waitForFuture(future, 15_000));
+            assertFalse(ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false));
+            assertSame(interpreter, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            indicator.cancel();
+            PlatformTestUtil.waitWithEventsDispatching("Owned operation stops", future::isDone, 20);
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    private void disposeEnvironmentProcesses() {
+        var manager = RunContentManager.getInstance(getProject());
+        for (var descriptor : manager.getAllDescriptors()) {
+            var handler = descriptor.getProcessHandler();
+            if (handler != null && handler.isProcessTerminated()) {
+                manager.removeRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor);
+                Disposer.dispose(descriptor);
+            }
+        }
+    }
+
     private PythonRunConfiguration scriptConfiguration() {
         var configuration = (PythonRunConfiguration) PythonConfigurationType.getInstance().getFactory().createTemplateConfiguration(getProject());
         configuration.setUseModuleSdk(false);

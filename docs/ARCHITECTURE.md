@@ -57,6 +57,10 @@ environments remains separate from explicit native SDK setup and assignment. Pyt
 run/test configurations, process consoles and the debugger. Its version matches
 the pinned platform build. SDK state remains in platform stores; notification
 collection does not probe executables or install dependencies.
+Explicit environment creation uses CPython's standard `venv` module through an
+owned background process. The module owns the native Run console lifetime, Stop
+cancels that process tree, and completion preserves any newer interpreter choice.
+Existing directories are never overwritten or automatically removed.
 See [Python development](PYTHON.md) for supported interactions and acceptance.
 
 ## Usage roles and capability boundaries
