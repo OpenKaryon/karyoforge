@@ -24,6 +24,8 @@ public final class PythonInterpreterNotification implements EditorNotificationPr
         if (status == PythonInterpreters.Status.READY) {
             return null;
         }
+        boolean localEnvironment = status == PythonInterpreters.Status.MISSING
+                && !ExistingPythonEnvironments.discover(module).isEmpty();
         return editor -> {
             if (module.isDisposed() || project.isDisposed()) {
                 return null;
@@ -32,6 +34,9 @@ public final class PythonInterpreterNotification implements EditorNotificationPr
             panel.setText(status == PythonInterpreters.Status.MISSING
                     ? "Choose a Python interpreter for module '" + module.getName() + "' to run and debug Python."
                     : "The Python interpreter for module '" + module.getName() + "' is not ready. Review its configuration.");
+            if (localEnvironment) {
+                panel.createActionLabel("Use project environment...", () -> UseProjectPythonEnvironmentAction.choose(module));
+            }
             panel.createActionLabel("Choose interpreter...", () -> ChoosePythonInterpreterAction.choose(module));
             return panel;
         };

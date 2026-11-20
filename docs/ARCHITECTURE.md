@@ -52,7 +52,8 @@ alone cannot unload a mandatory third-party plugin.
 ## Python provider integration
 
 `languages.python` owns module/file context, explicit native interpreter selection
-and a scoped setup notification. PythonCore owns parsing, editor intelligence,
+and a scoped setup notification. Bounded discovery of existing local virtual
+environments remains separate from explicit native SDK setup and assignment. PythonCore owns parsing, editor intelligence,
 run/test configurations, process consoles and the debugger. Its version matches
 the pinned platform build. SDK state remains in platform stores; notification
 collection does not probe executables or install dependencies.

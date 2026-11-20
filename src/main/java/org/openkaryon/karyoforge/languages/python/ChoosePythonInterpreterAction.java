@@ -2,7 +2,6 @@ package org.openkaryon.karyoforge.languages.python;
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.ui.EditorNotifications;
@@ -19,20 +18,13 @@ public final class ChoosePythonInterpreterAction extends DumbAwareAction {
 
     @Override
     public void update(@NotNull AnActionEvent event) {
-        var project = event.getProject();
-        var file = event.getData(CommonDataKeys.VIRTUAL_FILE);
-        event.getPresentation().setEnabledAndVisible(project != null && PythonInterpreters.owner(project, file) != null);
+        event.getPresentation().setEnabledAndVisible(PythonModuleContext.available(event.getProject()));
     }
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent event) {
-        var project = event.getProject();
-        if (project != null) {
-            var module = PythonInterpreters.owner(project, event.getData(CommonDataKeys.VIRTUAL_FILE));
-            if (module != null) {
-                choose(module);
-            }
-        }
+        Module module = PythonModuleContext.choose(event);
+        if (module != null) choose(module);
     }
 
     public static void choose(Module module) {

@@ -28,6 +28,9 @@
             <action id="org.openkaryon.karyoforge.python.chooseInterpreter" text="Choose Python Interpreter..."
                     description="Choose the interpreter for the module owning the active Python file"
                     class="org.openkaryon.karyoforge.languages.python.ChoosePythonInterpreterAction"/>
+            <action id="org.openkaryon.karyoforge.python.useProjectEnvironment" text="Use Project Python Environment..."
+                    description="Choose an existing local virtual environment for a module"
+                    class="org.openkaryon.karyoforge.languages.python.UseProjectPythonEnvironmentAction"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </group>
     </actions>

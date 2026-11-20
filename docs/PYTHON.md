@@ -11,7 +11,8 @@ interpreter setup. It does not implement another parser or test protocol.
 Open a Python file belonging to a project module. If that module has no Python
 interpreter, the editor offers **Choose interpreter...**. The same native chooser
 is available under **Tools > KaryoForge > Choose Python Interpreter...** and through
-Find Action while a module-owned Python file is active. Select an existing
+Find Action. The active file's module is used when available; otherwise the
+explicit Python action offers module selection in a multi-module project. Select an existing
 interpreter or use the provider's explicitly selected environment setup options.
 
 The choice is assigned to that module. KaryoForge does not replace the project
@@ -25,6 +26,29 @@ keeps a configuration warning visible. A ready status is not a successful runtim
 probe. Non-Python files and files without a module receive no setup banner.
 Only the missing-interpreter inspection covered by that banner is suppressed;
 invalid-interpreter and other Python diagnostics remain active.
+
+## Existing local environments
+
+**Tools > KaryoForge > Use Project Python Environment...** lists local CPython
+virtual environments belonging to the selected module or project root. A Python
+file without an interpreter also offers **Use project environment...** when one
+is found. The choice dialog shows the full interpreter path before applying it.
+An empty result offers the native interpreter chooser.
+
+Discovery checks only `.venv`, `venv`, `env` and `.env` directly under the module
+content roots and project base directory. A candidate requires `pyvenv.cfg` and
+an existing `Scripts/python.exe` on Windows, or `bin/python` on other systems.
+A dotenv file named `.env` is not an environment. Discovery does not recursively
+scan directories, launch interpreters, create an environment or assign an SDK.
+
+After selection, PythonCore performs SDK setup and reads its version/paths.
+KaryoForge reuses an existing local Python SDK with the same normalized invocation
+path instead of registering another entry. Windows path comparisons ignore case;
+resolving executable symlinks is deliberately avoided so separate virtual
+environments retain separate SDK identities. Missing executables, failed setup
+and cancellation leave the module's current interpreter unchanged.
+Other modules and the project SDK retain their existing settings. Native SDK
+persistence remains responsible for the saved interpreter definition.
 
 ## Run, test and debug
 

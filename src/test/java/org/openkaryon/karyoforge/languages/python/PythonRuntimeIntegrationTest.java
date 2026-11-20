@@ -1,6 +1,10 @@
 package org.openkaryon.karyoforge.languages.python;
 
 import com.intellij.execution.PsiLocation;
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.process.CapturingProcessHandler;
+import com.jetbrains.python.sdk.PythonSdkUpdater;
+import com.jetbrains.python.sdk.PythonSdkUtil;
 import com.intellij.execution.actions.ConfigurationContext;
 import com.intellij.execution.actions.RunConfigurationProducer;
 import com.intellij.execution.executors.DefaultDebugExecutor;
@@ -179,6 +183,39 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
             }
             runner.resetProcess();
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+        }
+    }
+
+    public void testNativeSdkSetupAndReuseForAnExistingProjectEnvironment() throws Exception {
+        Path environmentRoot = Path.of(sourceRoot.getPath()).resolve(".venv");
+        var creation = new GeneralCommandLine(interpreter.getHomePath(), "-m", "venv", "--without-pip", environmentRoot.toString())
+                .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE).withEnvironment(childEnvironment());
+        var created = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                new CapturingProcessHandler(creation).runProcess(30_000)), 35_000);
+        assertFalse(created.isTimeout());
+        assertEquals(created.getStderr(), 0, created.getExitCode());
+        Path executable = environmentRoot.resolve(com.intellij.openapi.util.SystemInfo.isWindows ? "Scripts/python.exe" : "bin/python");
+        assertTrue(Files.isRegularFile(executable));
+        PythonSdkUpdater.setEnabledInTests(true);
+        try {
+            var sdk = ExistingPythonEnvironments.prepare(executable);
+            assertNotNull(sdk);
+            Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() ->
+                    com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance().removeJdk(sdk)));
+            assertTrue(sdk.getVersionString(), sdk.getVersionString().startsWith("Python 3."));
+            int count = PythonSdkUtil.getAllSdks().size();
+            assertSame(sdk, ExistingPythonEnvironments.prepare(executable));
+            assertEquals(count, PythonSdkUtil.getAllSdks().size());
+            assertTrue(PythonInterpreters.assign(getModule(), sdk));
+            var file = myFixture.addFileToProject("runtime sources/environment_identity.py", "import sys\nprint('FORGE_ENV=' + sys.executable)\n");
+            var configuration = scriptConfiguration();
+            configuration.setSdk(sdk);
+            configuration.setScriptName(file.getVirtualFile().getPath());
+            String output = executeNative(configuration).getStdout();
+            String selected = output.lines().filter(line -> line.startsWith("FORGE_ENV=")).findFirst().orElseThrow();
+            assertEquals(executable, Path.of(selected.substring("FORGE_ENV=".length())));
+        } finally {
+            PythonSdkUpdater.setEnabledInTests(false);
         }
     }
 
