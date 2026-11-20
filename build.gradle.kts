@@ -6,11 +6,17 @@ import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 
 plugins {
     java
+    kotlin("jvm") version "2.2.20"
     id("org.jetbrains.intellij.platform") version "2.19.0"
 }
 
 group = "org.openkaryon.karyoforge"
 version = providers.gradleProperty("pluginVersion").get()
+
+// GUI sources and their runtime are isolated from the Java product plugin.
+sourceSets { create("uiTest") }
+val uiTestImplementation by configurations.getting
+val uiTestRuntimeOnly by configurations.getting
 
 repositories {
     mavenCentral()
@@ -22,6 +28,11 @@ repositories {
 dependencies {
     compileOnly("org.jetbrains:annotations:26.0.2")
     testImplementation("junit:junit:4.13.2")
+    uiTestImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.20")
+    uiTestImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
+    uiTestImplementation("org.kodein.di:kodein-di-jvm:7.20.2")
+    uiTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.1")
+    uiTestRuntimeOnly("org.junit.platform:junit-platform-console:1.12.2")
     intellijPlatform {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
         plugin("PythonCore", providers.gradleProperty("pythonPluginVersion").get())
@@ -31,6 +42,7 @@ dependencies {
         bundledPlugin("org.jetbrains.plugins.terminal")
         testBundledPlugin("com.intellij.java")
         javaCompiler(providers.gradleProperty("platformBuild").get())
+        testFramework(TestFrameworkType.Starter, providers.gradleProperty("platformBuild").get(), configurationName = "uiTestImplementation")
         pluginVerifier("1.410")
     }
 }
@@ -38,6 +50,8 @@ dependencies {
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
+
+kotlin { jvmToolchain(21) }
 
 tasks.processResources {
     from(files("LICENSE", "NOTICE")) {
@@ -222,4 +236,15 @@ for ((taskName, mode) in listOf("packageWindows" to "installer", "zipWindows" to
                 "tools/windows_distribution.py", mode, "--inputs", windowsInputs.get().asFile.absolutePath)
         }
     }
+}
+
+tasks.register<Sync>("uiTestBundle") {
+    description = "Compile the VM-only GUI suite and its isolated test runtime; do not launch an IDE locally."
+    val gui = sourceSets["uiTest"]
+    dependsOn(gui.classesTaskName)
+    into(layout.buildDirectory.dir("ui-test-bundle"))
+    from(gui.runtimeClasspath.filter { it.isFile && it.name.endsWith(".jar") }) { into("runtime") }
+    from(gui.output) { into("classes") }
+    from("uitest") { include("*.ps1") }
+    from("uitest/fixtures") { into("fixtures") }
 }

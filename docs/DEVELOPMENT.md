@@ -103,3 +103,10 @@ Product documentation has descriptive names and describes technical behavior.
 The local linter rejects delivery-code labels and plan/roadmap filenames. It
 checks local links without fetching web pages. Test reports distinguish the
 tool tests from JVM/platform/GUI tests and identify missing runtime evidence.
+
+## GUI acceptance on Windows
+
+`make gui-bundle` compiles the isolated GUI suite. `make test-gui` requires
+explicit connection settings for a separate Windows VM and never falls back to
+the development desktop. See [VM GUI acceptance](../uitest/README.md) for
+prerequisites, isolation, commands and result locations.

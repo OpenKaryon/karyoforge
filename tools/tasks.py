@@ -31,6 +31,8 @@ HELP = """KaryoForge local commands:
                                 Check reference drift without rewriting the report
   make build                    Gradle buildPlugin and verifyPluginStructure
   make verify                   Strict Gradle plugin compatibility verification
+  make gui-bundle               Compile and bundle the VM-only GUI suite; no local GUI launch
+  make test-gui                 Run on explicit KARYOFORGE_UI_HOST/USER/KEY VM settings
   make test-ide                 Gradle IDE integration tests
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
@@ -170,6 +172,10 @@ def execute(task: str, root: Path, reference: str = "", output: str = "", python
                    "--output", output or "docs/audit/reference-inventory.json"]
         if task.endswith("-check"):
             command.append("--check")
+    elif task == "test-gui":
+        command = [sys.executable, "tools/ui_vm.py"]
+    elif task == "gui-bundle":
+        command = gradle_command(root, ["uiTestBundle"])
     elif task == "test-python":
         if not python_executable.strip():
             raise ValueError("PYTHON_EXECUTABLE is required; select an owned Python runtime with pytest installed")
