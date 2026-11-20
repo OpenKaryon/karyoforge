@@ -1,6 +1,7 @@
 """Transport boundaries and result integrity; never opens an IDE on the controller."""
 
 import importlib.util
+import base64
 import os
 from pathlib import Path
 import subprocess
@@ -15,6 +16,33 @@ SPEC.loader.exec_module(ui_vm)
 
 
 class GuiControllerTest(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Requires the actual Windows PowerShell parser")
+    def test_gui_scripts_parse_with_windows_powershell_without_executing_them(self):
+        directory = Path(__file__).resolve().parents[2] / "uitest"
+        script = """
+        $ErrorActionPreference='Stop'
+        foreach ($file in Get-ChildItem -LiteralPath DIRECTORY -Filter '*.ps1') {
+            $tokens=$null; $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors) | Out-Null
+            if ($errors.Count) { $errors | ForEach-Object { Write-Output ($file.Name + ': ' + $_.Message) }; exit 1 }
+        }
+        """.replace("DIRECTORY", ui_vm.ps_string(str(directory)))
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                                capture_output=True, text=True, errors="replace", timeout=30)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_targeted_reruns_are_confined_to_public_classes_and_no_argument_methods(self):
+        prefix = "org.openkaryon.karyoforge.uitest."
+        method = prefix + "PythonEnvironmentUiTest#editorCompletionAndTypingUseTheConfiguredPythonProvider"
+        self.assertEqual([method, prefix + "DistributionUiTest"],
+                         ui_vm.parse_selectors(f" {method}, {prefix}DistributionUiTest,{method}, "))
+        for invalid in ("other.package.Test", prefix + "Test#", prefix + "Test#method()",
+                        prefix + "Test#method;cmd", prefix + "Test#one#two", prefix + "Test\n#method",
+                        prefix + "Test --scan-classpath", prefix + "1Test", prefix.upper() + "Test"):
+            with self.subTest(selector=invalid), self.assertRaises(ValueError):
+                ui_vm.parse_selectors(invalid)
+
     def test_remote_values_cannot_inject_powershell_commands(self):
         self.assertEqual("'a''; Write-Output injection; '''", ui_vm.ps_string("a'; Write-Output injection; '"))
         for value in ("line\nbreak", "nul\0value", "carriage\rreturn"):

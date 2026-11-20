@@ -1,15 +1,15 @@
 # Local validation evidence
 
-Recorded: 2026-11-20 on Windows 11 x64, Temurin JDK 21.0.11+10.
+Updated: 2026-11-22 on Windows 11 x64, Temurin JDK 21.0.11+10.
 The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 ## Executed checks
 
 | Check | Result |
 | --- | --- |
-| Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
+| Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 43 tests passed, no failures/errors/skips: platform, editing, consent, environments, project/dependency/session guards and ten real Python runtime cases |
+| Native headless integration tests | 48 tests passed, no failures/errors/skips: platform, editing, consent, environments, project/dependency/session guards and fifteen real Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -89,7 +89,7 @@ Reports are written to `build/reports/tests/test` and
 The default native test task now runs with the branding overlay and isolated
 AppData directories. Thirty-three native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 46 tests, including the thirteen process
+explicit-runtime invocation passed all 48 tests, including the fifteen process
 and debugger acceptance cases.
 
 Real-process console lifecycle regressions check that completed and failed output
@@ -108,8 +108,9 @@ starting a process. Interrupted directories are preserved for manual inspection.
 The project workflow checks use PythonCore's registered new-project step and
 native Python module builder. They create module roots with spaces, preserve the
 existing project SDK and confirm that source/dependency/environment files survive
-setup. They do not simulate clicking through the project wizard or the platform's
-trust/window-selection dialogs; those remain interactive acceptance.
+setup. These native checks do not simulate clicking through the wizard or the
+platform trust/window-selection dialogs; the separate GUI suite covers those
+project workflows.
 
 Dependency acceptance installed an owned wheel through a requirements file with
 spaces using `--no-index`, imported its value with the selected real interpreter,
@@ -133,7 +134,8 @@ the first console kept its original runtime. A native terminal customizer
 activated each chosen virtual environment; real `cmd` children reported the
 expected `sys.executable`. Saved console preferences were preserved. Native
 project save/dispose/reload restored the module SDK and source files. Terminal
-widget interaction and PowerShell activation remain manual GUI acceptance.
+widget interaction and PowerShell activation also passed in the separate VM
+GUI scenarios described below.
 Forced console cleanup can leave native RPC/socket shutdown warnings in test
 logs; all owned processes terminated and the native suite passed.
 
@@ -145,12 +147,69 @@ config/cache/log paths and exposed both public and Python settings successfully.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 
+## Windows VM GUI acceptance
+
+All 15 unique GUI methods passed in completed JUnit reports from the public
+portable distribution on a separate Windows 11 VMware guest. The guest had
+4 GiB RAM and reported two logical processors; the sequential runner was configured
+with a 512 MiB heap and each IDE with a 1024 MiB heap. The guest used Python 3.14.6 and the
+transferred pinned offline package wheelhouse. No graphical IDE was launched
+on the development desktop.
+
+| GUI coverage | Passed methods |
+| --- | ---: |
+| Distribution startup, About identity and consent regression | 1 |
+| Native Python project wizard, explicit open and module isolation | 2 |
+| Environment creation, selection, cancellation, overwrite rejection, restart, completion and indentation | 2 |
+| Requirements installation, upgrade, native removal, pip diagnostics and owned-process cancellation | 3 |
+| Editable/ordinary project installation, extras and invalid TOML rejection | 2 |
+| unittest/pytest method, class, file, folder and last runs; breakpoint, evaluation and resume | 3 |
+| Native Python consoles and cmd/PowerShell terminals across environment changes | 2 |
+
+The result combines a complete discovery run with targeted reruns after concrete
+GUI and product fixes; it is not a claim that one initial full run was green.
+Only completed per-method JUnit successes count. Interrupted, skipped and failing
+cases are excluded. Exhaustive comparison of all 37 shipped plugin JAR entries
+across the acceptance archives showed changes confined to the session helper,
+console action and terminal action. The debugger passed on the archive that
+reveals initialized consoles; both shell/session scenarios passed on the final
+archive with the cmd activation fix. Unrelated completed workflow evidence was
+retained, with each method's archive identity recorded in its environment report.
+
+GUI tests check actual script/import output and interpreter paths as well as
+visible native controls. Test-runner acceptance requires a visible results panel
+whose model contains exactly the expected passed leaf tests. Session acceptance
+requires the newly opened console to be visible and usable, the new terminal to
+activate the selected environment, and existing sessions to retain their original
+runtime. This exposed and fixed a hidden console tool window after native startup
+and an empty cmd activation cache after the provider's environment-reader timeout.
+The cmd action queues the selected environment's standard activation script in
+the new tab through the native terminal API. The provider's activation opt-out
+and custom cmd startup commands remain respected.
+
+Session teardown waits for native interpreter updates before disposing its
+project. A diagnostic shutdown hit the platform's ten-second project-scope
+deadline while two skeleton generators were active. The successful acceptance
+covers orderly closure after provider initialization; closure during active
+skeleton generation remains outside that claim.
+
+The current product also passed all 48 native tests, strict compatibility and
+plugin structure checks. Plugin Verifier retained five scheduled-removal and two
+deprecation diagnostics; its final verdict was Compatible. The rebuilt portable
+ZIP contains the current fixes. The separately recorded installer predates these
+fixes and was not rebuilt or accepted through its wizard by this GUI run.
+
+Completed XML, environment details, screenshots, IDE logs and controller output
+remain under ignored `build/ui-test-results/<run-id>`. The GUI harness and its
+reproducible commands are described in [the VM acceptance guide](../uitest/README.md).
+Raw guest credentials and machine-specific diagnostics are not product files.
+
 ## Scope
 
 This plugin snapshot contains the platform foundation, reversible spelling
 preferences and native Python editing/run/test/debug integration, without
 specialized viewers, presets or workflow execution.
-The checks do not establish interactive
-GUI acceptance, installer/uninstaller interaction, Linux/macOS runtime behavior or the
-reference implementation's notebook/genomic behavior. Historical reference
-reports remain separate from these executed public-plugin checks.
+The checks do not establish installer/uninstaller interaction, Linux/macOS
+runtime behavior, pixel-by-pixel splash fidelity or notebook/genomic behavior.
+Historical reference reports remain separate from these executed public-plugin
+checks.

@@ -2,8 +2,11 @@ package org.openkaryon.karyoforge.uitest
 
 import com.intellij.driver.client.Driver
 import com.intellij.driver.sdk.getRunContentManager
+import com.intellij.driver.sdk.getContentEntries
+import com.intellij.driver.sdk.getModules
 import com.intellij.driver.sdk.invokeAction
-import com.intellij.driver.sdk.openFile
+import com.intellij.driver.sdk.openEditor
+import com.intellij.driver.sdk.VirtualFile
 import com.intellij.driver.sdk.singleProject
 import com.intellij.driver.sdk.ui.components.common.codeEditor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
@@ -14,7 +17,6 @@ import com.intellij.driver.sdk.ui.components.elements.textField
 import com.intellij.driver.sdk.ui.present
 import com.intellij.driver.sdk.ui.shouldBe
 import com.intellij.driver.sdk.ui.ui
-import com.intellij.driver.sdk.waitForIndicators
 import org.junit.jupiter.api.Assertions.*
 import java.awt.event.KeyEvent
 import java.nio.file.Files
@@ -27,12 +29,34 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 fun awaitCondition(description: String, timeout: Duration = 5.minutes, condition: () -> Boolean) {
+    println("Waiting: $description")
     val deadline = System.nanoTime() + timeout.inWholeNanoseconds
     while (System.nanoTime() < deadline) {
-        if (condition()) return
+        if (condition()) {
+            println("Ready: $description")
+            return
+        }
         Thread.sleep(250)
     }
     assertTrue(condition(), description)
+}
+
+/** Resolve an owned fixture against its actual module, including multi-module projects. */
+fun Driver.openOwnedFile(file: Path) {
+    val expected = file.toAbsolutePath().normalize()
+    val roots = getModules(singleProject()).flatMap { getContentEntries(it).toList() }.map { it.getFile() }
+    val root = roots.filter { expected.startsWith(Path.of(it.getPath()).toAbsolutePath().normalize()) }
+        .maxByOrNull { Path.of(it.getPath()).nameCount }
+    assertNotNull(root, "The fixture belongs to an open module: $expected")
+    val relative = Path.of(root!!.getPath()).toAbsolutePath().normalize().relativize(expected)
+        .joinToString("/") { it.toString() }
+    invokeAction("Synchronize")
+    var target: VirtualFile? = null
+    awaitCondition("The module refresh discovers $relative", 2.minutes) {
+        target = root.findFileByRelativePath(relative)
+        target != null
+    }
+    openEditor(target!!)
 }
 
 fun pythonString(path: Path): String = "'" + path.toString().replace("\\", "\\\\").replace("'", "\\'") + "'"
@@ -45,9 +69,10 @@ fun Driver.createEnvironment(project: Path, name: String = ".venv"): Path {
         textField { byAccessibleName("New environment directory") }.text = target.toString()
         pressButton("Create")
     }
-    awaitCondition("CPython creates the chosen environment", 10.minutes) { target.resolve("pyvenv.cfg").exists() }
-    waitForIndicators(20.minutes)
-    assertTrue(target.resolve("Scripts/python.exe").exists())
+    awaitCondition("CPython creates the chosen environment and executable", 10.minutes) {
+        target.resolve("pyvenv.cfg").exists() && target.resolve("Scripts/python.exe").exists()
+    }
+    awaitModuleInterpreter(project, target.resolve("Scripts/python.exe"))
     return target.resolve("Scripts/python.exe")
 }
 
@@ -57,13 +82,12 @@ fun Driver.chooseEnvironment(name: String) {
         comboBox { byClass("ComboBox") }.selectItemContains(name)
         pressButton("Select")
     }
-    waitForIndicators(20.minutes)
+    waitForPythonIndexing()
 }
 
 fun Driver.selectFile(path: Path) {
     ui.fileChooser({ byClass("MyDialog") }) {
         openPath(path)
-        pressButton("OK")
     }
 }
 
@@ -73,8 +97,7 @@ fun Driver.runProbe(project: Path, name: String, code: String = "import sys\nres
     val marker = project.resolve("$name.result")
     assertFalse(marker.exists(), "A new probe must not accept an earlier run's result")
     script.writeText(code + "\nfrom pathlib import Path\nPath(" + pythonString(marker) + ").write_text(str(result), encoding='utf-8')\n")
-    invokeAction("Synchronize")
-    openFile(script.toString(), waitForCodeAnalysis = false)
+    openOwnedFile(script)
     assertFalse(marker.exists(), "Opening a Python file must not execute it")
     ideFrame {
         codeEditor().click()
@@ -91,13 +114,17 @@ fun Driver.assertInterpreter(project: Path, expected: Path, name: String) {
 }
 
 fun Driver.installRequirements(file: Path) {
+    val previous = selectedOperationIdentity()
     invokeAction("org.openkaryon.karyoforge.python.installRequirements", now = false)
     selectFile(file)
     ui.dialog({ byTitle("Install Python Requirements") }) {
-        x { contains(byVisibleText(file.toString())) }.shouldBe("The requirements path is visible before installation", present, 1.minutes)
+        val message = x { and(byClass("JEditorPane"), contains(byVisibleText("Requirements:"))) }
+        message.shouldBe("The requirements confirmation is visible before installation", present, 1.minutes)
+        assertTrue(message.nativeDocumentText().contains(file.toString()),
+            "The confirmation contains the exact selected requirements path")
         pressButton("Install")
     }
-    waitForIndicators(20.minutes)
+    awaitEnvironmentOperation(previous, "Install Python Requirements")
 }
 
 fun Driver.assertEditorReady() {

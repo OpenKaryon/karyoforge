@@ -25,7 +25,10 @@ make test-gui
 
 Store real connection values outside the repository. The controller also accepts
 `python tools/ui_vm.py --help`, `--select` with comma-separated public GUI class
-names, `--timeout`, and explicit SSH/SCP executable paths. SSH transport requires OpenSSH Server. `--skip-build` reuses
+names or `org.openkaryon.karyoforge.uitest.ClassName#methodName` for a targeted
+rerun, `--timeout`, and explicit SSH/SCP executable paths. Selectors are validated
+before connecting to the VM. JUnit logs individual outcomes as scenarios finish.
+SSH transport requires OpenSSH Server. `--skip-build` reuses
 existing inputs; normally the command builds the bundle and portable standalone
 IDE before transfer. Large runtime/distribution archives are cached by SHA-256
 on the VM; changing test code uses a separate payload archive.
@@ -45,7 +48,11 @@ config/cache/log paths, AppData and temporary directories. Terminal/native conso
 preferences changed by tests belong to those profiles. The VM's saved global
 Python, shell environment and the development machine's installed IDE are not
 changed. Before launch, the runner checks that the account's input desktop is
-unlocked. It holds a thread-scoped Windows execution-state request to prevent
+unlocked and that Windows reports an active unlocked session through WTS.
+The session check also runs during acceptance: a lock or disconnection stops
+the owned run instead of sending input behind LockApp. A desktop named Default
+alone does not establish that the lock-screen overlay is absent. The runner
+holds a thread-scoped Windows execution-state request to prevent
 automatic sleep and display shutdown during acceptance, then releases it on
 completion. Saved power plans and sign-in policies are unchanged. Windows login
 and initial account setup must be completed manually before running the suite.
@@ -63,6 +70,9 @@ under ignored `build/ui-test-results/<id>`. Settings, plugins, caches and heap
 dumps are excluded from collected IDE artifacts. Zero discovered tests, skipped
 tests, nonzero exits, timeouts and missing XML all fail acceptance. Compilation
 and controller unit tests do not establish that a GUI scenario passed on a VM.
+A scheduled task that exits without the runner's completion marker is recorded
+as a startup failure, including its native task result, and diagnostics are
+collected immediately.
 
 `DistributionUiTest` opens a real project, checks the About identity and rejects
 `consentMap` failures in the owned IDE logs. Starter retains its normal failure
@@ -82,6 +92,27 @@ The environment dialog exposes accessible names for its base executable and
 destination fields. Selectors use those public UI names, native dialog titles
 and standard Driver fixtures, with no production-only test hooks.
 
+Readiness checks observe the selected module's native SDK home/version and
+project indexing state. Package operations must expose a new native process
+with the expected title and reach termination; a previous completed operation
+cannot satisfy the wait. The matching native background task must also finish
+its package refresh before the next action. Background repository refreshes may
+continue after an interpreter becomes usable and do not substitute for these
+checks. Script execution, imports and debugger assertions still verify the resulting behavior.
+
+Generated probe files are resolved relative to their actual module content root
+after GUI Synchronize, including projects with multiple modules and Windows paths
+containing spaces. Completion opens through the registered `CodeCompletion`
+action. Its assertions read exact native lookup names because
+the visible renderer splits highlighted prefixes into separate text fragments.
+Selection and code entry continue through the GUI. Wait descriptions and
+completion messages are included in the runner log for failure diagnosis.
+Editor typing and shell command entry use the guest GUI clipboard so input does
+not depend on the account's keyboard layout or Windows Robot punctuation support.
+Real Enter key events still exercise Python indentation and terminal command
+execution. Environment creation waits for both metadata and the Windows
+executable before observing native SDK assignment.
+
 Acceptance requires completed GUI execution on the supported guest; compilation
 alone does not establish that these workflows pass.
 
@@ -92,6 +123,13 @@ requirements, opens Python Packages, removes that fixture through the native
 action, checks visible pip failure details and cancels an owned slow build.
 Its Python child must exit after Stop, and the module's interpreter must remain
 selected after success, failure and cancellation.
+
+Requirements confirmations are checked against the native text document so
+visual line wrapping cannot split the selected Windows path. A pip failure must
+show its exit status in the dialog and its actual diagnostic in the Run console.
+Cancellation uses the operation's accessible Stop button. Package removal selects
+the native Python Packages tree through its accessible cell labels so the
+assertion and Delete action refer to the actual installed fixture row.
 
 `prepareUiFixtures` downloads the versions in `tools/python-test-requirements.txt`
 from official PyPI into ignored build output and generates two small fixture
@@ -141,17 +179,22 @@ installation. Tests execute sequentially with a 512 MiB runner heap and a 1024
 MiB IDE heap by default. `--ide-memory` can select 768–4096 MiB. Environment
 artifacts record these limits, guest RAM and virtual CPU count so a successful
 run can be evaluated against its actual resources. Four GiB guests still need
-space for Windows, native IDE allocations and Python subprocesses.
+space for Windows, native IDE allocations and Python subprocesses. Cold SDK
+generation can justify an extended full-suite timeout such as
+`python tools/ui_vm.py --timeout 240`; each IDE scenario retains its own bound.
 
 ## Python test runners and debugger
 
 `PythonExecutionUiTest` selects unittest or pytest in native settings and runs
 an individual method, its class, its file, its folder and the last configuration
 again through editor/project-view shortcuts. Fresh append-only fixture output
-checks which tests actually ran, alongside the native passing-test summary.
+checks which tests actually ran. The native results panel must be visible, and
+its test model must contain exactly the expected number of passed leaf tests.
+The Testing panel's runner is selected by its exact name.
 pytest comes from the transferred pinned wheelhouse.
 
-The debugger scenario toggles a line breakpoint in the editor, starts Debug,
+The debugger scenario toggles a line breakpoint in the editor and invokes the
+registered `DebugClass` context action independently of the keyboard map. It
 checks the suspended local variable and evaluates it through Evaluate
 Expression. The result file must remain absent until Resume. Each scenario
 also verifies the selected module interpreter through an actual script run.
@@ -164,10 +207,19 @@ to the selected environment, start in the module content directory and expose
 the matching `VIRTUAL_ENV`. After the module SDK changes, the existing terminal
 must retain its interpreter and a new terminal must activate the new one.
 
-Native Python consoles evaluate probes at their prompts. The new console must
-use the new SDK while the original console process remains alive with its old
-executable. PowerShell uses a process-scoped execution-policy argument in this
-test profile; no saved Windows policy or global shell setting changes.
+Native Python consoles evaluate probes at their prompts. Each probe explicitly
+focuses the input editor and moves its caret to the end before pressing Enter.
+Readiness requires a new live native console process, its visible tool window,
+and the history/prompt
+editors before input. The native execute handler must be enabled and able to
+execute; the SDK fixture's panel-count check alone precedes the RPC connection. The new console must use the new SDK while the original
+console process remains alive with its old executable and creation identity.
+Terminal readiness reads the native screen buffer, preserving text independently of per-glyph painting;
+rendered line wraps are ignored only for this readiness check. Script probes
+still assert exact executable, working directory and virtual-environment paths.
+Session teardown waits for the owned native Python interpreter updates to
+finish before disposing the project, including background skeleton generation.
+PowerShell uses a process-scoped execution-policy argument in this test profile; no saved Windows policy or global shell setting changes.
 
 ## Process cleanup acceptance
 
@@ -180,3 +232,8 @@ enumerated before each process identity is checked. Termination targets each
 recorded process separately, without traversing a parent-PID tree. An actual
 unrecorded child fixture must survive when its recorded parent is stopped. These checks validate process ownership independently
 of the guest's graphical session.
+
+The runner reads each descendant's start time and executable once before
+recording its identity. Terminated or inaccessible children are ignored.
+Native creation times must match the observed CIM creation time within its
+microsecond precision, rejecting a PID replaced after the CIM snapshot.

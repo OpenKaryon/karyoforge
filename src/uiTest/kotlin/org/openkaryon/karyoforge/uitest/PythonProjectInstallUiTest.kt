@@ -7,7 +7,6 @@ import com.intellij.driver.sdk.ui.components.elements.dialog
 import com.intellij.driver.sdk.ui.present
 import com.intellij.driver.sdk.ui.shouldBe
 import com.intellij.driver.sdk.ui.ui
-import com.intellij.driver.sdk.waitForIndicators
 import com.intellij.ide.starter.driver.engine.runIdeWithDriver
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -22,7 +21,7 @@ class PythonProjectInstallUiTest {
         val project = VmIde.fixtureProject("project-install with spaces")
         val source = project.resolve("src/karyoforge_project_fixture.py")
         VmIde.context("project-install", project).runIdeWithDriver(runTimeout = 40.minutes).useDriverAndCloseIde {
-            waitForIndicators(10.minutes)
+            waitForPythonIndexing(10.minutes)
             val python = createEnvironment(project)
             installProject(project, editable = true)
             source.writeText("VALUE = 'changed editable source'\n")
@@ -41,7 +40,7 @@ class PythonProjectInstallUiTest {
         val metadata = project.resolve("pyproject.toml")
         metadata.writeText("[tool.example]\nenabled=true\n")
         VmIde.context("tool-only", project).runIdeWithDriver(runTimeout = 30.minutes).useDriverAndCloseIde {
-            waitForIndicators(10.minutes)
+            waitForPythonIndexing(10.minutes)
             val python = createEnvironment(project)
             invokeAction("org.openkaryon.karyoforge.python.installProject", now = false)
             selectFile(metadata)
@@ -56,6 +55,7 @@ class PythonProjectInstallUiTest {
     }
 
     private fun Driver.installProject(project: Path, editable: Boolean) {
+        val previous = selectedOperationIdentity()
         invokeAction("org.openkaryon.karyoforge.python.installProject", now = false)
         selectFile(project.resolve("pyproject.toml"))
         ui.dialog({ byTitle("Install Python Project") }) {
@@ -67,6 +67,6 @@ class PythonProjectInstallUiTest {
             assertEquals(editable, editableChoice.isSelected())
             pressButton("Install")
         }
-        waitForIndicators(20.minutes)
+        awaitEnvironmentOperation(previous, "Install Python Project")
     }
 }

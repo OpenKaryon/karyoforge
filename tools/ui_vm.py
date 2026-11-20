@@ -217,7 +217,17 @@ def sync_archive(vm: VmConnection | VmwareConnection, archive: Path, remote_root
     return target
 
 
+def parse_selectors(value: str) -> list[str]:
+    selectors = [name.strip() for name in value.split(",") if name.strip()]
+    identifier = r"[A-Za-z_][A-Za-z0-9_]*"
+    pattern = re.escape(PUBLIC_PACKAGE) + identifier + "(?:#" + identifier + ")?"
+    if any(not re.fullmatch(pattern, name) for name in selectors):
+        raise ValueError("GUI selectors must name public GUI test classes or Class#method")
+    return list(dict.fromkeys(selectors))
+
+
 def run(args: argparse.Namespace) -> int:
+    selectors = parse_selectors(args.select)
     if os.name != "nt":
         raise ValueError("The distribution GUI controller currently requires a Windows host")
     if args.transport == "vmware":
@@ -262,9 +272,6 @@ def run(args: argparse.Namespace) -> int:
     remote_run = args.vm_root + "/runs/" + run_id
     local = ROOT / "build/ui-test-results" / run_id
     local.mkdir(parents=True)
-    selectors = [name.strip() for name in args.select.split(",") if name.strip()]
-    if any(not re.fullmatch(re.escape(PUBLIC_PACKAGE) + r"[A-Za-z0-9_]+", name) for name in selectors):
-        raise ValueError("GUI selectors must name public GUI test classes")
     request = {"runId": run_id, "controller": controller, "ide": home, "runtime": libraries,
                "payload": source, "python": args.python, "select": selectors, "timeoutMinutes": args.timeout,
                "ideMemoryMb": args.ide_memory}
@@ -288,9 +295,27 @@ def run(args: argparse.Namespace) -> int:
     vm.powershell(start)
     deadline = time.monotonic() + args.timeout * 60
     code = None
+    status_command = """
+    $completion = COMPLETION_PATH
+    if (-not (Test-Path -LiteralPath $completion)) {
+        $task = Get-ScheduledTask -TaskName TASK_NAME -ErrorAction SilentlyContinue
+        if ($task -and $task.State -eq 'Ready') {
+            $info = $task | Get-ScheduledTaskInfo
+            if ($info.LastRunTime.Year -gt 2000) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $completion) | Out-Null
+                $failure = 'The scheduled GUI task ended without a completion marker. Task result: ' + $info.LastTaskResult
+                Set-Content -Encoding UTF8 -LiteralPath ERROR_PATH -Value $failure
+                Set-Content -Encoding ASCII -LiteralPath $completion -Value 1
+            }
+        }
+    }
+    if (Test-Path -LiteralPath $completion) { Get-Content -LiteralPath $completion }
+    """.replace("COMPLETION_PATH", ps_string(remote_run + "/results/exit-code.txt")) \
+        .replace("TASK_NAME", ps_string(task)) \
+        .replace("ERROR_PATH", ps_string(remote_run + "/results/runner-error.txt"))
     try:
         while time.monotonic() < deadline:
-            status = vm.powershell(f"if (Test-Path -LiteralPath {ps_string(remote_run + '/results/exit-code.txt')}) {{ Get-Content -LiteralPath {ps_string(remote_run + '/results/exit-code.txt')} }}")
+            status = vm.powershell(status_command)
             if status:
                 code = int(status)
                 break
@@ -324,7 +349,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=22)
     parser.add_argument("--vm-root", default="C:/KaryoForgeUi")
     parser.add_argument("--python", default=os.getenv("KARYOFORGE_UI_PYTHON", ""))
-    parser.add_argument("--select", default="")
+    parser.add_argument("--select", default="", help="Comma-separated public GUI classes or Class#method selectors")
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--ide-memory", type=int, default=1024, help="IDE heap limit in MiB (default: 1024)")
     parser.add_argument("--skip-build", action="store_true")

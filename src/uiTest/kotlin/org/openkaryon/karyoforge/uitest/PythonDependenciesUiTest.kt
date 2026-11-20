@@ -3,10 +3,10 @@ package org.openkaryon.karyoforge.uitest
 import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.ui.components.common.ideFrame
 import com.intellij.driver.sdk.ui.components.elements.dialog
+import com.intellij.driver.sdk.ui.components.elements.accessibleTree
 import com.intellij.driver.sdk.ui.present
 import com.intellij.driver.sdk.ui.shouldBe
 import com.intellij.driver.sdk.ui.ui
-import com.intellij.driver.sdk.waitForIndicators
 import com.intellij.ide.starter.driver.engine.runIdeWithDriver
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -22,7 +22,7 @@ class PythonDependenciesUiTest {
     fun requirementsInstallUpgradeAndNativePackageRemovalUseTheChosenEnvironment() {
         val project = VmIde.fixtureProject("dependencies")
         VmIde.context("dependencies", project).runIdeWithDriver(runTimeout = 40.minutes).useDriverAndCloseIde {
-            waitForIndicators(10.minutes)
+            waitForPythonIndexing(10.minutes)
             val python = createEnvironment(project)
             installRequirements(project.resolve("requirements.txt"))
             assertEquals("9.0.2:1", runProbe(project, "installed",
@@ -32,12 +32,25 @@ class PythonDependenciesUiTest {
                 "import importlib.metadata\nresult=importlib.metadata.version('karyoforge-gui-fixture')\n"))
             invokeAction("ActivatePythonPackagesToolWindow")
             ideFrame {
-                val installed = x { or(byVisibleText("karyoforge-gui-fixture"), byVisibleText("karyoforge_gui_fixture")) }
-                installed.shouldBe("The native package window shows the installed fixture", present, 3.minutes)
-                installed.click()
+                val packages = x { and(byClass("InternalDecoratorImpl"), byAccessibleName("Python Packages Tool Window")) }
+                    .accessibleTree { byClass("MyTree") }
+                val names = setOf("karyoforge-gui-fixture", "karyoforge_gui_fixture")
+                var reportedNames: List<String>? = null
+                awaitCondition("The native package tree shows the installed fixture", 3.minutes) {
+                    val labels = packages.collectExpandedPaths().map { it.path.lastOrNull().orEmpty() }
+                    if (labels != reportedNames) {
+                        println("Native installed package names: $labels")
+                        reportedNames = labels
+                    }
+                    labels.any { it in names }
+                }
+                packages.clickRow { it in names }
             }
             invokeAction("PyDeletePackage", now = false)
-            waitForIndicators(10.minutes)
+            awaitCondition("Native package removal deletes the owned installed fixture", 5.minutes) {
+                !python.parent.parent.resolve("Lib/site-packages/karyoforge_gui_fixture.py").exists()
+            }
+            waitForPythonIndexing()
             assertEquals("True", runProbe(project, "removed",
                 "import importlib.util\nresult=importlib.util.find_spec('karyoforge_gui_fixture') is None\n"))
             assertInterpreter(project, python, "after_package_operations")
@@ -49,15 +62,18 @@ class PythonDependenciesUiTest {
     fun aPipErrorShowsItsOutputAndKeepsTheModuleInterpreter() {
         val project = VmIde.fixtureProject("dependency-error")
         VmIde.context("dependency-error", project).runIdeWithDriver(runTimeout = 30.minutes).useDriverAndCloseIde {
-            waitForIndicators(10.minutes)
+            waitForPythonIndexing(10.minutes)
             val python = createEnvironment(project)
             invokeAction("org.openkaryon.karyoforge.python.installRequirements", now = false)
             selectFile(project.resolve("bad-requirements.txt"))
             ui.dialog({ byTitle("Install Python Requirements") }) { pressButton("Install") }
             ui.dialog({ byTitle("Python Requirements") }) {
                 x { contains(byVisibleText("exit code")) }.shouldBe("The real pip failure is visible", present, 5.minutes)
-                x { contains(byVisibleText("missing-owned-wheel")) }.shouldBe("The dialog includes pip output", present, 1.minutes)
                 pressButton("OK")
+            }
+            ideFrame {
+                x { and(byClass("EditorComponentImpl"), contains(byVisibleText("missing-owned-wheel"))) }
+                    .shouldBe("Run exposes the actual pip failure output", present, 1.minutes)
             }
             assertInterpreter(project, python, "after_failure")
         }
@@ -80,7 +96,7 @@ class PythonDependenciesUiTest {
         val requirements = project.resolve("slow-requirements.txt")
         requirements.writeText("--no-index\n./slow-project\n")
         VmIde.context("dependency-cancel", project).runIdeWithDriver(runTimeout = 30.minutes).useDriverAndCloseIde {
-            waitForIndicators(10.minutes)
+            waitForPythonIndexing(10.minutes)
             val python = createEnvironment(project)
             invokeAction("org.openkaryon.karyoforge.python.installRequirements", now = false)
             selectFile(requirements)
@@ -89,7 +105,7 @@ class PythonDependenciesUiTest {
             awaitCondition("Pip starts the owned slow build", 5.minutes) { pid.exists() && Files.size(pid) > 0 }
             val child = pid.readText().trim().toLong()
             ideFrame {
-                x { contains(byTooltip("Cancel this environment operation")) }.click()
+                x { and(byClass("ActionButton"), byAccessibleName("Stop")) }.click()
             }
             ui.dialog({ byTitle("Python Requirements") }) {
                 x { contains(byVisibleText("cancelled")) }.shouldBe("Cancellation is reported", present, 2.minutes)
