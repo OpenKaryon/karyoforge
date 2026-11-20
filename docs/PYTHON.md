@@ -98,6 +98,40 @@ that module's interpreter while creation was running. Cancelling SDK setup keeps
 the created environment available for explicit later selection. Existing terminal
 and console sessions are not restarted.
 
+## Packages and requirements
+
+Open **View > Tool Windows > Python Packages** for the provider's installed
+package list, package search, installation, upgrade and removal controls. Check
+the interpreter selected in that window before making changes. These controls
+belong to PythonCore and retain its repository and error handling UI.
+
+**Tools > KaryoForge > Install Python Requirements...** installs a chosen
+requirements file into the selected module's local virtual environment. The
+confirmation identifies both full paths. The adapter refuses base Python and
+remote SDKs, saves editor changes after confirmation, and uses the requirements
+file's parent as its working directory so local paths have an explicit base.
+Includes, constraints, markers and hashes are interpreted by pip itself.
+
+Installation runs in the background with output and Stop in Run. It invokes the
+selected absolute Python as `-I -m pip`, requires a virtual environment, disables
+interactive input and version checks, and does not load pip configuration files
+or inherited pip/Python environment overrides. Project requirements may explicitly
+declare an index; otherwise pip uses its normal default index. Missing pip is an
+error, not an automatic installation into another interpreter.
+
+Another KaryoForge dependency operation cannot run against the same environment
+concurrently. A changed module selection before startup aborts the operation;
+changing it after startup never retargets an already running install. Failure or
+cancellation leaves SDK choices unchanged, but pip may already have changed some
+packages. Review output and installed packages before retrying. Refresh Python
+Packages if its visible list is stale.
+
+The installed-package refresh uses PythonCore's public compatibility bridge.
+That bridge is deprecated in the pinned provider; its newer refresh entry points
+are internal APIs and are deliberately not linked by KaryoForge. Strict API
+verification remains enabled, and this boundary is covered by real install,
+uninstall and failure checks against the exact supported provider build.
+
 ## Run, test and debug
 
 Use the native **Run > Edit Configurations...** dialog for a Python script path

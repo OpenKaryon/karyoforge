@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 27 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments creation and seven native Python runtime cases |
+| Native headless integration tests | 34 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments project workflows, dependency guards and eight native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -86,9 +86,9 @@ strict verifier reported Compatible without deprecated project API usages.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Twenty-three native tests are available without runtime opt-in, including
+AppData directories. Twenty-six native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 27 tests, including the seven process
+explicit-runtime invocation passed all 34 tests, including the eight process
 and debugger acceptance cases.
 
 Creation acceptance created a real environment, ran its bundled pip and assigned
@@ -103,6 +103,14 @@ native Python module builder. They create module roots with spaces, preserve the
 existing project SDK and confirm that source/dependency/environment files survive
 setup. They do not simulate clicking through the project wizard or the platform's
 trust/window-selection dialogs; those remain interactive acceptance.
+
+Dependency acceptance installed an owned wheel through a requirements file with
+spaces using `--no-index`, imported its value with the selected real interpreter,
+removed it and verified both native package state and import removal. A missing
+wheel produced a real pip failure without changing the module SDK. Base-Python
+and missing-file guards passed. The final package boundary passed targeted tests
+and strict verification after replacing internal provider calls with its public
+compatibility bridge; deprecation diagnostics remain visible.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 

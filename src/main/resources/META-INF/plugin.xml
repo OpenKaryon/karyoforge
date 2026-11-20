@@ -34,6 +34,9 @@
             <action id="org.openkaryon.karyoforge.python.createEnvironment" text="Create Python Environment..."
                     description="Create a local virtual environment and assign it to a module"
                     class="org.openkaryon.karyoforge.languages.python.CreatePythonEnvironmentAction"/>
+            <action id="org.openkaryon.karyoforge.python.installRequirements" text="Install Python Requirements..."
+                    description="Install an explicitly chosen requirements file into the module virtual environment"
+                    class="org.openkaryon.karyoforge.languages.python.InstallPythonRequirementsAction"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </group>
     </actions>

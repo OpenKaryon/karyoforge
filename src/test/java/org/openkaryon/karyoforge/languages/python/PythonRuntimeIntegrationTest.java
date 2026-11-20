@@ -292,6 +292,81 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
         }
     }
 
+    public void testRequirementsInstallAndRemovalRefreshNativePackageState() throws Exception {
+        Path root = Path.of(sourceRoot.getPath());
+        var lifetime = Disposer.newDisposable();
+        try {
+            Path target = root.resolve("dependency environment");
+            var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+            Path executable = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    VirtualEnvironmentCreation.create(getProject(), lifetime, Path.of(interpreter.getHomePath()), target, indicator)), 60_000);
+            PythonSdkUpdater.setEnabledInTests(true);
+            com.intellij.openapi.projectRoots.Sdk sdk;
+            try {
+                sdk = ExistingPythonEnvironments.prepare(executable);
+                assertNotNull(sdk);
+                Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() ->
+                        com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance().removeJdk(sdk)));
+            } finally {
+                PythonSdkUpdater.setEnabledInTests(false);
+            }
+            PythonInterpreters.assign(getModule(), sdk);
+            var environment = PythonDependencyOperations.selected(getModule());
+            Path wheel = root.resolve("karyoforge_fixture-1.0.0-py3-none-any.whl");
+            var entries = new java.util.LinkedHashMap<String, String>();
+            entries.put("karyoforge_fixture.py", "VALUE = 42\n");
+            entries.put("karyoforge_fixture-1.0.0.dist-info/METADATA", "Metadata-Version: 2.1\nName: karyoforge-fixture\nVersion: 1.0.0\n");
+            entries.put("karyoforge_fixture-1.0.0.dist-info/WHEEL", "Wheel-Version: 1.0\nGenerator: KaryoForge acceptance\nRoot-Is-Purelib: true\nTag: py3-none-any\n");
+            entries.put("karyoforge_fixture-1.0.0.dist-info/RECORD", "");
+            entries.put("karyoforge_fixture-1.0.0.dist-info/RECORD",
+                    entries.keySet().stream().map(name -> name + ",,\n").collect(java.util.stream.Collectors.joining()));
+            try (var archive = new java.util.zip.ZipOutputStream(Files.newOutputStream(wheel))) {
+                for (var entry : entries.entrySet()) {
+                    archive.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));
+                    archive.write(entry.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    archive.closeEntry();
+                }
+            }
+            Path requirements = Files.writeString(root.resolve("project requirements.txt"), "--no-index\n./" + wheel.getFileName() + "\n");
+            PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                PythonDependencyOperations.run(getProject(), lifetime, environment, root,
+                        PythonDependencyOperations.requirementsArguments(requirements), "Requirements acceptance", indicator);
+                return true;
+            }), 45_000);
+            var manager = environment.packages();
+            assertTrue(manager.getPackages().toString(), manager.getPackages().stream().anyMatch(value -> "karyoforge-fixture".equals(value.getName().replace('_', '-'))));
+            var imported = PythonEnvironmentProcess.command(executable, root, List.of("-I", "-c", "import karyoforge_fixture;print(karyoforge_fixture.VALUE)"));
+            var output = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> new CapturingProcessHandler(imported).runProcess(15_000)), 20_000);
+            assertEquals(output.getStderr(), 0, output.getExitCode());
+            assertEquals("42", output.getStdout().trim());
+            PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                PythonDependencyOperations.run(getProject(), lifetime, environment, root,
+                        List.of("uninstall", "--yes", "karyoforge-fixture"), "Package removal acceptance", indicator);
+                return true;
+            }), 45_000);
+            assertFalse(manager.getPackages().stream().anyMatch(value -> "karyoforge-fixture".equals(value.getName().replace('_', '-'))));
+            var removed = PythonEnvironmentProcess.command(executable, root, List.of("-I", "-c",
+                    "import importlib.util;assert importlib.util.find_spec('karyoforge_fixture') is None"));
+            var removalOutput = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    new CapturingProcessHandler(removed).runProcess(15_000)), 20_000);
+            assertEquals(removalOutput.getStderr(), 0, removalOutput.getExitCode());
+            Files.writeString(requirements, "--no-index\n./missing-fixture.whl\n");
+            assertTrue(PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                try {
+                    PythonDependencyOperations.run(getProject(), lifetime, environment, root,
+                            PythonDependencyOperations.requirementsArguments(requirements), "Failed requirements acceptance", indicator);
+                    return false;
+                } catch (com.intellij.execution.ExecutionException expected) {
+                    return expected.getMessage().contains("exit code");
+                }
+            }), 30_000));
+            assertSame(sdk, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
     private PythonRunConfiguration scriptConfiguration() {
         var configuration = (PythonRunConfiguration) PythonConfigurationType.getInstance().getFactory().createTemplateConfiguration(getProject());
         configuration.setUseModuleSdk(false);
