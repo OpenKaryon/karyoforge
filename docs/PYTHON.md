@@ -43,6 +43,13 @@ debugger owns suspension, frame variables, expression evaluation, continuation
 and stopping the launched process. KaryoForge does not start test discovery or
 user code merely because a project or Python file is opened.
 
+## Usage-statistics compatibility
+
+The branded runtime includes the OpenKaryon consent compatibility resource and
+disables platform feature-usage collection/reporting. Native Python package
+listeners and editor inspections can check permissions without creating user
+confirmations or throwing `consentMap` errors. See [branding](BRANDING.md).
+
 ## Executed acceptance
 
 Native headless tests check Python PSI/highlighting, cross-file function

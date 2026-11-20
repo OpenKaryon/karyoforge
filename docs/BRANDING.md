@@ -24,8 +24,9 @@ does not install fonts.
 ## Resource overlay
 
 `make branding` builds `build/branding/karyoforge-branding-0.1.0-SNAPSHOT.jar`.
-The resource-only JAR contains the five assets, notices, a SHA-256 asset manifest
-and generated `idea/IdeaApplicationInfo.xml`. It is separate from the installable
+The resource-only JAR contains the five assets, notices, a SHA-256 asset manifest,
+generated `idea/IdeaApplicationInfo.xml` and the native
+`consents-OpenKaryon.json` compatibility resource. It is separate from the installable
 KaryoForge plugin ZIP: a normal plugin installation does not replace its host
 IDE's application identity.
 
@@ -52,10 +53,26 @@ to the staged `bin/karyoforge.exe`, preserving the SDK cache. It bundles the sam
 branding resource overlay. See [Windows distribution](WINDOWS_DISTRIBUTION.md).
 The Gradle development launch continues to use the cached native launcher.
 
+## Usage statistics
+
+The OpenKaryon consent resource defines unavailable native usage-statistics,
+EAP-feedback and AI-data-collection services. Its entries remain unaccepted and
+are marked unavailable; they do not create a user confirmation or prompt for
+services this product does not offer. A missing vendor resource causes the
+pinned platform's consent lookup to throw instead of returning an undefined
+permission, including from Python listeners and editor inspection passes.
+
+Development launches and standalone Windows packaging disable feature-usage
+collection and reporting with `idea.disable.collect.statistics=true` and
+`idea.suppress.statistics.report=true`; headless statistics remain disabled.
+This policy does not disable local diagnostic logs or performance measurements.
+It does not modify JetBrains SDK JARs or another IDE's consent settings.
+
 ## Validation
 
 `make test-branding` starts a fresh headless JVM using the overlay before the
-SDK libraries. The probe reads native `ApplicationNamesInfo` and application
+SDK libraries. It also exercises native consent lookup with isolated storage
+and verifies that permission reads do not create accepted-consent files. The probe reads native `ApplicationNamesInfo` and application
 metadata, checks KaryoForge/OpenKaryon identity and the unchanged platform build,
 and renders the small SVG through IntelliJ's SVG loader at 16 and 32 pixels.
 It decodes both splash images and verifies that their resources came from the

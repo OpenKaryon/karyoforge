@@ -78,6 +78,18 @@ tasks.register<Copy>("stageVerifierPlugins") {
 }
 
 tasks.test {
+    dependsOn("brandingJar")
+    systemProperty("idea.vendor.name", "OpenKaryon")
+    systemProperty("intellij.platform.load.app.info.from.resources", "true")
+    systemProperty("idea.disable.collect.statistics", "true")
+    systemProperty("idea.suppress.statistics.report", "true")
+    systemProperty("idea.headless.enable.statistics", "false")
+    val consentProfile = layout.buildDirectory.dir("test-profile").get().asFile
+    environment("APPDATA", consentProfile.resolve("roaming").absolutePath)
+    environment("LOCALAPPDATA", consentProfile.resolve("local").absolutePath)
+    doFirst {
+        classpath = files(tasks.named<Jar>("brandingJar").flatMap { it.archiveFile }) + classpath
+    }
     if (!providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) {
         exclude("**/PythonRuntimeIntegrationTest.class")
     }
@@ -93,6 +105,9 @@ tasks.test {
 }
 
 tasks.withType<JavaExec>().configureEach {
+    systemProperty("idea.disable.collect.statistics", "true")
+    systemProperty("idea.suppress.statistics.report", "true")
+    systemProperty("idea.headless.enable.statistics", "false")
     val nativeDirectory = layout.buildDirectory.dir("native").get().asFile
     systemProperty("winp.folder.preferred", nativeDirectory.absolutePath)
     doFirst {
@@ -122,7 +137,7 @@ val brandingJar = tasks.register<Jar>("brandingJar") {
     archiveBaseName.set("karyoforge-branding")
     destinationDirectory.set(layout.buildDirectory.dir("branding"))
     from(brandingOutput) {
-        include("idea/IdeaApplicationInfo.xml", "branding-manifest.json", "karyoforge.svg",
+        include("idea/IdeaApplicationInfo.xml", "branding-manifest.json", "consents-OpenKaryon.json", "karyoforge.svg",
             "karyoforge_16.svg", "karyoforge.ico", "karyoforge_logo.png", "karyoforge_logo@2x.png")
     }
     from(files("LICENSE", "NOTICE")) { into("META-INF") }
@@ -151,6 +166,9 @@ tasks.register<JavaExec>("verifyBranding") {
     doFirst {
         systemProperty("idea.home.path", sdkDirectory.get().absolutePath)
     }
+    val consentProfile = layout.buildDirectory.dir("branding/probe-profile").get().asFile
+    environment("APPDATA", consentProfile.resolve("roaming").absolutePath)
+    environment("LOCALAPPDATA", consentProfile.resolve("local").absolutePath)
     args(providers.gradleProperty("platformBuild").get())
 }
 

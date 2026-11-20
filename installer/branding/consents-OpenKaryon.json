@@ -1,0 +1,26 @@
+[
+  {
+    "consentId": "rsch.send.usage.stat",
+    "version": "1.0",
+    "text": "Usage statistics collection and reporting are disabled in this KaryoForge build.",
+    "printableName": "Usage statistics unavailable",
+    "accepted": false,
+    "deleted": true
+  },
+  {
+    "consentId": "eap",
+    "version": "1.0",
+    "text": "Early access feedback subscriptions are not offered by this KaryoForge build.",
+    "printableName": "Feedback subscriptions unavailable",
+    "accepted": false,
+    "deleted": true
+  },
+  {
+    "consentId": "ai.data.collection.and.use.policy",
+    "version": "1.0",
+    "text": "AI usage data collection is not offered by this KaryoForge build.",
+    "printableName": "AI data collection unavailable",
+    "accepted": false,
+    "deleted": true
+  }
+]

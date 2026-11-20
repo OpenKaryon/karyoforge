@@ -7,11 +7,12 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 | Check | Result |
 | --- | --- |
-| Source lint, tool tests and namespace/inventory audit | Passed; 28 Python tool tests, including branding and distribution input boundaries |
+| Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
 | Native headless integration tests | 14 tests passed, no failures/errors/skips: platform, editing, Python editor/module ownership and four native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
+| Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
 | Product branding | Native product/vendor/build metadata, both splash images and 16/32 px SVG rendering checked in a fresh headless JVM |
 | Standalone Windows IDE | Bundled Java startup passed with 187 configurables, including KaryoForge and Python Integrated Tools |
 | Windows installer | NSIS 3.13 compiled the per-user EXE; adjacent SHA-256 matches the completed executable |
@@ -75,6 +76,11 @@ Setup and uninstall were not run on the owner's Windows installation.
 
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
+The default native test task now runs with the branding overlay and isolated
+AppData directories. Twelve native tests pass without runtime opt-in, including
+two consent regression cases; the earlier four Python runtime cases remain
+separately recorded above.
+
 Raw local diagnostics and cache paths are not committed as product evidence.
 
 ## Scope

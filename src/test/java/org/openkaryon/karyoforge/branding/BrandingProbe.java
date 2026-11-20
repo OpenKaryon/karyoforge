@@ -1,5 +1,6 @@
 package org.openkaryon.karyoforge.branding;
 
+import com.intellij.ide.gdpr.ConsentOptions;
 import com.intellij.openapi.application.ApplicationNamesInfo;
 import com.intellij.openapi.application.impl.ApplicationInfoImpl;
 import com.intellij.util.SVGLoader;
@@ -29,7 +30,18 @@ public final class BrandingProbe {
             int scale = name.contains("@2x") ? 2 : 1;
             require(splash.getWidth() == 760 * scale && splash.getHeight() == 440 * scale, "Splash size: " + name);
         }
-        System.out.println("KaryoForge branding passed: native product metadata, build, SVG at 16/32 px and both splash images.");
+        resource("/consents-OpenKaryon.json");
+        var confirmed = ConsentOptions.getConfirmedConsentsFileForTests();
+        require(confirmed.startsWith(java.nio.file.Path.of(System.getenv("APPDATA"))), "Isolated consent storage");
+        require(!java.nio.file.Files.exists(confirmed), "Probe starts without accepted consents");
+        var consents = ConsentOptions.getInstance();
+        var consent = consents.getDefaultUsageStatsConsent();
+        require(consent != null && !consent.isAccepted() && consent.isDeleted(), "Usage statistics must not be accepted by default");
+        require(consents.isSendingUsageStatsAllowed() != ConsentOptions.Permission.YES, "No implicit usage consent");
+        require(consents.getAiDataCollectionPermission() != ConsentOptions.Permission.YES, "No implicit AI consent");
+        require(consents.isEAPFeedbackAllowed() != ConsentOptions.Permission.YES, "No implicit survey consent");
+        require(!java.nio.file.Files.exists(confirmed), "Consent reads must not persist acceptance");
+        System.out.println("KaryoForge branding and consent checks passed: native product metadata, build, SVG at 16/32 px and both splash images.");
     }
 
     private static URL resource(String name) {

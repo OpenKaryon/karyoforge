@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -45,8 +46,20 @@ class BrandingTest(unittest.TestCase):
         self.assertEqual("IC-252.28539.97", document.find("a:build", ns).attrib["number"])
         manifest = json.loads((self.output / "branding-manifest.json").read_text())
         self.assertEqual(set(BRANDING.ASSETS), set(manifest["assets"]))
-        self.assertEqual(set(BRANDING.ASSETS) | {"idea/IdeaApplicationInfo.xml", "branding-manifest.json"},
+        self.assertEqual(set(BRANDING.ASSETS) | {"idea/IdeaApplicationInfo.xml", "branding-manifest.json", "consents-OpenKaryon.json"},
                          {path.relative_to(self.output).as_posix() for path in self.output.rglob("*") if path.is_file()})
+
+    def test_accepted_telemetry_policy_is_rejected_before_creating_output(self):
+        assets = self.root / "assets"
+        assets.mkdir()
+        for name in (*BRANDING.ASSETS, "consents-OpenKaryon.json"):
+            shutil.copy2(ROOT / "installer/branding" / name, assets / name)
+        policy = json.loads((assets / "consents-OpenKaryon.json").read_text())
+        policy[0]["accepted"] = True
+        (assets / "consents-OpenKaryon.json").write_text(json.dumps(policy))
+        with self.assertRaisesRegex(ValueError, "unaccepted native telemetry consents"):
+            BRANDING.prepare(self.sdk, assets, self.output, "252.28539.97")
+        self.assertFalse(self.output.exists())
 
     def test_wrong_platform_fails_before_creating_an_overlay(self):
         self.product.write_text(json.dumps({"productCode": "IC", "buildNumber": "252.0.1"}))

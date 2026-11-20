@@ -170,7 +170,9 @@ def stage(inputs: dict, lock: dict) -> Path:
                      "idea.config.path=${user.home}/AppData/Roaming/" + profile + "\n"
                      "idea.system.path=${user.home}/AppData/Local/" + profile + "\n"
                      "idea.plugins.path=${idea.config.path}/plugins\n"
-                     "idea.log.path=${idea.system.path}/log\nide.no.platform.update=true\n")
+                     "idea.log.path=${idea.system.path}/log\nide.no.platform.update=true\n"
+                     "idea.disable.collect.statistics=true\nidea.suppress.statistics.report=true\n"
+                     "idea.headless.enable.statistics=false\n")
     notices = app / "openkaryon-license"
     notices.mkdir()
     for name in ("LICENSE", "NOTICE"):

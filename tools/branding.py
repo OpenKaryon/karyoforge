@@ -53,6 +53,14 @@ def prepare(sdk: Path, assets: Path, output: Path, expected_build: str) -> None:
     for name in ("icon", "icon-eap"):
         element(name).attrib.update(svg="/karyoforge.svg", **{"svg-small": "/karyoforge_16.svg"})
 
+    policy_name = "consents-OpenKaryon.json"
+    policy = (assets / policy_name).read_bytes()
+    records = json.loads(policy)
+    required = {"rsch.send.usage.stat", "eap", "ai.data.collection.and.use.policy"}
+    if ({row["consentId"] for row in records} != required or len(records) != len(required)
+            or any(row.get("accepted") is not False or row.get("deleted") is not True for row in records)):
+        raise ValueError("OpenKaryon must define unavailable, unaccepted native telemetry consents")
+
     # Validate the complete explicit input set before creating any output.
     content = {name: (assets / name).read_bytes() for name in ASSETS}
     for name, size in (("karyoforge.svg", "64"), ("karyoforge_16.svg", "16")):
@@ -72,9 +80,11 @@ def prepare(sdk: Path, assets: Path, output: Path, expected_build: str) -> None:
         raise ValueError("Unresolved upstream build placeholder")
     (output / "idea").mkdir(parents=True, exist_ok=True)
     (output / "idea/IdeaApplicationInfo.xml").write_bytes(metadata)
+    (output / policy_name).write_bytes(policy)
     for name, data in content.items():
         (output / name).write_bytes(data)
     manifest = {"platformBuild": "IC-" + expected_build,
+                "consentPolicy": {"resource": policy_name, "sha256": hashlib.sha256(policy).hexdigest()},
                 "assets": {name: hashlib.sha256(data).hexdigest() for name, data in content.items()}}
     (output / "branding-manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
