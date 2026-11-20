@@ -66,6 +66,12 @@ inputs and native console ownership. Standard project metadata is read through
 the pinned TOML provider; pip retains responsibility for PEP 517/660 backend
 execution and editable installation. PythonCore's public compatibility bridge
 owns installed-package refresh; internal provider APIs remain excluded.
+New module console actions snapshot the local SDK on a fresh native runner.
+The terminal action opens a fresh tab at the module root and delegates virtual
+environment activation to PythonCore's terminal integration. Session actions
+initialize missing native SDK data without changing saved console preferences
+or existing processes. TOML and Terminal are explicit pinned-platform plugin
+dependencies, already included in the standalone distribution.
 See [Python development](PYTHON.md) for supported interactions and acceptance.
 
 ## Usage roles and capability boundaries

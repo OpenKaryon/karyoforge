@@ -9,11 +9,11 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 29 Python tool tests, including branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 39 tests passed, no failures/errors/skips: platform, editing, consent policy, existing environments project workflows, dependency guards standard project metadata and nine native Python runtime cases |
+| Native headless integration tests | 43 tests passed, no failures/errors/skips: platform, editing, consent, environments, project/dependency/session guards and ten real Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
-| Python project workflows | Three additional native checks passed: Python wizard registration, explicit SDK/content-root creation and preservation of existing source/dependency/environment files |
+| Python project workflows | Three native checks passed: Python wizard registration, explicit SDK/content-root creation and preservation of existing source/dependency/environment files |
 | Product branding | Native product/vendor/build metadata, both splash images and 16/32 px SVG rendering checked in a fresh headless JVM |
 | Standalone Windows IDE | Bundled Java startup passed with 187 configurables, including KaryoForge and Python Integrated Tools |
 | Windows installer | NSIS 3.13 compiled the per-user EXE; adjacent SHA-256 matches the completed executable |
@@ -23,7 +23,7 @@ The strict verifier configuration treats incompatible APIs, invalid packaging,
 missing dependencies, internal APIs and override-only API usage as failures.
 The stock SDK reports missing layout components in its product metadata; those
 warnings remain visible and the final plugin verdict is Compatible. The native
-test compilation reports a deprecated test API and the test JVM emits a class
+test compilation reports deprecated test APIs and the test JVM emits a class
 data-sharing warning for the platform classloader; neither is a passing claim
 for unexecuted behavior.
 Headless settings-index generation also retains stock shared-index, theme/grid
@@ -71,7 +71,7 @@ with an explicit bundled-plugin allowlist. Its packaged Java started the native
 headless settings-index command in a disposable profile, reported KaryoForge
 IC-252.28539.97 and loaded both PythonCore and the public plugin. The generated
 indices contain their actual settings IDs. The per-user installer compiled with
-NSIS 3.13 using zlib compression and is 627,537,314 bytes. Native launcher resource
+NSIS 3.13 using zlib compression and is 627,578,267 bytes. Native launcher resource
 metadata reports KaryoForge/OpenKaryon; the local executable is unsigned.
 Setup and uninstall were not run on the owner's Windows installation.
 
@@ -81,14 +81,15 @@ same SDK on repeated selection and ran a native Python configuration whose
 `sys.executable` matched that environment. Bounded-discovery tests exercised
 missing markers/executables, dotenv exclusion, nested-directory exclusion,
 normalized path identity and preservation of module/project SDK state. The
-strict verifier reported Compatible without deprecated project API usages.
+strict verifier reported Compatible. Package refresh retains a deprecated
+public provider bridge; internal APIs remain rejected.
 
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Thirty native tests are available without runtime opt-in, including
+AppData directories. Thirty-three native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 39 tests, including the nine process
+explicit-runtime invocation passed all 43 tests, including the ten process
 and debugger acceptance cases.
 
 Creation acceptance created a real environment, ran its bundled pip and assigned
@@ -119,6 +120,22 @@ after an ordinary install, another source edit did not change the installed copy
 Native metadata tests covered tables, inline/dotted keys, quoted extra names,
 unterminated strings and rejection of tool-only configuration. Strict verification
 accepted the explicit TOML dependency without internal API usage.
+
+Session acceptance launched two real native Python Consoles with different
+interpreters, executed input in both, changed the module SDK and verified that
+the first console kept its original runtime. A native terminal customizer
+activated each chosen virtual environment; real `cmd` children reported the
+expected `sys.executable`. Saved console preferences were preserved. Native
+project save/dispose/reload restored the module SDK and source files. Terminal
+widget interaction and PowerShell activation remain manual GUI acceptance.
+Forced console cleanup can leave native RPC/socket shutdown warnings in test
+logs; all owned processes terminated and the native suite passed.
+
+The latest installer includes the vendor consent resource and disabled usage
+collection/sending properties. Its SHA-256 is
+`f54a3222ece9d59ba17cdef451fee37ee6bad4ccc6c379b1ddd6d7cbd2812727`.
+The packaged-Java smoke run used isolated AppData directories as well as native
+config/cache/log paths and exposed both public and Python settings successfully.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 

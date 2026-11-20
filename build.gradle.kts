@@ -28,6 +28,7 @@ dependencies {
         testFramework(TestFrameworkType.Platform, providers.gradleProperty("platformBuild").get())
         testBundledModule("intellij.spellchecker")
         bundledPlugin("org.toml.lang")
+        bundledPlugin("org.jetbrains.plugins.terminal")
         testBundledPlugin("com.intellij.java")
         javaCompiler(providers.gradleProperty("platformBuild").get())
         pluginVerifier("1.410")

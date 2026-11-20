@@ -280,6 +280,8 @@ def smoke(app: Path) -> None:
     classpath = os.pathsep.join(str(app / "lib" / name) for name in launch["bootClassPathJarNames"])
     environment = {name: value for name, value in os.environ.items()
                    if name.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "USERPROFILE", "APPDATA", "LOCALAPPDATA"}}
+    environment["APPDATA"] = str(profile / "roaming")
+    environment["LOCALAPPDATA"] = str(profile / "local")
     with (profile / "startup.log").open("w", encoding="utf-8") as log:
         run([app / "jbr/bin/java.exe", *arguments, "-classpath", classpath, "com.intellij.idea.Main",
              "traverseUI", profile / "search-options", "true"], stdout=log, stderr=subprocess.STDOUT,

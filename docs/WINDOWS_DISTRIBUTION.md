@@ -63,8 +63,9 @@ platform build remains IC-252.28539.97. SDK JARs and the Gradle SDK cache remain
 unchanged. Platform self-updates are disabled for this pinned distribution.
 
 Python itself is not installed by Setup. After launch, open a project, choose
-its Python interpreter and install project dependencies through your normal
-environment workflow. See [Python development](PYTHON.md).
+its local Python interpreter or create a virtual environment, then explicitly
+install dependencies through Python Packages, requirements or standard project
+installation actions. See [Python development](PYTHON.md).
 
 ## Installation and profiles
 
@@ -111,7 +112,8 @@ test fixtures, pinned input agreement, Gradle archive reuse and the boundary for
 replacing an owned build stage. Extraction validates archive paths before writing.
 Rebuilding replaces only `build/windows/app` with its public ownership marker.
 
-`make verify-dist-windows` uses a fresh disposable profile and the packaged
+`make verify-dist-windows` uses fresh disposable config/cache/log and AppData
+directories, and the packaged
 Java executable to run the platform's headless settings-index command. Acceptance
 requires both public KaryoForge and native Python settings in its output. Logs
 remain in ignored `build/windows/smoke-*` directories. It does not run Setup,

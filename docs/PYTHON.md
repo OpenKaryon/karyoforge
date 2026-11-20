@@ -160,6 +160,36 @@ and native package refresh. Error dialogs include a bounded tail of process
 output; the complete output remains in Run. Cancellation is not a package
 rollback. Build backends can create their normal artifacts in the source project.
 
+## Module consoles and terminals
+
+**Tools > KaryoForge > Open Module Python Console** starts a new native Python
+Console using the selected module's current local SDK. A ready base interpreter
+or virtual environment can be used. The SDK is overridden only on that new
+runner; saved console interpreter preferences remain unchanged. Native working
+directory, startup script and console options still apply. Existing consoles
+keep their original interpreter when the module SDK changes.
+After native initialization, the action reveals and focuses the Python Console
+tool window for the new session.
+
+**Open Module Python Terminal** starts a new native terminal tab in the module's
+first local content directory. This action requires a local virtual environment;
+it rejects base SDKs instead of silently using an unrelated Python from shell
+`PATH`. PythonCore owns activation and respects its **Activate virtualenv** option
+in Terminal settings. With activation enabled, new tabs use the module's current
+environment. Disabling it is an explicit opt-out. Existing terminals are not
+restarted or reactivated, and user shell settings are not rewritten.
+For plain Windows cmd shells, a new module tab conditionally queues its
+environment's standard `activate.bat` when that environment is not already active.
+This also recovers from an empty native activation cache after a helper timeout.
+The activation opt-out is respected; custom cmd startup commands retain native
+provider behavior.
+
+Missing native SDK metadata is initialized through the provider's standard SDK
+loading API before opening a session. The selected interpreter must be visible
+to the platform's local VFS. No global `PATH`, PowerShell execution policy or base
+Python installation is modified. Module SDK references and project roots use the
+platform's normal persistence; reopening a saved project restores its SDK choice.
+
 ## Run, test and debug
 
 Use the native **Run > Edit Configurations...** dialog for a Python script path

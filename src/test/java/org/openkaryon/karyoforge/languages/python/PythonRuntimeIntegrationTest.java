@@ -431,6 +431,186 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
         }
     }
 
+    public void testNativeConsoleAndTerminalUseModuleEnvironmentAndPreserveExistingSessions() throws Exception {
+        Path root = Path.of(sourceRoot.getPath());
+        var lifetime = Disposer.newDisposable();
+        var consoles = new java.util.ArrayList<com.jetbrains.python.console.PydevConsoleRunner>();
+        var settings = com.jetbrains.python.console.PyConsoleOptions.getInstance(getProject()).getPythonConsoleSettings();
+        String previousHome = settings.getSdkHome();
+        boolean previousUseModule = settings.isUseModuleSdk();
+        boolean previousParent = settings.isPassParentEnvs();
+        String previousWorkingDirectory = settings.getWorkingDirectory();
+        var previousEnvs = new java.util.LinkedHashMap<>(settings.getEnvs());
+        var terminalSettings = com.intellij.python.terminal.PyVirtualEnvTerminalSettings.Companion.getInstance(getProject());
+        boolean previousActivation = terminalSettings.getVirtualEnvActivate();
+        var terminalOptions = org.jetbrains.plugins.terminal.TerminalProjectOptionsProvider.getInstance(getProject());
+        String previousShell = terminalOptions.getShellPath();
+        try {
+            var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+            Path target = root.resolve("session environment");
+            Path executable = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    VirtualEnvironmentCreation.create(getProject(), lifetime, Path.of(interpreter.getHomePath()), target, indicator)), 60_000);
+            PythonSdkUpdater.setEnabledInTests(true);
+            com.intellij.openapi.projectRoots.Sdk sdk;
+            try {
+                sdk = ExistingPythonEnvironments.prepare(executable);
+                assertNotNull(sdk);
+                Disposer.register(getTestRootDisposable(), () -> WriteAction.run(() ->
+                        com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance().removeJdk(sdk)));
+            } finally {
+                PythonSdkUpdater.setEnabledInTests(false);
+            }
+            PythonInterpreters.assign(getModule(), sdk);
+            terminalOptions.setShellPath("cmd.exe");
+            terminalSettings.setVirtualEnvActivate(false);
+            assertNull("The public provider's activation opt-out is preserved", ModulePythonSessions.cmdActivation(getModule()));
+            terminalSettings.setVirtualEnvActivate(true);
+            assertNotNull("The public provider enables the new cmd tab's activation", ModulePythonSessions.cmdActivation(getModule()));
+            String directory = ModulePythonSessions.terminalDirectory(getModule()).toString();
+            assertTrue("The new SDK must be a native virtual environment", PythonSdkUtil.isVirtualEnv(sdk));
+            assertNotNull("The SDK executable must be visible to the native VFS", sdk.getHomeDirectory());
+            assertSame(sdk, com.intellij.openapi.application.ReadAction.compute(() ->
+                    com.jetbrains.python.sdk.PySdkUtil.findSdkForDirectory(getProject(), Path.of(directory), false)));
+            var firstTerminal = customizeNativeTerminal(directory);
+            assertNotNull("Native terminal activation must expose VIRTUAL_ENV", firstTerminal.get("VIRTUAL_ENV"));
+            assertEquals(target, Path.of(firstTerminal.get("VIRTUAL_ENV")));
+            verifyTerminalPython(directory, firstTerminal, executable);
+            settings.setSdkHome(interpreter.getHomePath());
+            settings.setUseModuleSdk(false);
+            settings.setPassParentEnvs(false);
+            settings.setEnvs(childEnvironment());
+            settings.setWorkingDirectory(root.toString());
+            var first = ModulePythonSessions.console(getModule());
+            consoles.add(first);
+            startConsole(first);
+            assertConsolePython(first, root.resolve("first-console.txt"), executable);
+            PythonInterpreters.assign(getModule(), interpreter);
+            assertEquals(Path.of(directory), ModulePythonSessions.terminalDirectory(getModule()));
+            var nextTerminal = customizeNativeTerminal(directory);
+            assertEquals(Path.of(interpreter.getHomePath()).getParent().getParent(), Path.of(nextTerminal.get("VIRTUAL_ENV")));
+            assertEquals(target, Path.of(firstTerminal.get("VIRTUAL_ENV")));
+            verifyTerminalPython(directory, nextTerminal, Path.of(interpreter.getHomePath()));
+            var second = ModulePythonSessions.console(getModule());
+            consoles.add(second);
+            startConsole(second);
+            assertConsolePython(second, root.resolve("second-console.txt"), Path.of(interpreter.getHomePath()));
+            assertConsolePython(first, root.resolve("preserved-console.txt"), executable);
+            assertSame(sdk, first.getSdk());
+            assertEquals(interpreter.getHomePath(), settings.getSdkHome());
+            assertFalse(settings.isUseModuleSdk());
+        } finally {
+            settings.setSdkHome(previousHome);
+            settings.setUseModuleSdk(previousUseModule);
+            settings.setPassParentEnvs(previousParent);
+            settings.setWorkingDirectory(previousWorkingDirectory);
+            settings.setEnvs(previousEnvs);
+            terminalSettings.setVirtualEnvActivate(previousActivation);
+            terminalOptions.setShellPath(previousShell);
+            for (var console : consoles) {
+                var handler = console.getProcessHandler();
+                if (handler != null && !handler.isProcessTerminated()) {
+                    handler.destroyProcess();
+                    PlatformTestUtil.waitWithEventsDispatching("Owned Python console stops", handler::isProcessTerminated, 20);
+                }
+                if (console.getConsoleView() != null) Disposer.dispose(console.getConsoleView());
+            }
+            for (var descriptor : com.jetbrains.python.console.PythonConsoleToolWindow.getInstance(getProject()).getConsoleContentDescriptors()) {
+                Disposer.dispose(descriptor);
+            }
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    public void testCmdActivationUsesTheSelectedEnvironmentWithoutCachedProviderVariables() throws Exception {
+        Path root = Path.of(sourceRoot.getPath());
+        var lifetime = Disposer.newDisposable();
+        try {
+            Path target = root.resolve("cmd & activation");
+            Path executable = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                    VirtualEnvironmentCreation.create(getProject(), lifetime, Path.of(interpreter.getHomePath()), target,
+                            new com.intellij.openapi.progress.EmptyProgressIndicator())), 60_000);
+            String activation = ModulePythonSessions.cmdActivationCommand(executable, "cmd.exe /D", true);
+            assertNotNull(activation);
+            Files.writeString(root.resolve("cmd_activation_probe.py"), """
+                    import os, sys
+                    from pathlib import Path
+                    print(sys.executable)
+                    print(os.environ.get('VIRTUAL_ENV', ''))
+                    print(os.environ.get('PATH', '').lower().split(os.pathsep).count(str(Path(sys.executable).parent).lower()))
+                    """);
+            Files.writeString(root.resolve("cmd_activation_probe.cmd"), "@echo off\r\n" + activation
+                    + "\r\npython -I \"%~dp0cmd_activation_probe.py\"\r\n");
+            for (String prior : List.of("", root.resolve("other environment").toString(), target.toString())) {
+                var environment = childEnvironment();
+                environment.put("VIRTUAL_ENV", prior);
+                if (prior.equals(target.toString())) {
+                    environment.put("PATH", executable.getParent() + ";" + environment.getOrDefault("PATH", ""));
+                }
+                var command = new GeneralCommandLine(System.getenv("SystemRoot") + "\\System32\\cmd.exe", "/d", "/c",
+                        "cmd_activation_probe.cmd").withWorkDirectory(root.toFile())
+                        .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE).withEnvironment(environment);
+                var output = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                        new CapturingProcessHandler(command).runProcess(20_000)), 25_000);
+                assertEquals(output.getStderr(), 0, output.getExitCode());
+                String[] lines = output.getStdout().trim().split("\\R");
+                assertEquals(output.getStdout(), 3, lines.length);
+                assertEquals(executable, Path.of(lines[0]));
+                assertEquals(target, Path.of(lines[1]));
+                assertEquals("The selected Scripts directory appears once in PATH", "1", lines[2]);
+            }
+        } finally {
+            Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    public void testCmdActivationPreservesOptOutOtherShellsAndCustomStartupCommands() {
+        Path executable = Path.of(interpreter.getHomePath());
+        assertNull(ModulePythonSessions.cmdActivationCommand(executable, "cmd.exe", false));
+        assertNull(ModulePythonSessions.cmdActivationCommand(executable, "powershell.exe -NoLogo", true));
+        assertNull(ModulePythonSessions.cmdActivationCommand(executable, "cmd.exe /K custom-startup.cmd", true));
+    }
+
+    private java.util.Map<String, String> customizeNativeTerminal(String directory) throws Exception {
+        return PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+            var environment = childEnvironment();
+            new com.intellij.python.terminal.PyVirtualEnvTerminalCustomizer().customizeCommandAndEnvironment(getProject(), directory,
+                    new String[]{System.getenv("SystemRoot") + "\\System32\\cmd.exe"}, environment);
+            return environment;
+        }), 30_000);
+    }
+
+    private void verifyTerminalPython(String directory, java.util.Map<String, String> environment, Path expected) throws Exception {
+        Path root = Path.of(directory);
+        Files.writeString(root.resolve("terminal_probe.py"), "import sys\nprint(sys.executable)\n");
+        Files.writeString(root.resolve("terminal_acceptance.cmd"), "@echo off\r\npython -I \"%~dp0terminal_probe.py\"\r\n");
+        var command = new GeneralCommandLine(System.getenv("SystemRoot") + "\\System32\\cmd.exe", "/d", "/c", "terminal_acceptance.cmd")
+                .withWorkDirectory(directory).withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE).withEnvironment(environment);
+        var output = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() ->
+                new CapturingProcessHandler(command).runProcess(15_000)), 20_000);
+        assertEquals(output.getStderr(), 0, output.getExitCode());
+        assertEquals(expected, Path.of(output.getStdout().trim()));
+    }
+
+    private void startConsole(com.jetbrains.python.console.PydevConsoleRunner console) {
+        var ready = new AtomicBoolean();
+        console.addConsoleListener(view -> ready.set(true));
+        console.run(true);
+        PlatformTestUtil.waitWithEventsDispatching("Native Python console connects", ready::get, 45);
+        assertNotNull(console.getProcessHandler());
+        assertFalse(console.getProcessHandler().isProcessTerminated());
+    }
+
+    private void assertConsolePython(com.jetbrains.python.console.PydevConsoleRunner console, Path result, Path expected) throws Exception {
+        String literal = "'" + result.toString().replace("\\", "\\\\").replace("'", "\\'") + "'";
+        console.getConsoleExecuteActionHandler().processLine("import sys;from pathlib import Path;Path(" + literal + ").write_text(sys.executable)");
+        PlatformTestUtil.waitWithEventsDispatching("Native Python console executes input", () -> {
+            try { return Files.exists(result) && Files.size(result) > 0; } catch (java.io.IOException ignored) { return false; }
+        }, 20);
+        assertEquals(expected, Path.of(Files.readString(result)));
+    }
+
     private PythonRunConfiguration scriptConfiguration() {
         var configuration = (PythonRunConfiguration) PythonConfigurationType.getInstance().getFactory().createTemplateConfiguration(getProject());
         configuration.setUseModuleSdk(false);
