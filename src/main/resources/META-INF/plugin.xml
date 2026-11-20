@@ -4,16 +4,31 @@
     <vendor url="https://github.com/OpenKaryon">OpenKaryon</vendor>
     <description><![CDATA[
         <p>KaryoForge is an OpenKaryon workbench built on IntelliJ IDEA Community.</p>
+        <p>Native Python editing, script and module execution, unittest/pytest
+        configurations and debugging use the pinned Python Community provider.
+        Explicit interpreter selection is scoped to the active file's module.</p>
         <p>Reversible spell-checking preferences preserve existing inspection
         profiles and leave code and error diagnostics unchanged.</p>
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
+    <depends>PythonCore</depends>
     <extensions defaultExtensionNs="com.intellij">
         <applicationConfigurable parentId="tools" id="org.openkaryon.karyoforge.settings"
                                  displayName="KaryoForge"
                                  instance="org.openkaryon.karyoforge.settings.EditingSettingsConfigurable"/>
         <lang.inspectionSuppressor language=""
                                   implementationClass="org.openkaryon.karyoforge.settings.SpellingInspectionSuppressor"/>
+        <editorNotificationProvider implementation="org.openkaryon.karyoforge.languages.python.PythonInterpreterNotification"/>
+        <lang.inspectionSuppressor language="Python"
+                                  implementationClass="org.openkaryon.karyoforge.languages.python.MissingPythonInterpreterSuppressor"/>
     </extensions>
+    <actions>
+        <group id="org.openkaryon.karyoforge.tools" text="KaryoForge" popup="true">
+            <action id="org.openkaryon.karyoforge.python.chooseInterpreter" text="Choose Python Interpreter..."
+                    description="Choose the interpreter for the module owning the active Python file"
+                    class="org.openkaryon.karyoforge.languages.python.ChoosePythonInterpreterAction"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+    </actions>
 </idea-plugin>

@@ -11,7 +11,8 @@ unchanged. Source packages do not depend on a country-specific namespace.
 
 The repository currently implements reversible spelling preferences in `settings`,
 with a common settings page and spelling-only inspection overlay. It also contains
-the pinned platform foundation, native integration tests and developer/audit tools.
+native Python provider integration in `languages.python`, the pinned platform
+foundation, native integration tests and developer/audit tools.
 The boundaries below define ownership
 for application code; they are not claims that those features are implemented
 in this source snapshot. Create directories together with working code rather
@@ -47,6 +48,15 @@ These ownership rules regroup reference responsibilities without requiring one
 Gradle subproject or installable plugin per package. Optional plugin descriptors
 must isolate direct provider-class linkage where necessary. A workflow switch
 alone cannot unload a mandatory third-party plugin.
+
+## Python provider integration
+
+`languages.python` owns module/file context, explicit native interpreter selection
+and a scoped setup notification. PythonCore owns parsing, editor intelligence,
+run/test configurations, process consoles and the debugger. Its version matches
+the pinned platform build. SDK state remains in platform stores; notification
+collection does not probe executables or install dependencies.
+See [Python development](PYTHON.md) for supported interactions and acceptance.
 
 ## Usage roles and capability boundaries
 

@@ -38,6 +38,7 @@ exit; source validation is not substituted for a product installer build.
 | `build` | Delegate to Gradle `buildPlugin verifyPluginStructure`; fail if build prerequisites are absent |
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
 | `test-ide` | Delegate to Gradle `test`; fail if build prerequisites are absent |
+| `test-python` | Run native Python script/module, selected unittest/pytest and debugger checks with explicit `PYTHON_EXECUTABLE` |
 | `run` | Launch the development IDE with a separate sandbox configuration |
 | `package-windows` | Run `installer/build-installer.ps1`; fail if it is absent |
 | `package-linux` | Run `installer/build-linux.ps1`; fail if it is absent |
@@ -62,11 +63,17 @@ in the headless platform test environment and checks its ID, enabled state and
 the exact platform build. Editing tests also exercise the registered spelling
 overlay, state round-trip and settings Apply/Reset/disposal behavior. The test
 environment does not use the owner's regular IDE configuration.
+Python editor and module-isolation checks run with `make test-ide`. Real process
+and debugger checks require `make test-python PYTHON_EXECUTABLE="/path/to/python"`
+and the pinned dependencies in `tools/python-test-requirements.txt`. See
+[Python development](PYTHON.md). This suite uses 2 GB of test heap for SDK
+indexing; default platform tests retain the 1 GB limit.
+
 `make run` is an explicit interactive action, with development configuration,
 plugins, caches and logs below `.intellijPlatform`; close its IDE to end the task.
 The plugin ZIP is written under `build/distributions`. Structure checks inspect
 that ZIP; Plugin Verifier 1.410 checks the exact pinned platform offline after
-the declared tools/platform inputs have been downloaded. Reports live under
+the declared tools/platform/PythonCore inputs have been downloaded. Reports live under
 `build/reports`. Neither test execution nor archive creation is a GUI acceptance
 claim. This minimal plugin adds no automatic startup workflow or external service.
 

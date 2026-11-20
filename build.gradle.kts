@@ -21,8 +21,10 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     intellijPlatform {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
+        plugin("PythonCore", providers.gradleProperty("pythonPluginVersion").get())
         testFramework(TestFrameworkType.Platform, providers.gradleProperty("platformBuild").get())
         testBundledModule("intellij.spellchecker")
+        testBundledPlugin("com.intellij.java")
         javaCompiler(providers.gradleProperty("platformBuild").get())
         pluginVerifier("1.410")
     }
@@ -62,10 +64,21 @@ intellijPlatform {
 }
 
 tasks.named<VerifyPluginTask>("verifyPlugin") {
+    dependsOn("stageVerifierPlugins")
+    systemProperty("plugin.verifier.home.dir", layout.buildDirectory.dir("pluginVerifierHome").get().asFile.absolutePath)
     offline.set(true)
 }
 
+tasks.register<Copy>("stageVerifierPlugins") {
+    from(configurations.named("intellijPlatformPlugin"))
+    into(layout.buildDirectory.dir("pluginVerifierHome/loaded-plugins"))
+}
+
 tasks.test {
+    if (!providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) {
+        exclude("**/PythonRuntimeIntegrationTest.class")
+    }
+    systemProperty("karyoforge.python.executable", providers.gradleProperty("pythonExecutable").orElse("").get())
     // Keep tests headless and independent from the owner's normal IDE profile.
     systemProperty("java.awt.headless", "true")
     val nativeDirectory = layout.buildDirectory.dir("native-test").get().asFile
@@ -73,7 +86,7 @@ tasks.test {
     doFirst {
         nativeDirectory.mkdirs()
     }
-    maxHeapSize = "1g"
+    maxHeapSize = if (providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) "2g" else "1g"
 }
 
 tasks.withType<JavaExec>().configureEach {

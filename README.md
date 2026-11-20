@@ -5,14 +5,15 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 
 ## Available in this repository
 
-This source snapshot provides reversible spell-checking preferences, a pinned
-IntelliJ plugin foundation, native integration tests, reference-registration
-auditing and local validation commands. The plugin identity is
+This source snapshot provides native Python editing, run/test/debug support,
+explicit module interpreter setup, reversible spell-checking preferences,
+a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. Specialized editors, usage presets and workflow
 execution are not included. The reference implementation is supplied separately
 when running its audit.
 
 - [Architecture and package ownership](docs/ARCHITECTURE.md)
+- [Python development](docs/PYTHON.md)
 - [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
 - [Executed local validation](docs/VALIDATION.md)
@@ -42,7 +43,7 @@ Set `PYTHON` to select another Python executable.
 
 `make build` creates the plugin ZIP under `build/distributions`; `make run`
 opens a separate development IDE profile. The first build downloads Gradle,
-the pinned IntelliJ Community distribution and verification/test dependencies.
+the pinned IntelliJ Community distribution, PythonCore and verification/test dependencies.
 Later builds reuse their caches. `make package-windows` and `make package-linux`
 still fail explicitly because full-product installer scripts are not included.
 

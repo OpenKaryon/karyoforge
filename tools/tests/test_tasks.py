@@ -132,6 +132,24 @@ class TasksTest(unittest.TestCase):
             self.assertEqual("--check", command[-1])
             self.assertNotIn("shell", run.call_args.kwargs)
 
+    def test_python_runtime_requires_an_explicit_existing_interpreter(self):
+        with self.assertRaisesRegex(ValueError, "PYTHON_EXECUTABLE is required"):
+            TASKS.execute("test-python", self.root)
+        with self.assertRaisesRegex(ValueError, "existing interpreter"):
+            TASKS.execute("test-python", self.root, python_executable="missing-python")
+
+    def test_python_runtime_path_and_opt_in_are_forwarded_as_arguments(self):
+        interpreter = self.root / "Python runtime.exe"
+        interpreter.write_bytes(b"fixture")
+        with patch.object(TASKS, "gradle_command", side_effect=lambda root, arguments: ["gradlew", *arguments]), \
+                patch.object(TASKS.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            self.assertEqual(0, TASKS.execute("test-python", self.root, python_executable=str(interpreter)))
+            command = run.call_args.args[0]
+            self.assertIn("-PpythonRuntimeTests=true", command)
+            self.assertIn(f"-PpythonExecutable={interpreter.resolve()}", command)
+            self.assertNotIn("shell", run.call_args.kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()

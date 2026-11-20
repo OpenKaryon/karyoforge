@@ -32,6 +32,8 @@ HELP = """KaryoForge local commands:
   make build                    Gradle buildPlugin and verifyPluginStructure
   make verify                   Strict Gradle plugin compatibility verification
   make test-ide                 Gradle IDE integration tests
+  make test-python PYTHON_EXECUTABLE="/path/to/python"
+                                Native script, selected unittest/pytest and debugger checks
   make run                      Launch a separate development IDE profile
   make package-windows          Windows installer script
   make package-linux            Linux package script
@@ -143,7 +145,7 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
         "--no-daemon", "--console=plain", *tasks]
 
 
-def execute(task: str, root: Path, reference: str = "", output: str = "") -> int:
+def execute(task: str, root: Path, reference: str = "", output: str = "", python_executable: str = "") -> int:
     if task == "help":
         print(HELP)
         return 0
@@ -162,6 +164,16 @@ def execute(task: str, root: Path, reference: str = "", output: str = "") -> int
                    "--output", output or "docs/audit/reference-inventory.json"]
         if task.endswith("-check"):
             command.append("--check")
+    elif task == "test-python":
+        if not python_executable.strip():
+            raise ValueError("PYTHON_EXECUTABLE is required; select an owned Python runtime with pytest installed")
+        selected = Path(python_executable).expanduser()
+        if not selected.is_absolute():
+            selected = root / selected
+        selected = selected.resolve()
+        if not selected.is_file():
+            raise ValueError("PYTHON_EXECUTABLE must name an existing interpreter file")
+        command = gradle_command(root, ["test", "-PpythonRuntimeTests=true", f"-PpythonExecutable={selected}"])
     elif task in {"build", "verify", "test-ide", "run"}:
         tasks = {"build": ["buildPlugin", "verifyPluginStructure"],
                  "verify": ["verifyPlugin"], "test-ide": ["test"], "run": ["runIde"]}[task]
@@ -182,9 +194,10 @@ def main() -> int:
     parser.add_argument("task")
     parser.add_argument("--reference", default="")
     parser.add_argument("--output", default="")
+    parser.add_argument("--python-executable", default="")
     args = parser.parse_args()
     try:
-        return execute(args.task, ROOT, args.reference, args.output)
+        return execute(args.task, ROOT, args.reference, args.output, args.python_executable)
     except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2

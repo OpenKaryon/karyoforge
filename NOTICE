@@ -3,12 +3,15 @@ Copyright 2026 OpenKaryon contributors
 
 The technical documentation is adapted from the project's existing Apache-2.0
 KaryoForge documentation. This source snapshot contains an original plugin
-foundation, platform test and developer/audit tools, not the reference runtime.
+foundation, Python integration and developer/audit tools.
 
 IntelliJ IDEA, JetBrains and referenced language/runtime products belong to
 their respective owners. No IntelliJ, Python, R, LSP4IJ or HTSJDK runtime binaries
-are committed to this source repository. IntelliJ and verification/test libraries
-are obtained separately for development; they are not bundled in the plugin ZIP.
+are committed to this source repository. IntelliJ, PythonCore and verification/test libraries are obtained separately
+for development; they are not bundled in the KaryoForge plugin ZIP. PythonCore
+252.28539.97 is the JetBrains Python Community plugin, obtained from the official
+JetBrains Marketplace: https://plugins.jetbrains.com/plugin/7322-python-community-edition
+Its source and license notices belong to the JetBrains intellij-community project.
 
 Gradle Wrapper 9.1.0 scripts and bootstrap JAR are distributed as build tooling
 under Apache-2.0, preserving their original notices. Their source is the Gradle
