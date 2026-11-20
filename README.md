@@ -6,6 +6,7 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 ## Available in this repository
 
 This source snapshot provides native Python editing, run/test/debug support,
+native Python project creation, existing/created local environments,
 explicit module interpreter setup, reversible spell-checking preferences,
 a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. Specialized editors, usage presets and workflow

@@ -13,6 +13,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
+| Python project workflows | Three additional native checks passed: Python wizard registration, explicit SDK/content-root creation and preservation of existing source/dependency/environment files |
 | Product branding | Native product/vendor/build metadata, both splash images and 16/32 px SVG rendering checked in a fresh headless JVM |
 | Standalone Windows IDE | Bundled Java startup passed with 187 configurables, including KaryoForge and Python Integrated Tools |
 | Windows installer | NSIS 3.13 compiled the per-user EXE; adjacent SHA-256 matches the completed executable |
@@ -85,7 +86,7 @@ strict verifier reported Compatible without deprecated project API usages.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Twenty native tests are available without runtime opt-in, including
+AppData directories. Twenty-three native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
 explicit-runtime invocation passed all 27 tests, including the seven process
 and debugger acceptance cases.
@@ -96,6 +97,12 @@ cancellable owned Python process exited after cancellation. Console resources
 were disposed explicitly by their owner; native test teardown found no leaked
 editors. Validation rejects pre-existing directories and missing parents before
 starting a process. Interrupted directories are preserved for manual inspection.
+
+The project workflow checks use PythonCore's registered new-project step and
+native Python module builder. They create module roots with spaces, preserve the
+existing project SDK and confirm that source/dependency/environment files survive
+setup. They do not simulate clicking through the project wizard or the platform's
+trust/window-selection dialogs; those remain interactive acceptance.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 

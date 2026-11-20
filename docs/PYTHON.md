@@ -1,5 +1,32 @@
 # Python development
 
+## Creating and opening projects
+
+Choose **File > New > Project... > Python** to create a Python project. The Python
+entry is provided by the bundled PythonCore plugin and uses its native project
+wizard, content-root setup and Python module builder. Choose the project name,
+location and local interpreter explicitly. KaryoForge does not maintain a second
+project generator or a separate project metadata format.
+
+For a directory with existing sources, choose **File > Open...** and select that
+directory. Review the platform's trust prompt and window choice. Opening a
+directory does not mean its dependencies have been installed or its interpreter
+has been validated. Existing `main.py`, `requirements.txt`, `pyproject.toml` and
+environment files remain the project's own files.
+
+After opening, choose **Tools > KaryoForge > Use Project Python Environment...**
+to select an existing local environment, **Create Python Environment...** to
+create one, or **Choose Python Interpreter...** for another local interpreter.
+These actions also work before a Python editor is active. If the project has
+several modules, select the owning module explicitly. Configuring a Python module
+does not replace another module's SDK or the project's existing SDK.
+
+Use the platform's **Open Recent** entries to reopen an existing project. Module
+roots, SDK references and run configurations use the platform's normal `.idea`
+and module configuration files. PythonCore owns its wizard options; this does
+not make its remote interpreters or additional environment managers part of
+KaryoForge's accepted local CPython/venv workflow.
+
 ## Editor and runtime ownership
 
 KaryoForge uses JetBrains Python Community support (`PythonCore`), pinned to
