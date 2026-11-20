@@ -168,3 +168,15 @@ Native Python consoles evaluate probes at their prompts. The new console must
 use the new SDK while the original console process remains alive with its old
 executable. PowerShell uses a process-scoped execution-policy argument in this
 test profile; no saved Windows policy or global shell setting changes.
+
+## Process cleanup acceptance
+
+Windows controller tests launch disposable hidden sleepers to exercise the
+actual PowerShell cleanup script without opening an IDE. They verify that
+creation-time and executable mismatches survive, cross-run ownership is rejected,
+multiple recorded descendants can be stopped after the runner exits, and
+unrelated processes remain alive. Windows PowerShell JSON arrays are explicitly
+enumerated before each process identity is checked. Termination targets each
+recorded process separately, without traversing a parent-PID tree. An actual
+unrecorded child fixture must survive when its recorded parent is stopped. These checks validate process ownership independently
+of the guest's graphical session.
