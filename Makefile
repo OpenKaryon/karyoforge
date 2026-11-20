@@ -5,7 +5,7 @@ REFERENCE_DIR ?=
 AUDIT_OUTPUT ?= docs/audit/reference-inventory.json
 PYTHON_EXECUTABLE ?=
 
-.PHONY: help lint test audit check audit-reference audit-reference-check build verify test-ide test-python run package-windows package-linux
+.PHONY: help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run package-windows package-linux
 
 help:
 	"$(PYTHON)" tools/tasks.py help
@@ -38,6 +38,12 @@ test-ide:
 
 test-python:
 	"$(PYTHON)" tools/tasks.py test-python --python-executable "$(PYTHON_EXECUTABLE)"
+
+branding:
+	"$(PYTHON)" tools/tasks.py branding
+
+test-branding:
+	"$(PYTHON)" tools/tasks.py test-branding
 
 run:
 	"$(PYTHON)" tools/tasks.py run

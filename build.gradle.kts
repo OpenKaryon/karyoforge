@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
+
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 
@@ -95,4 +97,58 @@ tasks.withType<JavaExec>().configureEach {
     doFirst {
         nativeDirectory.mkdirs()
     }
+}
+
+val brandingOutput = layout.buildDirectory.dir("branding/resources")
+val developmentIde = tasks.named<RunIdeTask>("runIde")
+val sdkDirectory = providers.provider { developmentIde.get().platformPath.toFile() }
+val prepareBranding = tasks.register<Exec>("prepareBranding") {
+    inputs.dir("installer/branding")
+    inputs.file("tools/branding.py")
+    inputs.file(sdkDirectory.map { it.resolve("product-info.json") })
+    inputs.file(sdkDirectory.map { it.resolve("lib/app.jar") })
+    inputs.property("platformBuild", providers.gradleProperty("platformBuild"))
+    outputs.dir(brandingOutput)
+    doFirst {
+        commandLine(providers.gradleProperty("pythonCommand").orElse(providers.environmentVariable("PYTHON")).orElse("python").get(), "tools/branding.py",
+            "--sdk", sdkDirectory.get().absolutePath, "--assets", "installer/branding",
+            "--output", brandingOutput.get().asFile.absolutePath,
+            "--build", providers.gradleProperty("platformBuild").get())
+    }
+}
+val brandingJar = tasks.register<Jar>("brandingJar") {
+    dependsOn(prepareBranding)
+    archiveBaseName.set("karyoforge-branding")
+    destinationDirectory.set(layout.buildDirectory.dir("branding"))
+    from(brandingOutput) {
+        include("idea/IdeaApplicationInfo.xml", "branding-manifest.json", "karyoforge.svg",
+            "karyoforge_16.svg", "karyoforge.ico", "karyoforge_logo.png", "karyoforge_logo@2x.png")
+    }
+    from(files("LICENSE", "NOTICE")) { into("META-INF") }
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+developmentIde {
+    dependsOn(brandingJar)
+    systemProperty("intellij.platform.load.app.info.from.resources", "true")
+    systemProperty("idea.reset.classpath.from.manifest", "false")
+    doFirst {
+        classpath = files(brandingJar.flatMap { it.archiveFile }) + classpath
+    }
+}
+
+tasks.register<JavaExec>("verifyBranding") {
+    dependsOn(brandingJar, tasks.testClasses)
+    mainClass.set("org.openkaryon.karyoforge.branding.BrandingProbe")
+    classpath = files(brandingJar.flatMap { it.archiveFile }) + sourceSets.test.get().runtimeClasspath +
+        files(sdkDirectory.map { fileTree(it.resolve("lib")) { include("*.jar") } })
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
+    systemProperty("java.awt.headless", "true")
+    systemProperty("idea.platform.prefix", "Idea")
+    systemProperty("intellij.platform.load.app.info.from.resources", "true")
+    doFirst {
+        systemProperty("idea.home.path", sdkDirectory.get().absolutePath)
+    }
+    args(providers.gradleProperty("platformBuild").get())
 }

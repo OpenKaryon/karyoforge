@@ -7,11 +7,12 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 | Check | Result |
 | --- | --- |
-| Source lint, tool tests and namespace/inventory audit | Passed; 18 synthetic Python tool tests |
+| Source lint, tool tests and namespace/inventory audit | Passed; 21 Python tool tests, including branding input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
 | Native headless integration tests | 14 tests passed, no failures/errors/skips: platform, editing, Python editor/module ownership and four native Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
+| Product branding | Native product/vendor/build metadata, both splash images and 16/32 px SVG rendering checked in a fresh headless JVM |
 | Settings search index | Generated successfully; includes `org.openkaryon.karyoforge.settings` |
 
 The strict verifier configuration treats incompatible APIs, invalid packaging,

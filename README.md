@@ -13,6 +13,7 @@ execution are not included. The reference implementation is supplied separately
 when running its audit.
 
 - [Architecture and package ownership](docs/ARCHITECTURE.md)
+- [Product branding](docs/BRANDING.md)
 - [Python development](docs/PYTHON.md)
 - [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
@@ -42,7 +43,9 @@ without Make, use `python tools/tasks.py help` and the equivalent task name.
 Set `PYTHON` to select another Python executable.
 
 `make build` creates the plugin ZIP under `build/distributions`; `make run`
-opens a separate development IDE profile. The first build downloads Gradle,
+opens a separate development IDE profile with KaryoForge application branding.
+`make branding` builds its resource overlay; `make test-branding` checks native
+metadata, splash resources and SVG scaling without opening a window. The first build downloads Gradle,
 the pinned IntelliJ Community distribution, PythonCore and verification/test dependencies.
 Later builds reuse their caches. `make package-windows` and `make package-linux`
 still fail explicitly because full-product installer scripts are not included.

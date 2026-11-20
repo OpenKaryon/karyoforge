@@ -34,6 +34,8 @@ HELP = """KaryoForge local commands:
   make test-ide                 Gradle IDE integration tests
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
+  make branding                 Build the resource-only product branding JAR
+  make test-branding            Check native product identity, splash and SVG scaling
   make run                      Launch a separate development IDE profile
   make package-windows          Windows installer script
   make package-linux            Linux package script
@@ -174,9 +176,12 @@ def execute(task: str, root: Path, reference: str = "", output: str = "", python
         if not selected.is_file():
             raise ValueError("PYTHON_EXECUTABLE must name an existing interpreter file")
         command = gradle_command(root, ["test", "-PpythonRuntimeTests=true", f"-PpythonExecutable={selected}"])
-    elif task in {"build", "verify", "test-ide", "run"}:
+    elif task in {"build", "verify", "test-ide", "branding", "test-branding", "run"}:
         tasks = {"build": ["buildPlugin", "verifyPluginStructure"],
-                 "verify": ["verifyPlugin"], "test-ide": ["test"], "run": ["runIde"]}[task]
+                 "verify": ["verifyPlugin"], "test-ide": ["test"], "branding": ["brandingJar"],
+                 "test-branding": ["verifyBranding"], "run": ["runIde"]}[task]
+        if task in {"branding", "test-branding", "run"}:
+            tasks.append(f"-PpythonCommand={sys.executable}")
         command = gradle_command(root, tasks)
     elif task in {"package-windows", "package-linux"}:
         name = "build-installer.ps1" if task == "package-windows" else "build-linux.ps1"

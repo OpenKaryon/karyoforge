@@ -5,6 +5,10 @@ The technical documentation is adapted from the project's existing Apache-2.0
 KaryoForge documentation. This source snapshot contains an original plugin
 foundation, Python integration and developer/audit tools.
 
+Final KaryoForge application SVG/ICO artwork and rendered splash PNGs are
+supplied by OpenKaryon. No design generators, mockup sources or font binaries
+are included. The plugin icon derives from the final application SVG.
+
 IntelliJ IDEA, JetBrains and referenced language/runtime products belong to
 their respective owners. No IntelliJ, Python, R, LSP4IJ or HTSJDK runtime binaries
 are committed to this source repository. IntelliJ, PythonCore and verification/test libraries are obtained separately

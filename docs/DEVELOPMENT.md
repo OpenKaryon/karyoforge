@@ -39,7 +39,9 @@ exit; source validation is not substituted for a product installer build.
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
 | `test-ide` | Delegate to Gradle `test`; fail if build prerequisites are absent |
 | `test-python` | Run native Python script/module, selected unittest/pytest and debugger checks with explicit `PYTHON_EXECUTABLE` |
-| `run` | Launch the development IDE with a separate sandbox configuration |
+| `branding` | Build a resource-only KaryoForge application branding JAR |
+| `test-branding` | Check native branded metadata, both splash images and small SVG rendering in a fresh headless JVM |
+| `run` | Launch the branded development IDE with a separate sandbox configuration |
 | `package-windows` | Run `installer/build-installer.ps1`; fail if it is absent |
 | `package-linux` | Run `installer/build-linux.ps1`; fail if it is absent |
 
@@ -71,6 +73,10 @@ indexing; default platform tests retain the 1 GB limit.
 
 `make run` is an explicit interactive action, with development configuration,
 plugins, caches and logs below `.intellijPlatform`; close its IDE to end the task.
+Application branding comes from a separate resource overlay; see
+[product branding](BRANDING.md). `make branding` creates that JAR and
+`make test-branding` checks it without launching an interactive IDE.
+
 The plugin ZIP is written under `build/distributions`. Structure checks inspect
 that ZIP; Plugin Verifier 1.410 checks the exact pinned platform offline after
 the declared tools/platform/PythonCore inputs have been downloaded. Reports live under
