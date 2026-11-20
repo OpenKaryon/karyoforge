@@ -58,3 +58,19 @@ and controller unit tests do not establish that a GUI scenario passed on a VM.
 `consentMap` failures in the owned IDE logs. Starter retains its normal failure
 diagnostics. This checks the staged IDE; it does not claim installer-wizard or
 pixel-by-pixel splash acceptance.
+
+## Python project and environment scenarios
+
+`PythonProjectUiTest` exercises the native Python project wizard, explicit
+File/Open of an existing project and isolation between two Python modules.
+`PythonEnvironmentUiTest` covers creating/selecting environments, rejected
+overwrite, dialog cancellation, SDK restoration after an IDE restart, native
+completion and typing indentation. Probe scripts are launched from the editor
+and must create fresh results with the expected `sys.executable`.
+
+The environment dialog exposes accessible names for its base executable and
+destination fields. Selectors use those public UI names, native dialog titles
+and standard Driver fixtures, with no production-only test hooks.
+
+These scenarios have been compiled on the controller. Their VM execution is
+pending a supported, accessible Windows test guest; Windows 7 is unsuitable.

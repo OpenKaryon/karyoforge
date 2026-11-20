@@ -22,6 +22,8 @@ final class CreatePythonEnvironmentDialog extends DialogWrapper {
         super(module.getProject());
         setTitle("Create Python Environment for " + module.getName());
         setOKButtonText("Create");
+        base.getTextField().getAccessibleContext().setAccessibleName("Base Python executable");
+        target.getTextField().getAccessibleContext().setAccessibleName("New environment directory");
         base.addBrowseFolderListener(module.getProject(), FileChooserDescriptorFactory.singleFile());
         target.addBrowseFolderListener(module.getProject(), FileChooserDescriptorFactory.singleDir());
         var sdk = PythonSdkUtil.findPythonSdk(module);
