@@ -155,3 +155,16 @@ The debugger scenario toggles a line breakpoint in the editor, starts Debug,
 checks the suspended local variable and evaluates it through Evaluate
 Expression. The result file must remain absent until Resume. Each scenario
 also verifies the selected module interpreter through an actual script run.
+
+## Python consoles and Windows shells
+
+`PythonSessionsUiTest` runs separately with cmd and PowerShell selected through
+the fresh profile's Terminal settings. Each real shell must resolve `python`
+to the selected environment, start in the module content directory and expose
+the matching `VIRTUAL_ENV`. After the module SDK changes, the existing terminal
+must retain its interpreter and a new terminal must activate the new one.
+
+Native Python consoles evaluate probes at their prompts. The new console must
+use the new SDK while the original console process remains alive with its old
+executable. PowerShell uses a process-scoped execution-policy argument in this
+test profile; no saved Windows policy or global shell setting changes.
