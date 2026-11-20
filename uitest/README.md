@@ -142,3 +142,16 @@ MiB IDE heap by default. `--ide-memory` can select 768–4096 MiB. Environment
 artifacts record these limits, guest RAM and virtual CPU count so a successful
 run can be evaluated against its actual resources. Four GiB guests still need
 space for Windows, native IDE allocations and Python subprocesses.
+
+## Python test runners and debugger
+
+`PythonExecutionUiTest` selects unittest or pytest in native settings and runs
+an individual method, its class, its file, its folder and the last configuration
+again through editor/project-view shortcuts. Fresh append-only fixture output
+checks which tests actually ran, alongside the native passing-test summary.
+pytest comes from the transferred pinned wheelhouse.
+
+The debugger scenario toggles a line breakpoint in the editor, starts Debug,
+checks the suspended local variable and evaluates it through Evaluate
+Expression. The result file must remain absent until Resume. Each scenario
+also verifies the selected module interpreter through an actual script run.
