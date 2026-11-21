@@ -13,6 +13,10 @@ The repository currently implements reversible spelling preferences in `settings
 with a common settings page and spelling-only inspection overlay. It also contains
 native Python provider integration in `languages.python`, the pinned platform
 foundation, native integration tests and developer/audit tools.
+`notebook.model` owns strict bounded nbformat 4 JSON, lossless document snapshots,
+explicit cell mutations and saved outputs independently of IDE services. It
+registers no editor and starts no kernel. See [the document contract](NOTEBOOKS.md).
+
 The boundaries below define ownership
 for application code; they are not claims that those features are implemented
 in this source snapshot. Create directories together with working code rather

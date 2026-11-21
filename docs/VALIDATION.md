@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 48 tests passed, no failures/errors/skips: platform, editing, consent, environments, project/dependency/session guards and fifteen real Python runtime cases |
+| Native headless integration tests | 64 tests passed, no failures/errors/skips: platform, Python workflows, sixteen notebook document cases and fifteen real Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -87,10 +87,10 @@ public provider bridge; internal APIs remain rejected.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Thirty-three native tests are available without runtime opt-in, including
+AppData directories. Forty-nine native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 48 tests, including the fifteen process
-and debugger acceptance cases.
+explicit-runtime invocation passed all 64 tests, including sixteen notebook
+document cases and fifteen Python process/debugger acceptance cases.
 
 Real-process console lifecycle regressions check that completed and failed output
 can be disposed while post-processing remains active, without late cancellation.
@@ -147,6 +147,26 @@ config/cache/log paths and exposed both public and Python settings successfully.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 
+## Notebook document acceptance
+
+Sixteen model tests passed with the existing native suite: 64 tests completed
+without failures, errors or skips. Strict plugin verification and structure
+checks passed with the pinned platform. The model adds no process or network
+startup and has no graphical editor or kernel registration.
+
+Tests cover exact untouched text, source string/line-array preservation, cell
+IDs and minor-version handling, unknown cells and fields, attachments, MIME
+bundles, metadata locks and rejected conversions. They check duplicate-key and
+malformed JSON rejection, resource bounds, cyclic incoming JSON, defensive
+ownership and explicit serialization overflow. Numeric tests preserve large
+values, scientific notation and signed zero and distinguish output/metadata
+updates beyond the finite double range. UTF-8 round trips retain supplementary
+characters and escaped unpaired surrogates in both keys and values.
+
+These are document-model checks. The Python GUI evidence below covers the
+previously accepted Python distribution, including its console/terminal fixes;
+it does not establish notebook GUI or kernel acceptance.
+
 ## Windows VM GUI acceptance
 
 All 15 unique GUI methods passed in completed JUnit reports from the public
@@ -193,10 +213,10 @@ deadline while two skeleton generators were active. The successful acceptance
 covers orderly closure after provider initialization; closure during active
 skeleton generation remains outside that claim.
 
-The current product also passed all 48 native tests, strict compatibility and
+The Python GUI acceptance build also passed all 48 native tests, strict compatibility and
 plugin structure checks. Plugin Verifier retained five scheduled-removal and two
 deprecation diagnostics; its final verdict was Compatible. The rebuilt portable
-ZIP contains the current fixes. The separately recorded installer predates these
+ZIP contains the Python session fixes. The separately recorded installer predates these
 fixes and was not rebuilt or accepted through its wizard by this GUI run.
 
 Completed XML, environment details, screenshots, IDE logs and controller output

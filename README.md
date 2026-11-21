@@ -18,6 +18,7 @@ when running its audit.
 - [Windows distribution and installer](docs/WINDOWS_DISTRIBUTION.md)
 - [Product branding](docs/BRANDING.md)
 - [Python development](docs/PYTHON.md)
+- [Notebook document model](docs/NOTEBOOKS.md)
 - [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
 - [Executed local validation](docs/VALIDATION.md)
