@@ -68,7 +68,10 @@ public final class PythonEnvironmentProcess {
                 descriptor.setAutoFocusContent(false);
                 Disposer.register(lifetime, descriptor);
                 Disposer.register(descriptor, console);
-                Disposer.register(descriptor, indicator::cancel);
+                Disposer.register(descriptor, () -> {
+                    // Completed output may be reused while package-cache refresh still owns the task.
+                    if (!process.isProcessTerminated()) indicator.cancel();
+                });
                 var actions = new DefaultActionGroup();
                 actions.add(new DumbAwareAction("Stop", "Cancel this environment operation", AllIcons.Actions.Suspend) {
                     @Override public void actionPerformed(@NotNull AnActionEvent event) { indicator.cancel(); }

@@ -89,8 +89,14 @@ Reports are written to `build/reports/tests/test` and
 The default native test task now runs with the branding overlay and isolated
 AppData directories. Thirty-three native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 43 tests, including the ten process
+explicit-runtime invocation passed all 46 tests, including the thirteen process
 and debugger acceptance cases.
+
+Real-process console lifecycle regressions check that completed and failed output
+can be disposed while post-processing remains active, without late cancellation.
+Disposing active output still cancels and terminates its owned process. These
+cases preserve the selected module interpreter and verify the actual failure
+output for a nonzero exit.
 
 Creation acceptance created a real environment, ran its bundled pip and assigned
 its native SDK only when the original module selection was still current. A

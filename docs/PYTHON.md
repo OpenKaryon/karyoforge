@@ -126,6 +126,11 @@ cancellation leaves SDK choices unchanged, but pip may already have changed some
 packages. Review output and installed packages before retrying. Refresh Python
 Packages if its visible list is stale.
 
+Completed Run output can be closed or reused while package-cache refresh finishes.
+That does not cancel a completed command or replace its failure with a late
+cancellation. Closing output for an active command still cancels its owned
+process tree; background-task cancellation remains available during refresh.
+
 The installed-package refresh uses PythonCore's public compatibility bridge.
 That bridge is deprecated in the pinned provider; its newer refresh entry points
 are internal APIs and are deliberately not linked by KaryoForge. Strict API

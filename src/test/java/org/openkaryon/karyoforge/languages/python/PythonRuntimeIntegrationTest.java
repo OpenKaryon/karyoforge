@@ -281,13 +281,107 @@ public final class PythonRuntimeIntegrationTest extends PythonRuntimeFixture {
         }
     }
 
+    public void testCompletedOperationConsoleDisposalDoesNotCancelPostProcessing() throws Exception {
+        var lifetime = Disposer.newDisposable();
+        var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+        String title = "Completed console lifecycle acceptance";
+        indicator.start();
+        try {
+            var command = PythonEnvironmentProcess.command(Path.of(interpreter.getHomePath()),
+                    Path.of(sourceRoot.getPath()), List.of("-I", "-c", "print('completed operation', flush=True)"));
+            PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                PythonEnvironmentProcess.run(getProject(), lifetime, command, title, indicator);
+                return null;
+            }), 20_000);
+            assertFalse(indicator.isCanceled());
+
+            // Run content can be reused while the task still refreshes installed packages.
+            Disposer.dispose(lifetime);
+            assertFalse("Closing completed output must not cancel post-processing", indicator.isCanceled());
+            indicator.checkCanceled();
+            assertTrue("The surrounding task still owns its progress lifetime", indicator.isRunning());
+            assertSame(interpreter, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            indicator.stop();
+            if (!Disposer.isDisposed(lifetime)) Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    public void testFailedOperationConsoleDisposalKeepsItsFailureWithoutCancellation() throws Exception {
+        var lifetime = Disposer.newDisposable();
+        var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+        String title = "Failed console lifecycle acceptance";
+        indicator.start();
+        try {
+            var command = PythonEnvironmentProcess.command(Path.of(interpreter.getHomePath()),
+                    Path.of(sourceRoot.getPath()), List.of("-I", "-c",
+                            "import sys;print('owned failure output', flush=True);sys.exit(7)"));
+            var failure = PlatformTestUtil.waitForFuture(AppExecutorUtil.getAppExecutorService().submit(() -> {
+                try {
+                    PythonEnvironmentProcess.run(getProject(), lifetime, command, title, indicator);
+                    return null;
+                } catch (com.intellij.execution.ExecutionException expected) {
+                    return expected;
+                }
+            }), 20_000);
+            assertNotNull("The actual process failure must be reported", failure);
+            assertTrue(failure.getMessage(), failure.getMessage().contains("exit code 7"));
+            assertTrue(failure.getMessage(), failure.getMessage().contains("owned failure output"));
+            Disposer.dispose(lifetime);
+            assertFalse("Disposing failed output must not convert failure into cancellation", indicator.isCanceled());
+            assertSame(interpreter, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            indicator.stop();
+            if (!Disposer.isDisposed(lifetime)) Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
+    public void testActiveOperationConsoleDisposalCancelsItsOwnedProcess() throws Exception {
+        var lifetime = Disposer.newDisposable();
+        var indicator = new com.intellij.openapi.progress.EmptyProgressIndicator();
+        Path root = Path.of(sourceRoot.getPath());
+        Path pid = root.resolve("console-disposal.pid");
+        String title = "Active console lifecycle acceptance";
+        var command = PythonEnvironmentProcess.command(Path.of(interpreter.getHomePath()), root, List.of("-I", "-c",
+                "import os,time,pathlib;pathlib.Path('console-disposal.pid').write_text(str(os.getpid()));time.sleep(120)"));
+        indicator.start();
+        var future = AppExecutorUtil.getAppExecutorService().submit(() -> {
+            try {
+                PythonEnvironmentProcess.run(getProject(), lifetime, command, title, indicator);
+                fail("Disposing active output must cancel its operation");
+            } catch (com.intellij.openapi.progress.ProcessCanceledException expected) {
+                return true;
+            }
+            return false;
+        });
+        try {
+            PlatformTestUtil.waitWithEventsDispatching("Owned process starts", () -> pid.toFile().length() > 0, 20);
+            long child = Long.parseLong(Files.readString(pid));
+            assertTrue(ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false));
+            Disposer.dispose(lifetime);
+            assertTrue(PlatformTestUtil.waitForFuture(future, 15_000));
+            assertTrue(indicator.isCanceled());
+            assertFalse("The owned process exits when its active console is disposed",
+                    ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false));
+            assertSame(interpreter, PythonSdkUtil.findPythonSdk(getModule()));
+        } finally {
+            indicator.cancel();
+            PlatformTestUtil.waitWithEventsDispatching("Owned operation stops", future::isDone, 20);
+            indicator.stop();
+            if (!Disposer.isDisposed(lifetime)) Disposer.dispose(lifetime);
+            disposeEnvironmentProcesses();
+        }
+    }
+
     private void disposeEnvironmentProcesses() {
         var manager = RunContentManager.getInstance(getProject());
         for (var descriptor : manager.getAllDescriptors()) {
             var handler = descriptor.getProcessHandler();
             if (handler != null && handler.isProcessTerminated()) {
                 manager.removeRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor);
-                Disposer.dispose(descriptor);
+                if (!Disposer.isDisposed(descriptor)) Disposer.dispose(descriptor);
             }
         }
     }
