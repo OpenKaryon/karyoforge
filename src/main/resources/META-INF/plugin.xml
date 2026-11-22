@@ -13,9 +13,12 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
     <depends>PythonCore</depends>
+    <depends>com.intellij.modules.json</depends>
     <depends>org.toml.lang</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <fileTypeOverrider implementation="org.openkaryon.karyoforge.notebook.editor.NotebookJsonType" order="first"/>
+        <fileEditorProvider implementation="org.openkaryon.karyoforge.notebook.editor.NotebookEditorProvider" order="first"/>
         <applicationConfigurable parentId="tools" id="org.openkaryon.karyoforge.settings"
                                  displayName="KaryoForge"
                                  instance="org.openkaryon.karyoforge.settings.EditingSettingsConfigurable"/>
@@ -27,6 +30,9 @@
     </extensions>
     <actions>
         <group id="org.openkaryon.karyoforge.tools" text="KaryoForge" popup="true">
+            <action id="org.openkaryon.karyoforge.notebook.new" text="New Jupyter Notebook..."
+                    description="Create a local notebook without starting a Python runtime"
+                    class="org.openkaryon.karyoforge.notebook.editor.NewNotebookAction"/>
             <action id="org.openkaryon.karyoforge.python.chooseInterpreter" text="Choose Python Interpreter..."
                     description="Choose the interpreter for the module owning the active Python file"
                     class="org.openkaryon.karyoforge.languages.python.ChoosePythonInterpreterAction"/>

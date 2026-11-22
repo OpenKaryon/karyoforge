@@ -8,9 +8,10 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 This source snapshot provides native Python editing, run/test/debug support,
 native Python project creation, existing/created local environments,
 requirements and standard project installation, module consoles and terminals,
-explicit module interpreter setup, reversible spell-checking preferences,
+explicit module interpreter setup, notebook creation and passive saved-output
+previews with native JSON editing, reversible spell-checking preferences,
 a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
-`org.openkaryon.karyoforge`. Specialized editors, usage presets and workflow
+`org.openkaryon.karyoforge`. Biological editors, usage presets and workflow
 execution are not included. The reference implementation is supplied separately
 when running its audit.
 
@@ -18,7 +19,7 @@ when running its audit.
 - [Windows distribution and installer](docs/WINDOWS_DISTRIBUTION.md)
 - [Product branding](docs/BRANDING.md)
 - [Python development](docs/PYTHON.md)
-- [Notebook document model](docs/NOTEBOOKS.md)
+- [Jupyter notebook files](docs/NOTEBOOKS.md)
 - [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
 - [Executed local validation](docs/VALIDATION.md)

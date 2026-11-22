@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 64 tests passed, no failures/errors/skips: platform, Python workflows, sixteen notebook document cases and fifteen real Python runtime cases |
+| Native headless integration tests | 72 tests passed, no failures/errors/skips: platform, Python workflows, sixteen notebook document cases, eight notebook view/creation cases and fifteen real Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -87,10 +87,11 @@ public provider bridge; internal APIs remain rejected.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Forty-nine native tests are available without runtime opt-in, including
+AppData directories. Fifty-seven native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 64 tests, including sixteen notebook
-document cases and fifteen Python process/debugger acceptance cases.
+explicit-runtime invocation passed all 72 tests, including sixteen notebook
+document cases, eight notebook editor cases and fifteen Python process/debugger
+acceptance cases.
 
 Real-process console lifecycle regressions check that completed and failed output
 can be disposed while post-processing remains active, without late cancellation.
@@ -149,7 +150,7 @@ Raw local diagnostics and cache paths are not committed as product evidence.
 
 ## Notebook document acceptance
 
-Sixteen model tests passed with the existing native suite: 64 tests completed
+The document-model acceptance build passed sixteen model tests: 64 tests completed
 without failures, errors or skips. Strict plugin verification and structure
 checks passed with the pinned platform. The model adds no process or network
 startup and has no graphical editor or kernel registration.
@@ -166,6 +167,27 @@ characters and escaped unpaired surrogates in both keys and values.
 These are document-model checks. The Python GUI evidence below covers the
 previously accepted Python distribution, including its console/terminal fixes;
 it does not establish notebook GUI or kernel acceptance.
+
+## Notebook view and creation acceptance
+
+Five native editor tests and three output-preview tests passed. The complete
+explicit-Python native suite passed 72 tests without failures, errors or skips;
+plugin structure and strict compatibility checks passed. Native tests check the
+registered file/editor/action entries, raw JSON ownership, unchanged source on
+opening, page bounds, replaced-editor disposal, document reload, repair fallback
+and exclusive creation without overwriting an existing file. Output tests check
+literal markup, retained MIME data, text/output limits, local PNG decoding,
+shared page image limits and invalid-image notices.
+
+The broader run exposed a Python fixture teardown race: synchronous SDK setup
+can leave a provider refresh holding the temporary environment's executable.
+Runtime cleanup now waits for scheduled/active updates only for SDKs beneath
+that fixture's owned source root before deleting it. It does not cancel global
+provider work or weaken the deletion failure check.
+
+The notebook GUI sources include passive opening/paging and native JSON-repair
+scenarios. Compilation does not establish that these new scenarios passed on
+the Windows VM; notebook GUI acceptance is not claimed by these native checks.
 
 ## Windows VM GUI acceptance
 

@@ -237,3 +237,12 @@ The runner reads each descendant's start time and executable once before
 recording its identity. Terminated or inaccessible children are ignored.
 Native creation times must match the observed CIM creation time within its
 microsecond precision, rejecting a PID replaced after the CIM snapshot.
+
+## Notebook file scenarios
+
+`NotebookFilesUiTest` opens an owned notebook with saved outputs and code that
+would create a marker if executed. It checks passive output display, paging,
+unchanged JSON and absence of that marker. A second scenario repairs malformed
+source through the native Text editor, saves it and returns to the refreshed
+Notebook view. These cases require the same separate unlocked Windows VM as
+the Python suite. Build/compile success alone is not notebook GUI acceptance.

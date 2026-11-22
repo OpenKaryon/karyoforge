@@ -1,8 +1,44 @@
-# Notebook document model
+# Jupyter notebook files
 
-`notebook.model` provides an IDE-independent nbformat 4 document model. It does
-not register a file editor or launch Python. Its operations are in memory;
-the caller owns saving, conflict handling and undo through the IDE Document.
+Open a local `.ipynb` file to see its **Notebook** tab. Code, Markdown and Raw
+sources have read-only native previews with highlighting from their installed
+language providers. Saved text and PNG/JPEG output is displayed without starting
+Python. **Tools > KaryoForge > New Jupyter Notebook...** creates a UTF-8 notebook
+with one empty Code cell in an existing directory. Existing files are refused,
+including a file that appears after the save chooser closes.
+
+The native **Text** tab edits the same backing JSON Document. Its normal save,
+undo, reload and conflict handling remain authoritative. Editing JSON and
+returning to Notebook refreshes the cell view; malformed input shows an error
+while retaining the original source for repair. The effective JSON file type
+is provided through a public extension without persisting file associations.
+The pinned JSON provider is an explicit dependency already bundled in the IDE.
+
+Opening, paging and displaying saved outputs do not choose an interpreter,
+install packages, start a kernel or execute saved cells. HTML/SVG/JavaScript
+MIME data is retained and described rather than executed. Stream text containing
+markup is displayed literally. Kernel execution is not provided by this viewer.
+
+## View boundaries
+
+The native view accepts files up to 32 MiB and displays 20 cells per page. Source
+previews are limited to 200,000 characters per cell; full source remains in the
+Text tab. Each cell shows at most 50 outputs and 200,000 text characters. A page
+renders at most four PNG/JPEG images, each with at most 4 MiB encoded data,
+16,777,216 source pixels and 2,097,152 decoded preview pixels. Images are decoded
+from local saved MIME bytes with bounded subsampling. Invalid or excessive
+images produce a notice and retain their original data. Other saved output
+types remain in JSON with an explicit unsupported-preview notice.
+
+The view releases owned source editors on page changes, document reload and
+closure. Pending reloads check editor/project lifetime and document generation.
+The parser and serializer have their own limits described below; the native Text
+editor remains available for files outside the notebook view's bounds.
+
+## Document model
+
+`notebook.model` provides an IDE-independent nbformat 4 model. Operations are in
+memory; `notebook.editor` owns the view and the platform owns the backing Document.
 
 ## Reading and preservation
 

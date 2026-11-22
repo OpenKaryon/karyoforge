@@ -86,6 +86,7 @@ abstract class PythonRuntimeFixture extends BasePlatformTestCase {
     @Override
     protected void tearDown() throws Exception {
         try {
+            awaitOwnedSdkUpdates();
             ModuleRootModificationUtil.setModuleSdk(getModule(), null);
             if (sourceRoot != null) {
                 ModuleRootModificationUtil.updateModel(getModule(), model -> {
@@ -96,6 +97,40 @@ abstract class PythonRuntimeFixture extends BasePlatformTestCase {
             }
         } finally {
             super.tearDown();
+        }
+    }
+
+    private void awaitOwnedSdkUpdates() {
+        if (sourceRoot == null) return;
+        Path ownedRoot = Path.of(sourceRoot.getPath()).toAbsolutePath().normalize();
+        var owned = com.jetbrains.python.sdk.PythonSdkUtil.getAllSdks().stream().filter(sdk -> {
+            if (sdk.getHomePath() == null) return false;
+            try { return Path.of(sdk.getHomePath()).toAbsolutePath().normalize().startsWith(ownedRoot); }
+            catch (java.nio.file.InvalidPathException unrelated) { return false; }
+        }).toList();
+        // Synchronous SDK setup schedules remaining provider work that can still hold python.exe.
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+        if (owned.stream().anyMatch(com.jetbrains.python.sdk.PythonSdkUpdater::isUpdateScheduled)) {
+            System.out.println("Waiting for owned Python SDK updates before fixture cleanup");
+        }
+        PlatformTestUtil.waitWithEventsDispatching("Owned Python SDK updates finish before deleting their environments",
+                () -> owned.stream().noneMatch(com.jetbrains.python.sdk.PythonSdkUpdater::isUpdateScheduled), 120);
+        // Package initialization has a separate coroutine after SDK roots are ready.
+        // Await only managers for SDKs inside this fixture; do not cancel shared IDE jobs.
+        for (Sdk sdk : owned) {
+            var initialized = new java.util.concurrent.CompletableFuture<kotlin.Unit>();
+            var manager = getProject()
+                    .getService(com.jetbrains.python.packaging.management.PythonPackageManagerService.class)
+                    .forSdk(getProject(), sdk);
+            Object result = manager.waitForInit(new kotlin.coroutines.Continuation<kotlin.Unit>() {
+                @Override public kotlin.coroutines.CoroutineContext getContext() { return kotlin.coroutines.EmptyCoroutineContext.INSTANCE; }
+                @Override public void resumeWith(Object value) {
+                    try { kotlin.ResultKt.throwOnFailure(value); initialized.complete(kotlin.Unit.INSTANCE); }
+                    catch (Throwable failure) { initialized.completeExceptionally(failure); }
+                }
+            });
+            if (result != kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED()) initialized.complete(kotlin.Unit.INSTANCE);
+            PlatformTestUtil.waitForFuture(initialized, 60_000);
         }
     }
 
