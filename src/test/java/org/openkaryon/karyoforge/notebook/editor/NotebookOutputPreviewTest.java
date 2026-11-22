@@ -61,4 +61,16 @@ public final class NotebookOutputPreviewTest extends TestCase {
         var failure = new NotebookOutputPreview().create(invalid);
         assertTrue(NotebookEditorIntegrationTest.components(failure, JLabel.class).stream().anyMatch(label -> label.getText().contains("unavailable")));
     }
+    public void testMarkdownPreviewStylesLiteralTextAndCapsItsWork() {
+        var preview = new NotebookMarkdownPreview();
+        preview.showSource("# Heading\n> quoted\n```python\nprint('<html>')\n```\n<img src='https://invalid.example/never-fetch'>");
+        assertEquals("text/plain", preview.getContentType());
+        assertTrue(preview.getText().startsWith("Heading"));
+        assertTrue(preview.getText().contains("<img src='https://invalid.example/never-fetch'>"));
+        assertTrue(javax.swing.text.StyleConstants.isBold(preview.getStyledDocument().getCharacterElement(0).getAttributes()));
+        preview.showSource("line\n".repeat(2_000));
+        assertTrue(preview.getText().contains("preview limited"));
+        assertTrue(preview.getText().length() < 10_000);
+    }
+
 }

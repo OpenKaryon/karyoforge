@@ -15,8 +15,11 @@ native Python provider integration in `languages.python`, the pinned platform
 foundation, native integration tests and developer/audit tools.
 `notebook.model` owns strict bounded nbformat 4 JSON, lossless document snapshots,
 explicit cell mutations and saved outputs independently of IDE services. It
-starts no kernel. `notebook.editor` supplies native source/output previews,
-paging and exclusive notebook creation. Its public file-type extension shares raw
+starts no kernel. `notebook.editor` supplies native cell editing, saved-output
+previews, paging and exclusive notebook creation. Cell edits use independent
+model snapshots and modification-stamp guards before committing a minimal JSON
+range through native commands. `DocumentsEditor` and public Undo identity APIs
+keep the authoritative backing Document's history shared with the Text tab. Its public file-type extension shares raw
 JSON with the native Text editor, and the JSON provider is an explicit dependency.
 See [notebook files and the document contract](NOTEBOOKS.md).
 

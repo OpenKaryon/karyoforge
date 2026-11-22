@@ -70,6 +70,28 @@ public final class NotebookDocument {
         }
     }
 
+    /** Independent transaction snapshot; unchanged nested JSON is shared and never mutated in place. */
+    public NotebookDocument copy() {
+        JsonObject owned = shallowCopy(root);
+        var copiedCells = new ArrayList<Cell>();
+        JsonArray values = new JsonArray();
+        for (Cell cell : cells) {
+            JsonObject value = shallowCopy(cell.value);
+            copiedCells.add(new Cell(cell.id, value));
+            values.add(value);
+        }
+        owned.add("cells", values);
+        var copy = new NotebookDocument(originalText, owned, copiedCells);
+        copy.modified = modified;
+        return copy;
+    }
+
+    private static JsonObject shallowCopy(JsonObject original) {
+        var result = new JsonObject();
+        for (var entry : original.entrySet()) result.add(entry.getKey(), entry.getValue());
+        return result;
+    }
+
     public static NotebookDocument create() {
         JsonObject root = new JsonObject();
         root.add("cells", new JsonArray());
@@ -221,8 +243,11 @@ public final class NotebookDocument {
         validateOutput(output, "New output");
         Cell cell = requireCode(id);
         JsonObject safeOutput = NotebookJson.copy(output);
+        JsonArray outputs = new JsonArray();
+        for (JsonElement previous : cell.value.getAsJsonArray("outputs")) outputs.add(previous);
+        outputs.add(safeOutput);
         beginMutation();
-        cell.value.getAsJsonArray("outputs").add(safeOutput);
+        cell.value.add("outputs", outputs);
     }
 
     public void clearOutputs(String id) { setExecution(id, null, new JsonArray()); }

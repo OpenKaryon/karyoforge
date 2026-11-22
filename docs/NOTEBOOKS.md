@@ -1,14 +1,15 @@
 # Jupyter notebook files
 
 Open a local `.ipynb` file to see its **Notebook** tab. Code, Markdown and Raw
-sources have read-only native previews with highlighting from their installed
-language providers. Saved text and PNG/JPEG output is displayed without starting
+sources use native cell editors with highlighting from their installed language
+providers. Saved text and PNG/JPEG output is displayed without starting
 Python. **Tools > KaryoForge > New Jupyter Notebook...** creates a UTF-8 notebook
 with one empty Code cell in an existing directory. Existing files are refused,
 including a file that appears after the save chooser closes.
 
-The native **Text** tab edits the same backing JSON Document. Its normal save,
-undo, reload and conflict handling remain authoritative. Editing JSON and
+The native **Text** tab edits the same backing JSON Document as the cell editors.
+**Ctrl+S**, ordinary IDE **Undo/Redo**, reload and conflict handling operate on
+that shared document. Editing JSON and
 returning to Notebook refreshes the cell view; malformed input shows an error
 while retaining the original source for repair. The effective JSON file type
 is provided through a public extension without persisting file associations.
@@ -19,11 +20,32 @@ install packages, start a kernel or execute saved cells. HTML/SVG/JavaScript
 MIME data is retained and described rather than executed. Stream text containing
 markup is displayed literally. Kernel execution is not provided by this viewer.
 
+## Cell editing
+
+**Add Code**, **Add Markdown** and **Add Raw** append cells. Each cell offers type
+selection, movement and deletion; Code cells also offer **Clear outputs**.
+Conversion refuses to discard saved results or attachments. Source/type editing
+and deletion respect cell metadata locks; read-only files remain read-only.
+Unknown cell types are retained with disabled editing controls.
+
+Each edit uses an independent model snapshot and writes only the changed JSON
+range in a native command. Cell source projections share the backing document's
+Undo identity and do not create a second history. An invalid or excessive edit
+is rejected before writing the JSON document. A stale cell view cannot overwrite
+an external/raw-JSON change; it reloads the authoritative content and reports
+that the view changed. Untouched cells retain their source representation and
+metadata. Native cell documents normalize their displayed line endings without
+rewriting an untouched notebook.
+
+Markdown cells include a literal styled-text preview for headings, quotes and
+fenced code. It has a 20,000-character/500-line bound, does not interpret HTML,
+load URLs or execute scripts, and keeps the complete source in the cell/JSON.
+
 ## View boundaries
 
 The native view accepts files up to 32 MiB and displays 20 cells per page. Source
-previews are limited to 200,000 characters per cell; full source remains in the
-Text tab. Each cell shows at most 50 outputs and 200,000 text characters. A page
+previews are limited to 200,000 characters per cell; cells above this source
+preview bound remain read-only in the Notebook tab, with full source in Text. Each cell shows at most 50 outputs and 200,000 text characters. A page
 renders at most four PNG/JPEG images, each with at most 4 MiB encoded data,
 16,777,216 source pixels and 2,097,152 decoded preview pixels. Images are decoded
 from local saved MIME bytes with bounded subsampling. Invalid or excessive
@@ -70,7 +92,10 @@ cell type; updating notebook metadata; and replacing, appending or clearing
 Code outputs and execution counts. Stable in-memory IDs are assigned to cells
 that lack them. The first real mutation persists those IDs and advances older
 documents to minor version 5; it never downgrades a newer minor version.
-No-op edits do not rewrite or upgrade the document.
+No-op edits do not rewrite or upgrade the document. Transaction snapshots retain
+unpersisted in-memory cell IDs. Unchanged nested JSON is shared immutably;
+mutations replace owned containers so snapshots remain independent without
+copying large saved MIME payloads on each keystroke.
 
 Cell `editable` and `deletable` metadata control source/type edits and deletion.
 Conversion refuses to discard existing outputs, attachments or unrecognized

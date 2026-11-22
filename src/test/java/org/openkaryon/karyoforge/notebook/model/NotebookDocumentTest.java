@@ -334,6 +334,41 @@ public final class NotebookDocumentTest extends TestCase {
         assertEquals(value, saved.metadata().get(value).getAsString());
     }
 
+    public void testTransactionCopiesKeepVirtualIdsAndIsolateEveryExplicitMutation() throws Exception {
+        String text = notebook(0, "{\"cell_type\":\"raw\",\"metadata\":{},\"source\":[\"a\",\"b\"]}");
+        NotebookDocument original = NotebookDocument.parse(text);
+        NotebookDocument copy = original.copy();
+        String id = original.cellAt(0).id();
+        assertEquals(id, copy.cellAt(0).id());
+        assertEquals(text, copy.toJson());
+        assertFalse(copy.isModified());
+        copy.setSource(id, "changed");
+        assertEquals(text, original.toJson());
+        assertFalse(original.cellAt(0).json().has("id"));
+        assertEquals(id, NotebookDocument.parse(copy.toJson()).cellAt(0).id());
+        assertEquals(5, copy.formatMinor());
+        NotebookDocument second = copy.copy();
+        assertTrue(second.isModified());
+        assertEquals(copy.toJson(), second.toJson());
+        second.setSource(id, "another");
+        assertEquals("changed", copy.cell(id).source());
+        NotebookDocument rich = NotebookDocument.parse(RICH_NOTEBOOK);
+        NotebookDocument fork = rich.copy();
+        var output = JsonParser.parseString("{\"output_type\":\"future_output\",\"data\":{\"owned\":true}}").getAsJsonObject();
+        fork.appendOutput("code-existing", output);
+        assertEquals(3, rich.cell("code-existing").outputs().size());
+        assertEquals(4, fork.cell("code-existing").outputs().size());
+        rich.clearOutputs("code-existing");
+        assertEquals(4, fork.cell("code-existing").outputs().size());
+        fork.setCellType("markdown-existing", CellType.RAW);
+        assertEquals(CellType.MARKDOWN, rich.cell("markdown-existing").type());
+        fork.setMetadata(new JsonObject());
+        assertTrue(rich.metadata().has("custom"));
+        fork.removeCell("raw-existing");
+        assertEquals(4, rich.cells().size());
+        NotebookDocument.parse(fork.toJson());
+    }
+
     private static String notebook(int minor, String cells) {
         return "{\"nbformat\":4,\"nbformat_minor\":" + minor + ",\"metadata\":{},\"cells\":[" + cells + "]}";
     }

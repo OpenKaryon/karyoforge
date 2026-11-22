@@ -24,7 +24,7 @@ class NotebookFilesUiTest {
         val marker = project.resolve("opening-must-not-execute.result")
         val notebook = project.resolve("analysis.ipynb")
         val first = "from pathlib import Path\nPath('${marker.toString().replace('\\', '/')}').write_text('unexpected execution')"
-        val original = notebookJson(25, first)
+        val original = notebookFixtureJson(25, first)
         notebook.writeText(original)
         VmIde.context("notebook-files", project).runIdeWithDriver(runTimeout = 20.minutes).useDriverAndCloseIde {
             waitForPythonIndexing(10.minutes)
@@ -54,7 +54,7 @@ class NotebookFilesUiTest {
         val project = VmIde.project("notebook JSON repair")
         val notebook = project.resolve("repair.ipynb")
         notebook.writeText("{ invalid notebook")
-        val repaired = notebookJson(1, "value = 42")
+        val repaired = notebookFixtureJson(1, "value = 42")
         VmIde.context("notebook-repair", project).runIdeWithDriver(runTimeout = 20.minutes).useDriverAndCloseIde {
             waitForPythonIndexing(10.minutes)
             openOwnedFile(notebook)
@@ -76,25 +76,5 @@ class NotebookFilesUiTest {
         VmIde.assertNoConsentCrash()
     }
 
-    private fun notebookJson(count: Int, firstSource: String): String {
-        val cells = (0 until count).joinToString(",") { index ->
-            val source = if (index == 0) firstSource else "value = $index"
-            val outputs = if (index == 0) """[{"output_type":"stream","name":"stdout","text":"saved result only"}]""" else "[]"
-            """{"id":"cell-$index","cell_type":"code","metadata":{},"source":${jsonString(source)},"outputs":$outputs,"execution_count":1}"""
-        }
-        return """{"nbformat":4,"nbformat_minor":5,"metadata":{"custom":{"preserved":true}},"cells":[$cells]}""" + "\n"
-    }
 
-    private fun jsonString(value: String): String = buildString {
-        append('"')
-        for (character in value) when (character) {
-            '"' -> append("\\\"")
-            '\\' -> append("\\\\")
-            '\n' -> append("\\n")
-            '\r' -> append("\\r")
-            '\t' -> append("\\t")
-            else -> if (character.code < 32) append("\\u%04x".format(character.code)) else append(character)
-        }
-        append('"')
-    }
 }

@@ -246,3 +246,9 @@ unchanged JSON and absence of that marker. A second scenario repairs malformed
 source through the native Text editor, saves it and returns to the refreshed
 Notebook view. These cases require the same separate unlocked Windows VM as
 the Python suite. Build/compile success alone is not notebook GUI acceptance.
+
+`NotebookCellEditingUiTest` types into a native Code cell and exercises Save,
+keyboard Undo/Redo and actual notebook bytes. Its controls scenario rejects a
+conversion with saved results, clears outputs explicitly, changes cell type,
+adds/moves/deletes a Raw cell, restores it with native Undo and checks locked
+controls in a separate notebook. These tests use synthetic owned notebooks.

@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 72 tests passed, no failures/errors/skips: platform, Python workflows, sixteen notebook document cases, eight notebook view/creation cases and fifteen real Python runtime cases |
+| Native headless integration tests | 78 tests passed, no failures/errors/skips: platform, Python workflows, seventeen notebook document cases, thirteen notebook editor/output cases and fifteen real Python runtime cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -87,11 +87,11 @@ public provider bridge; internal APIs remain rejected.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Fifty-seven native tests are available without runtime opt-in, including
+AppData directories. Sixty-three native tests are available without runtime opt-in, including
 two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 72 tests, including sixteen notebook
-document cases, eight notebook editor cases and fifteen Python process/debugger
-acceptance cases.
+explicit-runtime invocation passed all 78 tests, including seventeen notebook
+document cases, thirteen notebook editor/output cases and fifteen Python
+process/debugger acceptance cases.
 
 Real-process console lifecycle regressions check that completed and failed output
 can be disposed while post-processing remains active, without late cancellation.
@@ -170,8 +170,8 @@ it does not establish notebook GUI or kernel acceptance.
 
 ## Notebook view and creation acceptance
 
-Five native editor tests and three output-preview tests passed. The complete
-explicit-Python native suite passed 72 tests without failures, errors or skips;
+The view/creation acceptance build passed five native editor tests and three
+output-preview tests. Its complete explicit-Python native suite passed 72 tests without failures, errors or skips;
 plugin structure and strict compatibility checks passed. Native tests check the
 registered file/editor/action entries, raw JSON ownership, unchanged source on
 opening, page bounds, replaced-editor disposal, document reload, repair fallback
@@ -188,6 +188,24 @@ provider work or weaken the deletion failure check.
 The notebook GUI sources include passive opening/paging and native JSON-repair
 scenarios. Compilation does not establish that these new scenarios passed on
 the Windows VM; notebook GUI acceptance is not claimed by these native checks.
+
+## Native notebook cell editing acceptance
+
+The full explicit-Python suite passed 78 tests. A subsequent targeted notebook
+run passed all 30 document/editor cases, and structure/strict compatibility
+checks passed after the final preview update. Native editing tests check actual
+backing JSON writes, saved bytes, two distinct source edits, native Undo/Redo,
+restoration of untouched older-format JSON, output-preserving conversion guards,
+cell creation/movement/deletion, metadata locks and read-only documents.
+
+A stale-projection test changes JSON before a pending source edit and verifies
+that the external data wins. Snapshot tests preserve virtual IDs and isolate
+source, metadata, type, output-append and structural mutations in both directions.
+Markdown tests check plain-text rendering, heading styles, literal markup and
+bounded work. Mixed-cell previews retain original CRLF source text on opening.
+
+VM GUI sources for keyboard Save/Undo/Redo and structural/locked-cell workflows
+compile. These native checks do not claim executed notebook GUI acceptance.
 
 ## Windows VM GUI acceptance
 

@@ -67,7 +67,7 @@ public final class NotebookEditorIntegrationTest extends BasePlatformTestCase {
         NotebookDocument mixed = NotebookDocument.create();
         mixed.insertCell(0, CellType.CODE, "value = 42");
         mixed.insertCell(1, CellType.MARKDOWN, "# Saved heading");
-        mixed.insertCell(2, CellType.RAW, "Raw content");
+        mixed.insertCell(2, CellType.RAW, "Raw\r\ncontent");
         var json = mixed.json();
         json.getAsJsonArray("cells").add(com.google.gson.JsonParser.parseString(
                 "{\"id\":\"opaque\",\"cell_type\":\"future_cell\",\"metadata\":{},\"source\":{\"preserved\":true}}"));
