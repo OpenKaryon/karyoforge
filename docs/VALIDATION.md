@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 78 tests passed, no failures/errors/skips: platform, Python workflows, seventeen notebook document cases, thirteen notebook editor/output cases and fifteen real Python runtime cases |
+| Native headless integration tests | 89 tests passed, no failures/errors/skips: platform, Python workflows, notebook model/editor/selection and real Python probe/kernel cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -44,6 +44,17 @@ waiting for the owned SDK's separate package-initialization coroutine before
 fixture cleanup. Strict plugin compatibility, archive structure and compilation
 of the VM-only GUI bundle also passed. Notebook GUI scenarios have not yet been
 executed on the VM; compiled coverage is not GUI acceptance.
+
+## Local notebook kernel acceptance
+
+The complete native suite passed 89 tests with no failures, errors or skips,
+using separate explicit Python and notebook runtime paths. Four real-kernel
+checks cover selected executable/cwd, retained namespace, execution counts,
+stdout/stderr/expression/error results, native document persistence, stale raw
+JSON rejection, busy closure and observed-child cleanup. An independently
+launched process stayed alive while the kernel's owned processes were stopped.
+Strict compatibility and archive structure passed. Notebook GUI execution on the
+separate Windows VM remains pending.
 
 ## Verified build inputs
 

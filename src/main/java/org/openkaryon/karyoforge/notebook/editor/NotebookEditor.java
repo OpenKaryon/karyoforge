@@ -58,6 +58,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
     private final Map<String, Editor> cellEditors = new LinkedHashMap<>();
     private final List<JButton> editingButtons = new ArrayList<>();
     private final Map<String, NotebookMarkdownPreview> markdownPreviews = new LinkedHashMap<>();
+    private NotebookKernelController execution;
     private NotebookDocument notebook;
     private long renderedStamp;
     private boolean committing;
@@ -97,6 +98,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
                 @Override public void documentChanged(@NotNull DocumentEvent event) {
                     changes.firePropertyChange(FileEditor.getPropModified(), null, isModified());
                     if (committing) return;
+                    if (execution != null) execution.invalidate();
                     dirty = true;
                     long expected = ++generation;
                     ApplicationManager.getApplication().invokeLater(() -> {
@@ -105,6 +107,13 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
                 }
             }, this);
         }
+        execution = new NotebookKernelController(project, file, () -> notebook, status::setText, this::render,
+                (id, result) -> {
+                    if (edit("Update notebook execution", model -> model.setExecution(id, result.count(), result.outputs()), true)) {
+                        status.setText("Cell execution finished: " + result.status() + ". Ctrl+S saves the result.");
+                    }
+                });
+        Disposer.register(this, execution);
         reload();
     }
 
@@ -285,6 +294,11 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         delete.addActionListener(event -> edit("Delete notebook cell", model -> model.removeCell(cell.id()), true));
         controls.add(delete);
         if (cell.type() == CellType.CODE) {
+            var run = new JButton("Run cell");
+            run.getAccessibleContext().setAccessibleName("Run cell " + (index + 1));
+            run.setEnabled(canWrite() && execution != null && !execution.isBusy());
+            run.addActionListener(event -> execution.run(cell.id()));
+            controls.add(run);
             var clear = new JButton("Clear outputs");
             clear.getAccessibleContext().setAccessibleName("Clear cell " + (index + 1) + " outputs");
             clear.setEnabled(canWrite() && (!cell.outputs().isEmpty() || cell.executionCount() != null));
@@ -321,6 +335,8 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
             return false;
         } finally { committing = false; }
     }
+
+    boolean hasOwnedKernelProcesses() { return execution != null && execution.hasOwnedProcesses(); }
 
     private void focusCell(String id) {
         Editor editor = cellEditors.get(id);

@@ -18,7 +18,7 @@ The pinned JSON provider is an explicit dependency already bundled in the IDE.
 Opening, paging and displaying saved outputs do not choose an interpreter,
 install packages, start a kernel or execute saved cells. HTML/SVG/JavaScript
 MIME data is retained and described rather than executed. Stream text containing
-markup is displayed literally. Kernel execution is not provided by this viewer.
+markup is displayed literally. Code cells offer explicit local Python execution.
 
 ## Local Python selection
 
@@ -40,6 +40,43 @@ The check has a 20-second deadline and separate 64 KiB stdout/stderr bounds.
 Switching the selection or closing the editor cancels the owned probe; pending
 results cannot update a newer selection or disposed editor. No executable is
 probed on open, paging or interpreter selection.
+
+## Local cell execution
+
+**Run cell** checks the explicitly selected Python's dependencies and starts one
+owned local Jupyter kernel in the notebook directory. Subsequent cell runs in
+the same editor and interpreter reuse its namespace and execution counter.
+Saved code never runs on opening. Notebooks declaring another language are
+preserved and declined for execution. No Jupyter server or global kernelspec
+registration is required. Remote connections and other-language kernels are
+not supported.
+
+The IDE talks to its Python helper over a private, identity-tagged JSON-lines
+protocol; the helper uses the official local Jupyter client and Python kernel.
+Connection credentials and helper files belong to a fresh temporary session,
+outside the project. Kernel stdout/stderr do not share the helper protocol pipe.
+Two dedicated daemon threads drain the helper's process pipes. On Java 21,
+blocking reads can otherwise occupy the virtual workers needed to start, execute
+and clean up kernels on machines with few CPU cores. Startup retains a 90-second
+deadline; the Jupyter readiness check has its own 60-second bound. Closing or
+cancelling startup stops only the owned session promptly, without waiting for
+those deadlines. Frames are
+bounded and the event queue applies backpressure. A cell's accepted output is bounded to 8 MiB/1,000 messages, with a
+visible notice when further output is dropped. This is an output transport
+bound, not a memory or time sandbox for explicitly executed Python code.
+
+Completed streams, expression results, rich MIME bundles, errors and execution
+counts update only the original Code cell if its identity, source, interpreter
+and backing document still match. They use the same native JSON document,
+Save and Undo history as cell editing. Results appear after execution completes;
+saved-output rendering retains its passive preview rules. A rejected excessive
+document update retains the last accepted JSON and reports the error.
+
+Closing the editor/project or replacing the raw JSON invalidates pending work
+and shuts down its owned helper/kernel. Cleanup tracks observed process
+identities, including creation time, and never searches for arbitrary Python
+processes by name. Temporary session files are removed only after owned children
+have stopped. A later explicit Run can create a fresh session.
 
 ## Cell editing
 
