@@ -30,6 +30,21 @@ Headless settings-index generation also retains stock shared-index, theme/grid
 and local recent-projects IPC warnings. It completed successfully without using
 the owner's normal IDE profile. These warnings are not hidden by editing SDK JARs.
 
+## Notebook interpreter acceptance
+
+The targeted notebook suite passed 37 native tests with no failures, errors or
+skips, including four workspace/selection cases and three real dependency-probe
+cases. The selected isolated Python 3.14.6 environment reported jupyter_client
+8.10.0 and ipykernel 7.4.0. Probe tests cover the exact executable, output bounds,
+timeout and cancellation. Selection tests cover passive opening, independent
+workspace persistence, module ownership, explicit disable and missing paths.
+
+The same run passed the existing native environment SDK reuse regression after
+waiting for the owned SDK's separate package-initialization coroutine before
+fixture cleanup. Strict plugin compatibility, archive structure and compilation
+of the VM-only GUI bundle also passed. Notebook GUI scenarios have not yet been
+executed on the VM; compiled coverage is not GUI acceptance.
+
 ## Verified build inputs
 
 - Gradle 9.1.0 wrapper JAR SHA-256:

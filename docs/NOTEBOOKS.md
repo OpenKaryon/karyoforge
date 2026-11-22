@@ -20,6 +20,27 @@ install packages, start a kernel or execute saved cells. HTML/SVG/JavaScript
 MIME data is retained and described rather than executed. Stream text containing
 markup is displayed literally. Kernel execution is not provided by this viewer.
 
+## Local Python selection
+
+The notebook header can follow the owning module's cached Python SDK, select an
+existing local Python SDK, choose a local executable, or explicitly select no
+interpreter. Selection is stored per notebook URL in the project's workspace
+file. It changes neither module/project SDKs nor portable notebook metadata.
+A missing explicit executable is reported without falling back to another SDK.
+Remote SDKs are unavailable for notebook execution.
+
+**Check dependencies** explicitly launches the selected executable in isolated
+mode to inspect metadata for `jupyter_client` and `ipykernel`. It does not import
+or start a kernel, register a kernelspec, install packages or modify an
+environment. Install missing packages into that interpreter yourself, then
+check again. Reported package presence is not a guarantee that every installed
+version will execute successfully. Probe errors remain visible.
+
+The check has a 20-second deadline and separate 64 KiB stdout/stderr bounds.
+Switching the selection or closing the editor cancels the owned probe; pending
+results cannot update a newer selection or disposed editor. No executable is
+probed on open, paging or interpreter selection.
+
 ## Cell editing
 
 **Add Code**, **Add Markdown** and **Add Raw** append cells. Each cell offers type

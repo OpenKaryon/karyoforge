@@ -110,6 +110,10 @@ tasks.test {
     if (!providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) {
         exclude("**/PythonRuntimeIntegrationTest.class")
     }
+    if (!providers.gradleProperty("notebookRuntimeTests").orElse("false").get().toBoolean()) {
+        exclude("**/NotebookProbeProcessTest.class")
+    }
+    systemProperty("karyoforge.notebook.python", providers.gradleProperty("notebookPythonExecutable").orElse("").get())
     systemProperty("karyoforge.python.executable", providers.gradleProperty("pythonExecutable").orElse("").get())
     // Keep tests headless and independent from the owner's normal IDE profile.
     systemProperty("java.awt.headless", "true")

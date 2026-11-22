@@ -83,7 +83,12 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         status.getAccessibleContext().setAccessibleName("Notebook edit status");
         previous.addActionListener(event -> { pageStart = Math.max(0, pageStart - PAGE_SIZE); render(); });
         next.addActionListener(event -> { pageStart += PAGE_SIZE; render(); });
-        component.add(toolbar, BorderLayout.NORTH);
+        var runtime = new org.openkaryon.karyoforge.notebook.runtime.NotebookRuntimePanel(project, file);
+        Disposer.register(this, runtime);
+        var header = new JPanel(new BorderLayout());
+        header.add(runtime, BorderLayout.NORTH);
+        header.add(toolbar, BorderLayout.SOUTH);
+        component.add(header, BorderLayout.NORTH);
         component.add(new JScrollPane(cells), BorderLayout.CENTER);
         component.add(status, BorderLayout.SOUTH);
         component.getAccessibleContext().setAccessibleName("KaryoForge notebook");
