@@ -246,6 +246,12 @@ for ((taskName, mode) in listOf("packageWindows" to "installer", "zipWindows" to
     }
 }
 
+val prepareNotebookFixtures = tasks.register<Exec>("prepareNotebookFixtures") {
+    inputs.files("tools/notebook_fixtures.py", "tools/notebook-test-wheels.json")
+    outputs.dir(layout.buildDirectory.dir("notebook-test-fixtures"))
+    doFirst { commandLine(providers.gradleProperty("pythonCommand").orElse("python").get(), "tools/notebook_fixtures.py", "--prepare") }
+}
+
 val prepareUiFixtures = tasks.register<Exec>("prepareUiFixtures") {
     inputs.files("tools/gui_fixtures.py", "tools/python-test-requirements.txt", "src/test/resources/python/local_build_backend.py")
     outputs.dir(layout.buildDirectory.dir("ui-test-fixtures"))
@@ -255,7 +261,7 @@ val prepareUiFixtures = tasks.register<Exec>("prepareUiFixtures") {
 tasks.register<Sync>("uiTestBundle") {
     description = "Compile the VM-only GUI suite and its isolated test runtime; do not launch an IDE locally."
     val gui = sourceSets["uiTest"]
-    dependsOn(gui.classesTaskName, prepareUiFixtures)
+    dependsOn(gui.classesTaskName, prepareUiFixtures, prepareNotebookFixtures)
     into(layout.buildDirectory.dir("ui-test-bundle"))
     from(gui.runtimeClasspath.filter { it.isFile && it.name.endsWith(".jar") }) { into("runtime") }
     from(gui.output) { into("classes") }
@@ -263,4 +269,5 @@ tasks.register<Sync>("uiTestBundle") {
     from(sdkDirectory.map { it.resolve("plugins/performanceTesting") }) { into("test-plugins/performanceTesting") }
     from("uitest") { include("*.ps1") }
     from(layout.buildDirectory.dir("ui-test-fixtures")) { into("fixtures") }
+    from(layout.buildDirectory.dir("notebook-test-fixtures")) { into("notebook-fixtures") }
 }

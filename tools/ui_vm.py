@@ -107,7 +107,7 @@ class VmConnection:
         prefix = "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
         encoded = base64.b64encode((prefix + script).encode("utf-16-le")).decode("ascii")
         command = [self.ssh, *self.options, "-p", str(self.port), self.target,
-                   "powershell.exe -NoProfile -NonInteractive -EncodedCommand " + encoded]
+                   "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand " + encoded]
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
         if result.returncode:
             raise RuntimeError(f"VM command failed ({result.returncode}): " + (result.stderr or result.stdout)[-4000:])
@@ -167,7 +167,7 @@ class VmwareConnection:
         """.replace("DESTINATION", ps_string(remote)).replace("SCRIPT", script)
         encoded = base64.b64encode(wrapper.encode("utf-16-le")).decode("ascii")
         self._call("runProgramInGuest", "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-                   "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded, timeout=timeout)
+                   "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded, timeout=timeout)
         with tempfile.TemporaryDirectory(prefix="karyoforge-vmware-") as folder:
             local = Path(folder) / "response.json"
             self.copy(remote, str(local), download=True)
@@ -261,6 +261,8 @@ def run(args: argparse.Namespace) -> int:
     shutil.copytree(bundle / "classes", payload / "classes", dirs_exist_ok=True)
     if (bundle / "fixtures").is_dir():
         shutil.copytree(bundle / "fixtures", payload / "fixtures", dirs_exist_ok=True)
+    if (bundle / "notebook-fixtures").is_dir():
+        shutil.copytree(bundle / "notebook-fixtures", payload / "notebook-fixtures", dirs_exist_ok=True)
     if (bundle / "test-plugins").is_dir():
         shutil.copytree(bundle / "test-plugins", payload / "test-plugins", dirs_exist_ok=True)
     for script in bundle.glob("*.ps1"):

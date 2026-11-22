@@ -64,7 +64,9 @@ fun pythonString(path: Path): String = "'" + path.toString().replace("\\", "\\\\
 fun Driver.createEnvironment(project: Path, name: String = ".venv"): Path {
     val target = project.resolve(name)
     invokeAction("org.openkaryon.karyoforge.python.createEnvironment", now = false)
-    ui.dialog({ contains(byTitle("Create Python Environment for")) }) {
+    val dialog = ui.dialog({ contains(byTitle("Create Python Environment for")) })
+    dialog.shouldBe("The environment dialog appears after project initialization", present, 2.minutes)
+    dialog.apply {
         textField { byAccessibleName("Base Python executable") }.text = VmIde.python.toString()
         textField { byAccessibleName("New environment directory") }.text = target.toString()
         pressButton("Create")

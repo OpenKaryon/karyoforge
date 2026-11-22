@@ -1,15 +1,15 @@
 # Local validation evidence
 
-Updated: 2026-11-22 on Windows 11 x64, Temurin JDK 21.0.11+10.
+Updated: 2026-11-23 on Windows 11 x64, Temurin JDK 21.0.11+10.
 The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 ## Executed checks
 
 | Check | Result |
 | --- | --- |
-| Source lint, tool tests and namespace/inventory audit | Passed; 44 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
+| Source lint, tool tests and namespace/inventory audit | Passed; 55 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 89 tests passed, no failures/errors/skips: platform, Python workflows, notebook model/editor/selection and real Python probe/kernel cases |
+| Native headless integration tests | 106 tests passed, no failures/errors/skips: 48 platform/Python cases and 58 notebook cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -30,58 +30,48 @@ Headless settings-index generation also retains stock shared-index, theme/grid
 and local recent-projects IPC warnings. It completed successfully without using
 the owner's normal IDE profile. These warnings are not hidden by editing SDK JARs.
 
-## Notebook interpreter acceptance
+## Notebook acceptance
 
-The targeted notebook suite passed 37 native tests with no failures, errors or
-skips, including four workspace/selection cases and three real dependency-probe
-cases. The selected isolated Python 3.14.6 environment reported jupyter_client
-8.10.0 and ipykernel 7.4.0. Probe tests cover the exact executable, output bounds,
-timeout and cancellation. Selection tests cover passive opening, independent
-workspace persistence, module ownership, explicit disable and missing paths.
+All 58 notebook native tests passed within the complete 106-test regression
+suite. The same notebook suite passed through `make test-notebook` against an
+environment created by `make notebook-runtime`. Its CPython 3.14.6 runtime uses
+jupyter_client 8.10.0, ipykernel 7.4.0 and a complete graph of 28 SHA-256-locked
+offline wheels. Creation/reuse passed `pip check` without changing the base
+interpreter. Tool tests reject corrupt downloads/manifests, unowned directories,
+different lock identities and nested links/Windows junctions. Lock files retain
+their exact bytes in both LF and CRLF checkouts.
 
-The same run passed the existing native environment SDK reuse regression after
-waiting for the owned SDK's separate package-initialization coroutine before
-fixture cleanup. Strict plugin compatibility, archive structure and compilation
-of the VM-only GUI bundle also passed. Notebook GUI scenarios have not yet been
-executed on the VM; compiled coverage is not GUI acceptance.
+| Native notebook coverage | Cases |
+| --- | ---: |
+| Strict lossless document model, exact numbers, metadata, IDs, limits and snapshots | 17 |
+| Native open/create, paging, raw JSON, cell edits/history/locks, literal Markdown and bounded previews | 14 |
+| Passive per-file workspace selection, module ownership and explicit missing/disabled choices | 4 |
+| Stream coalescing, deferred clear, live display updates and independent snapshots | 3 |
+| Real dependency probes, kernel execution/lifetimes/queue, input and native result history | 20 |
 
-## Local notebook kernel acceptance
+Real-process checks assert the selected executable and working directory,
+retained namespace/counts, streams/results/errors and absence of execution on
+opening. Queue tests cover order, non-Code skipping, errors, rejected result
+writes and edited/raw JSON invalidation. Responsive Stop preserves variables; deliberate ignored SIGINT
+triggers the five-second reset, and Restart/Shutdown retain explicit startup.
+Closing a busy kernel stops its observed child identities while an independently
+launched process remains alive. A forked real-process regression restricts Java 21
+to two carrier threads and verifies virtual-worker startup, both output streams,
+execution results, repeated fresh sessions and complete owned-process cleanup.
+Dedicated daemon pipe readers prevent blocking process I/O from occupying those
+carriers for the lifetime of the kernel. Isolated real Python environments also
+delay bridge startup beyond 40 seconds and kernel readiness beyond 30 seconds,
+verifying successful cold starts with the 90-second overall and 60-second
+readiness bounds. Cancellation during delayed startup releases the waiting
+worker, owned process and temporary runtime promptly.
 
-The complete native suite passed 89 tests with no failures, errors or skips,
-using separate explicit Python and notebook runtime paths. Four real-kernel
-checks cover selected executable/cwd, retained namespace, execution counts,
-stdout/stderr/expression/error results, native document persistence, stale raw
-JSON rejection, busy closure and observed-child cleanup. An independently
-launched process stayed alive while the kernel's owned processes were stopped.
-Strict compatibility and archive structure passed. Notebook GUI execution on the
-separate Windows VM remains pending.
-
-## Notebook queue and kernel controls
-
-All 45 targeted notebook native checks passed without failures, errors or
-skips. Additional real-kernel cases cover ordered Run All, non-Code skipping,
-queue termination on error, cancellation on queued-source edits, responsive
-interrupt with retained variables, fresh Restart and explicit Shutdown. A kernel
-that deliberately ignores SIGINT was reset after the five-second watchdog; its
-next execution started with count one and no old variables. Strict compatibility
-and structure passed. This is native acceptance; notebook VM GUI coverage still
-requires an executed run.
-
-## Notebook input and live-output acceptance
-
-All 53 targeted notebook native checks passed without failures, errors or skips.
-The real input/getpass checks cover password masking, cleared transient fields,
-no automatic echo/persistence, cancellation of queued cells and rejection of
-late responses after interruption. Live-output checks retain native source
-editor identities, keep incomplete previews out of the backing document,
-coalesce streams, implement deferred clear/current-cell display updates and
-preserve passive rich MIME. Native Undo/Redo restores one completed result
-without executing code. A nine-MiB print produces an explicit bounded notice.
-The complete preceding 101-test run identified one test-readiness race in the
-deliberately ignored-interrupt case; its corrected command-submission wait and
-all notebook cases passed the targeted rerun. Strict compatibility, structure
-and VM-only GUI compilation passed. Executed notebook GUI acceptance remains
-separate.
+Input/getpass checks cover masked passwords, cleared transient fields, no
+automatic echo/persistence, cancelled queued cells and rejected late replies.
+Live previews retain source-editor identities and do not modify accepted JSON
+until completion. Native Undo/Redo restores one completed result without
+executing code. Oversized output becomes an explicit bounded notice; saved/live
+HTML and JavaScript stay passive. GUI evidence below covers the same public
+notebook interactions on the separate Windows VM.
 
 ## Verified build inputs
 
@@ -140,11 +130,10 @@ public provider bridge; internal APIs remain rejected.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Sixty-three native tests are available without runtime opt-in, including
-two consent regression cases and six existing-environment cases. The full
-explicit-runtime invocation passed all 78 tests, including seventeen notebook
-document cases, thirteen notebook editor/output cases and fifteen Python
-process/debugger acceptance cases.
+AppData directories. Seventy-one native tests are available without runtime opt-in. The complete
+explicit-runtime invocation passed 106 cases, including fifteen Python runtime
+cases and twenty real notebook probe/kernel/editor cases. The remaining checks
+cover passive models, native editing, scope, settings and provider integration.
 
 Real-process console lifecycle regressions check that completed and failed output
 can be disposed while post-processing remains active, without late cancellation.
@@ -201,128 +190,58 @@ config/cache/log paths and exposed both public and Python settings successfully.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 
-## Notebook document acceptance
-
-The document-model acceptance build passed sixteen model tests: 64 tests completed
-without failures, errors or skips. Strict plugin verification and structure
-checks passed with the pinned platform. The model adds no process or network
-startup and has no graphical editor or kernel registration.
-
-Tests cover exact untouched text, source string/line-array preservation, cell
-IDs and minor-version handling, unknown cells and fields, attachments, MIME
-bundles, metadata locks and rejected conversions. They check duplicate-key and
-malformed JSON rejection, resource bounds, cyclic incoming JSON, defensive
-ownership and explicit serialization overflow. Numeric tests preserve large
-values, scientific notation and signed zero and distinguish output/metadata
-updates beyond the finite double range. UTF-8 round trips retain supplementary
-characters and escaped unpaired surrogates in both keys and values.
-
-These are document-model checks. The Python GUI evidence below covers the
-previously accepted Python distribution, including its console/terminal fixes;
-it does not establish notebook GUI or kernel acceptance.
-
-## Notebook view and creation acceptance
-
-The view/creation acceptance build passed five native editor tests and three
-output-preview tests. Its complete explicit-Python native suite passed 72 tests without failures, errors or skips;
-plugin structure and strict compatibility checks passed. Native tests check the
-registered file/editor/action entries, raw JSON ownership, unchanged source on
-opening, page bounds, replaced-editor disposal, document reload, repair fallback
-and exclusive creation without overwriting an existing file. Output tests check
-literal markup, retained MIME data, text/output limits, local PNG decoding,
-shared page image limits and invalid-image notices.
-
-The broader run exposed a Python fixture teardown race: synchronous SDK setup
-can leave a provider refresh holding the temporary environment's executable.
-Runtime cleanup now waits for scheduled/active updates only for SDKs beneath
-that fixture's owned source root before deleting it. It does not cancel global
-provider work or weaken the deletion failure check.
-
-The notebook GUI sources include passive opening/paging and native JSON-repair
-scenarios. Compilation does not establish that these new scenarios passed on
-the Windows VM; notebook GUI acceptance is not claimed by these native checks.
-
-## Native notebook cell editing acceptance
-
-The full explicit-Python suite passed 78 tests. A subsequent targeted notebook
-run passed all 30 document/editor cases, and structure/strict compatibility
-checks passed after the final preview update. Native editing tests check actual
-backing JSON writes, saved bytes, two distinct source edits, native Undo/Redo,
-restoration of untouched older-format JSON, output-preserving conversion guards,
-cell creation/movement/deletion, metadata locks and read-only documents.
-
-A stale-projection test changes JSON before a pending source edit and verifies
-that the external data wins. Snapshot tests preserve virtual IDs and isolate
-source, metadata, type, output-append and structural mutations in both directions.
-Markdown tests check plain-text rendering, heading styles, literal markup and
-bounded work. Mixed-cell previews retain original CRLF source text on opening.
-
-VM GUI sources for keyboard Save/Undo/Redo and structural/locked-cell workflows
-compile. These native checks do not claim executed notebook GUI acceptance.
-
 ## Windows VM GUI acceptance
 
-All 15 unique GUI methods passed in completed JUnit reports from the public
-portable distribution on a separate Windows 11 VMware guest. The guest had
-4 GiB RAM and reported two logical processors; the sequential runner was configured
-with a 512 MiB heap and each IDE with a 1024 MiB heap. The guest used Python 3.14.6 and the
-transferred pinned offline package wheelhouse. No graphical IDE was launched
-on the development desktop.
+All 24 unique GUI methods passed in completed per-method JUnit reports from the
+same public portable IDE archive on a separate Windows 11 VMware guest. The
+guest had 4 GiB RAM and reported two logical processors. The sequential run
+configuration requested 512 MiB for JUnit and 768 MiB for each IDE. Its base Python was
+3.14.6; notebook cases used a fresh owned environment installed from the
+transferred locked offline wheelhouse. No graphical IDE ran on the development
+desktop.
 
 | GUI coverage | Passed methods |
 | --- | ---: |
-| Distribution startup, About identity and consent regression | 1 |
-| Native Python project wizard, explicit open and module isolation | 2 |
-| Environment creation, selection, cancellation, overwrite rejection, restart, completion and indentation | 2 |
-| Requirements installation, upgrade, native removal, pip diagnostics and owned-process cancellation | 3 |
-| Editable/ordinary project installation, extras and invalid TOML rejection | 2 |
-| unittest/pytest method, class, file, folder and last runs; breakpoint, evaluation and resume | 3 |
-| Native Python consoles and cmd/PowerShell terminals across environment changes | 2 |
+| Distribution startup, About and consent | 1 |
+| Native Python project wizard and module isolation | 2 |
+| Environment creation/selection/cancellation/reopen and editor intelligence | 2 |
+| Requirements/package operations, diagnostics and owned cancellation | 3 |
+| Project installation, extras and invalid metadata | 2 |
+| unittest/pytest scopes and debugger breakpoint/evaluation/resume | 3 |
+| Native Python consoles and cmd/PowerShell sessions | 2 |
+| Notebook creation/cancellation, passive paging and raw JSON repair | 3 |
+| Notebook source/structure editing, locks and keyboard Save/Undo/Redo | 2 |
+| Notebook workspace Python/dependencies/reopen and queue/kernel controls | 2 |
+| Notebook input/getpass, rich PNG/text/passive HTML, result history and input cancellation | 2 |
 
-The result combines a complete discovery run with targeted reruns after concrete
-GUI and product fixes; it is not a claim that one initial full run was green.
-Only completed per-method JUnit successes count. Interrupted, skipped and failing
-cases are excluded. Exhaustive comparison of all 37 shipped plugin JAR entries
-across the acceptance archives showed changes confined to the session helper,
-console action and terminal action. The debugger passed on the archive that
-reveals initialized consoles; both shell/session scenarios passed on the final
-archive with the cmd activation fix. Unrelated completed workflow evidence was
-retained, with each method's archive identity recorded in its environment report.
+Only completed leaf-test successes count; interrupted, skipped and failed
+attempts do not. The recorded methods assert real notebook bytes, interpreter
+identity and result models as well as visible controls. A real execution counter
+proves notebook result Undo/Redo does not execute code again. Ordinary/password
+input is synthetic, masked where requested and absent from saved notebook data.
+Input cancellation prevents the later queued marker, including after reopening.
 
-GUI tests check actual script/import output and interpreter paths as well as
-visible native controls. Test-runner acceptance requires a visible results panel
-whose model contains exactly the expected passed leaf tests. Session acceptance
-requires the newly opened console to be visible and usable, the new terminal to
-activate the selected environment, and existing sessions to retain their original
-runtime. This exposed and fixed a hidden console tool window after native startup
-and an empty cmd activation cache after the provider's environment-reader timeout.
-The cmd action queues the selected environment's standard activation script in
-the new tab through the native terminal API. The provider's activation opt-out
-and custom cmd startup commands remain respected.
+The final accepted IDE archive SHA-256 is `8f7ff2e0cf91cc2ba2b7bcb098ec1c4dfcd3db0a7919da90dca3c9d7a705af0a`.
+Completed evidence is recorded under ignored `build/ui-test-results/<run-id>`;
+accepted run IDs are `29df737be56b`, `8c7d3301d43a`, `ab18904c5eee`, `d45d836ddd84`, `df3b61200b1e`. Each environment report identifies the same
+SHA-256-owned IDE cache, the selected payload, memory limits and runtime inputs.
+The controller uses hidden PowerShell transports and identity-checked cleanup.
+VM login, desktop unlocking and system/firewall prompts remain external desktop
+prerequisites; a run blocked by such a prompt is not acceptance.
 
-Session teardown waits for native interpreter updates before disposing its
-project. A diagnostic shutdown hit the platform's ten-second project-scope
-deadline while two skeleton generators were active. The successful acceptance
-covers orderly closure after provider initialization; closure during active
-skeleton generation remains outside that claim.
-
-The Python GUI acceptance build also passed all 48 native tests, strict compatibility and
-plugin structure checks. Plugin Verifier retained five scheduled-removal and two
-deprecation diagnostics; its final verdict was Compatible. The rebuilt portable
-ZIP contains the Python session fixes. The separately recorded installer predates these
-fixes and was not rebuilt or accepted through its wizard by this GUI run.
-
-Completed XML, environment details, screenshots, IDE logs and controller output
-remain under ignored `build/ui-test-results/<run-id>`. The GUI harness and its
-reproducible commands are described in [the VM acceptance guide](../uitest/README.md).
-Raw guest credentials and machine-specific diagnostics are not product files.
+Native regression, strict compatibility and plugin structure also passed.
+The verifier retains its existing scheduled-removal/deprecation diagnostics
+with a final Compatible verdict. The portable ZIP is the accepted artifact;
+the separately recorded installer was not rebuilt or accepted through its
+wizard by this GUI run. Raw guest credentials, machine-specific diagnostics,
+screenshots and IDE logs are not product source files. See
+[VM GUI acceptance](../uitest/README.md) for reproducible commands and isolation.
 
 ## Scope
 
-This plugin snapshot contains the platform foundation, reversible spelling
-preferences and native Python editing/run/test/debug integration, without
-specialized viewers, presets or workflow execution.
-The checks do not establish installer/uninstaller interaction, Linux/macOS
-runtime behavior, pixel-by-pixel splash fidelity or notebook/genomic behavior.
-Historical reference reports remain separate from these executed public-plugin
-checks.
+This snapshot supports the platform foundation, editing preferences, native
+Python workflows and the local Python notebook interactions described above.
+These checks do not establish installer/uninstaller interaction, Linux/macOS
+runtime behavior, pixel-by-pixel splash fidelity, remote notebook kernels,
+interactive widgets or genomic/workflow capabilities. Historical reference
+reports remain separate from executed public-plugin acceptance.

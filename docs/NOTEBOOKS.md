@@ -1,19 +1,22 @@
 # Jupyter notebook files
 
-Open a local `.ipynb` file to see its **Notebook** tab. Code, Markdown and Raw
+Open a local `.ipynb` file to see its **Notebook** view. Code, Markdown and Raw
 sources use native cell editors with highlighting from their installed language
 providers. Saved text and PNG/JPEG output is displayed without starting
 Python. **Tools > KaryoForge > New Jupyter Notebook...** creates a UTF-8 notebook
 with one empty Code cell in an existing directory. Existing files are refused,
 including a file that appears after the save chooser closes.
 
-The native **Text** tab edits the same backing JSON Document as the cell editors.
+The native **Text** view edits the same backing JSON Document as the cell editors.
 **Ctrl+S**, ordinary IDE **Undo/Redo**, reload and conflict handling operate on
 that shared document. Editing JSON and
 returning to Notebook refreshes the cell view; malformed input shows an error
 while retaining the original source for repair. The effective JSON file type
 is provided through a public extension without persisting file associations.
 The pinned JSON provider is an explicit dependency already bundled in the IDE.
+The native **Text**, **Notebook** and **Split** controls switch the layout. The
+platform text-and-preview container owns the complete JSON editor, restored
+state and both editor lifetimes, including rapid closure during startup.
 
 Opening, paging and displaying saved outputs do not choose an interpreter,
 install packages, start a kernel or execute saved cells. HTML/SVG/JavaScript
@@ -110,8 +113,8 @@ history.
 ## Kernel controls
 
 **Run All** captures Code cells in notebook order, skips Markdown/Raw/unknown
-cells and submits only one execution at a time. An error stops the remaining
-queue. Editing the notebook or replacing raw JSON invalidates running and queued
+cells and submits only one execution at a time. An error or rejected result
+write stops the remaining queue. Editing the notebook or replacing raw JSON invalidates running and queued
 work, so captured old code cannot overwrite a newer document. Changing the
 selected interpreter closes the old kernel without changing module/project SDKs.
 
@@ -155,7 +158,7 @@ load URLs or execute scripts, and keeps the complete source in the cell/JSON.
 
 The native view accepts files up to 32 MiB and displays 20 cells per page. Source
 previews are limited to 200,000 characters per cell; cells above this source
-preview bound remain read-only in the Notebook tab, with full source in Text. Each cell shows at most 50 outputs and 200,000 text characters. A page
+preview bound remain read-only in the Notebook view, with full source in Text. Each cell shows at most 50 outputs and 200,000 text characters. A page
 renders at most four PNG/JPEG images, each with at most 4 MiB encoded data,
 16,777,216 source pixels and 2,097,152 decoded preview pixels. Images are decoded
 from local saved MIME bytes with bounded subsampling. Invalid or excessive
@@ -227,3 +230,15 @@ last accepted IDE Document until serialization succeeds.
 
 The format contract follows the [official notebook format description](https://nbformat.readthedocs.io/en/latest/format_description.html)
 and [nbformat 4.5 schema](https://github.com/jupyter/nbformat/blob/main/nbformat/v4/nbformat.v4.5.schema.json).
+
+## Reproducible acceptance
+
+`make test-ide` covers passive model/editor checks without a Python process.
+`make notebook-runtime` prepares an owned, hash-locked Windows test environment
+from an explicit base Python; `make test-notebook` exercises real probe, kernel,
+queue, interruption, input, preview and native document-history behavior.
+The VM-only GUI suite covers native file creation, passive opening/repair,
+cell editing/history, scoped Python/dependencies, ordered execution/controls,
+masked input and passive rich output. Compilation is separate from executed
+GUI evidence. See [development commands](DEVELOPMENT.md) and
+[executed validation](VALIDATION.md) for requirements and results.

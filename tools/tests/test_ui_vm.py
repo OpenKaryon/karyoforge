@@ -154,6 +154,23 @@ class GuiControllerTest(unittest.TestCase):
                 vm.copy("C:/owned/results.zip", "D:/controller/results.zip", download=True)
                 call.assert_called_once_with("copyFileFromGuestToHost", "C:\\owned\\results.zip", "D:/controller/results.zip", timeout=1800)
 
+    def test_vmware_background_powershell_requests_a_hidden_window(self):
+        with tempfile.TemporaryDirectory(prefix="forge-vmware-hidden-") as folder:
+            root = Path(folder)
+            vmx, executable = root / "test.vmx", root / "vmrun.exe"
+            vmx.touch()
+            executable.touch()
+            with patch.dict(os.environ, {"KARYOFORGE_UI_GUEST_PASSWORD": "test-only"}):
+                vm = ui_vm.VmwareConnection(vmx, "guest", executable)
+            def response(source, destination, *, download=False):
+                self.assertTrue(download)
+                Path(destination).write_text('{"ok":true,"output":"ready"}', encoding="utf-8")
+            with patch.object(vm, "_call") as call, patch.object(vm, "copy", side_effect=response):
+                self.assertEqual("ready", vm.powershell("Write-Output 'ready'"))
+            launch = next(entry.args for entry in call.call_args_list if entry.args[0] == "runProgramInGuest")
+            index = launch.index("-WindowStyle")
+            self.assertEqual("Hidden", launch[index + 1])
+
 
 if __name__ == "__main__":
     unittest.main()

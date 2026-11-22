@@ -36,6 +36,11 @@ HELP = """KaryoForge local commands:
   make test-ide                 Gradle IDE integration tests
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
+  make notebook-fixtures        Prepare SHA-256-locked offline Windows notebook wheels
+  make notebook-runtime PYTHON_EXECUTABLE="/path/to/base-python"
+                                Create an owned Windows x64 CPython 3.14 notebook test environment
+  make test-notebook PYTHON_EXECUTABLE="/path/to/notebook-python"
+                                Native notebook model, editing, input and local-kernel checks
   make branding                 Build the resource-only product branding JAR
   make test-branding            Check native product identity, splash and SVG scaling
   make run                      Launch a separate development IDE profile
@@ -176,6 +181,23 @@ def execute(task: str, root: Path, reference: str = "", output: str = "", python
         command = [sys.executable, "tools/ui_vm.py"]
     elif task == "gui-bundle":
         command = gradle_command(root, ["uiTestBundle"])
+    elif task == "notebook-fixtures":
+        command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
+    elif task in {"notebook-runtime", "test-notebook"}:
+        if not python_executable.strip():
+            raise ValueError("PYTHON_EXECUTABLE is required; choose an owned Python runtime")
+        selected = Path(python_executable).expanduser()
+        if not selected.is_absolute():
+            selected = root / selected
+        selected = selected.resolve()
+        if not selected.is_file():
+            raise ValueError("PYTHON_EXECUTABLE must name an existing interpreter file")
+        if task == "notebook-runtime":
+            command = [sys.executable, "tools/notebook_fixtures.py", "--prepare", "--python-executable", str(selected),
+                       "--runtime", str(root / "build/notebook-runtime")]
+        else:
+            command = gradle_command(root, ["test", "--tests", "*Notebook*", "-PnotebookRuntimeTests=true",
+                                            f"-PnotebookPythonExecutable={selected}"])
     elif task == "test-python":
         if not python_executable.strip():
             raise ValueError("PYTHON_EXECUTABLE is required; select an owned Python runtime with pytest installed")

@@ -6,8 +6,9 @@ runtime is separate from the Java product plugin. The bundle includes the
 pinned SDK's Performance Testing plugin as test-only data. Each owned profile
 installs that plugin to provide Driver's server bridge; the public IDE archives
 do not include it. No GUI task runs an IDE on
-the development desktop. Database, notebook, genomic and private setup dialogs
-are outside this suite because the public distribution does not provide them.
+the development desktop. Database, genomic and private setup dialogs are outside this suite because the
+public distribution does not provide them. Notebook scenarios cover the public
+local Python implementation.
 
 ## Build and run
 
@@ -33,7 +34,10 @@ existing inputs; normally the command builds the bundle and portable standalone
 IDE before transfer. Large runtime/distribution archives are cached by SHA-256
 on the VM; changing test code uses a separate payload archive.
 
-The target must be a separate Windows 10/11 x64 VM with CPython 3.10+ and the test account logged into an unlocked desktop. An SSH shell
+The target must be a separate Windows 10/11 x64 VM with the test account logged
+into an unlocked desktop. The full suite and notebook selectors require Windows
+x64 CPython 3.14 for their locked wheelhouse. Explicit Python-only selectors can
+still use the supported CPython 3.10+ base runtime. An SSH shell
 alone has no interactive desktop. The runner uses a unique limited scheduled
 task in that account's session. Windows 7 is not accepted. The VM model and
 computer identity are checked before starting GUI processes. Finish Windows
@@ -240,7 +244,16 @@ microsecond precision, rejecting a PID replaced after the CIM snapshot.
 
 ## Notebook file scenarios
 
-`NotebookFilesUiTest` opens an owned notebook with saved outputs and code that
+The notebook fixture bundle is separate from ordinary Python project fixtures.
+The guest verifies its manifest and all 28 locked wheel hashes before creating
+an owned per-run notebook virtual environment. Pip uses only those offline
+wheels with required hashes; the VM base Python and its global packages are
+unchanged. Runtime versions and setup output accompany the run's results.
+No notebook test depends on a copied host virtual environment, global kernelspec
+or a Jupyter server.
+
+`NotebookFilesUiTest` creates a notebook through the native save chooser and
+checks cancellation. It also opens an owned notebook with saved outputs and code that
 would create a marker if executed. It checks passive output display, paging,
 unchanged JSON and absence of that marker. A second scenario repairs malformed
 source through the native Text editor, saves it and returns to the refreshed
@@ -252,3 +265,17 @@ keyboard Undo/Redo and actual notebook bytes. Its controls scenario rejects a
 conversion with saved results, clears outputs explicitly, changes cell type,
 adds/moves/deletes a Raw cell, restores it with native Undo and checks locked
 controls in a separate notebook. These tests use synthetic owned notebooks.
+
+`NotebookRuntimeUiTest` checks passive dependency state, a module environment
+missing notebook packages, explicit ready-Python selection, unchanged module SDKs
+and persisted independent workspace choices after reopening. Its execution case
+checks ordered Run All, skipped non-Code cells, Stop, a retained execution
+counter, a fresh Restart namespace and explicit Shutdown.
+
+`NotebookInputOutputsUiTest` submits ordinary input and masked getpass through
+the nonmodal UI, verifies no response echo/persistence and displays local PNG,
+plain text and retained passive HTML. A real execution counter proves keyboard
+Undo/Redo restores saved output without executing code. Input cancellation
+prevents a later queued marker from running, including after editor reopening.
+All input values are synthetic test data, and every project/runtime/profile is
+owned by the run.

@@ -91,6 +91,17 @@ public static class KaryoForgeUiPower {
         throw 'Could not keep the test guest awake for GUI acceptance'
     }
     $powerRequestActive = $true
+    $notebookFixtures = Join-Path $request.payload 'notebook-fixtures'
+    $notebookPython = ''
+    $includeNotebook = -not $request.select.Count -or @($request.select | Where-Object { $_ -cmatch '^org\.openkaryon\.karyoforge\.uitest\.Notebook' }).Count -gt 0
+    if ($includeNotebook -and (Test-Path -LiteralPath (Join-Path $notebookFixtures 'manifest.json'))) {
+        $notebookRuntime = Join-Path $root 'notebook-runtime'
+        & $python -I (Join-Path $notebookFixtures 'prepare_runtime.py') --fixtures $notebookFixtures --python-executable $python --runtime $notebookRuntime *>&1 |
+            Out-String | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $results 'notebook-runtime-setup.log')
+        if ($LASTEXITCODE -ne 0) { throw 'The owned offline notebook runtime could not be prepared; review notebook-runtime-setup.log' }
+        $notebookPython = Join-Path $notebookRuntime 'venv/Scripts/python.exe'
+        Copy-Item -LiteralPath (Join-Path $notebookRuntime 'runtime.json') -Destination (Join-Path $results 'notebook-runtime.json')
+    }
     $starter = Join-Path $root 'starter'
     New-Item -ItemType Directory -Force -Path $starter | Out-Null
     $classpath = (Join-Path $request.payload 'classes') + ';' + (Join-Path $request.runtime '*')
@@ -99,7 +110,7 @@ public static class KaryoForgeUiPower {
     $arguments = @('-Xmx512m', "-Dkaryoforge.ui.ideMemoryMb=$ideMemory", '-Djava.awt.headless=false', '-Didea.disable.collect.statistics=true',
         '-Didea.suppress.statistics.report=true', '-Didea.headless.enable.statistics=false',
         '-Dkaryoforge.ui.vmVerified=true', "-Dkaryoforge.ui.root=$root", "-Dkaryoforge.ui.ide=$($request.ide)",
-        "-Dkaryoforge.ui.python=$python", "-Dkaryoforge.ui.fixtures=$(Join-Path $request.payload 'fixtures')",
+        "-Dkaryoforge.ui.python=$python", "-Dkaryoforge.ui.notebookPython=$notebookPython", "-Dkaryoforge.ui.fixtures=$(Join-Path $request.payload 'fixtures')",
         "-Dkaryoforge.ui.testPlugins=$(Join-Path $request.payload 'test-plugins')",
         '-cp', $classpath, 'org.junit.platform.console.ConsoleLauncher', 'execute',
         '--reports-dir', (Join-Path $results 'junit'), '--details=flat', '--disable-banner', '--fail-if-no-tests',
@@ -126,7 +137,7 @@ public static class KaryoForgeUiPower {
     @{pid=$process.Id; startedTicks=$runnerStarted.Ticks; executable=$process.Path; runId=$request.runId} |
         ConvertTo-Json | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'runner-process.json')
     @{computer=$env:COMPUTERNAME; model=$system.Model; python=$python; pythonVersion="$version"; ide=$request.ide; runId=$request.runId;
-        ideMemoryMb=$ideMemory; runnerMemoryMb=512; physicalMemoryBytes=$system.TotalPhysicalMemory; logicalProcessors=$system.NumberOfLogicalProcessors} |
+        notebookPython=$notebookPython; ideMemoryMb=$ideMemory; runnerMemoryMb=512; physicalMemoryBytes=$system.TotalPhysicalMemory; logicalProcessors=$system.NumberOfLogicalProcessors} |
         ConvertTo-Json | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $results 'environment.json')
     $owned = @{}
     $deadline = (Get-Date).AddMinutes($request.timeoutMinutes)

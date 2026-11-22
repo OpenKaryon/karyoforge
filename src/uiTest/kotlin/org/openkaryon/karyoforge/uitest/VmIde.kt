@@ -25,6 +25,7 @@ object VmIde {
 
     val root: Path get() = Path.of(property("root")).toAbsolutePath().normalize()
     val python: Path get() = Path.of(property("python"))
+    val notebookPython: Path get() = Path.of(property("notebookPython"))
     val fixtures: Path get() = Path.of(property("fixtures"))
 
     fun project(name: String): Path {

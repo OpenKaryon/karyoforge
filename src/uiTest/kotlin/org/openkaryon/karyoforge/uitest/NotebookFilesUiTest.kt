@@ -3,6 +3,8 @@ package org.openkaryon.karyoforge.uitest
 import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.ui.components.common.codeEditor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
+import com.intellij.driver.sdk.ui.components.elements.dialog
+import com.intellij.driver.sdk.ui.components.elements.textField
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.pasteText
 import com.intellij.driver.sdk.ui.present
@@ -38,7 +40,7 @@ class NotebookFilesUiTest {
                 x { byVisibleText("Cells 21–25 of 25") }.shouldBe("The next cells are visible", present, 1.minutes)
                 button { byVisibleText("Previous cells") }.click()
                 x { byVisibleText("Cells 1–20 of 25") }.shouldBe("The first page can be revisited", present, 1.minutes)
-                x { byVisibleText("Text") }.click()
+                x { byAccessibleName("Text") }.click()
                 codeEditor { assertTrue(text.contains("\"nbformat\""), text) }
             }
             assertEquals(original, notebook.readText())
@@ -53,22 +55,23 @@ class NotebookFilesUiTest {
     fun malformedNotebookCanBeRepairedThroughItsNativeJsonDocument() {
         val project = VmIde.project("notebook JSON repair")
         val notebook = project.resolve("repair.ipynb")
-        notebook.writeText("{ invalid notebook")
+        val malformed = "{ invalid notebook\n"
+        notebook.writeText(malformed)
         val repaired = notebookFixtureJson(1, "value = 42")
         VmIde.context("notebook-repair", project).runIdeWithDriver(runTimeout = 20.minutes).useDriverAndCloseIde {
             waitForPythonIndexing(10.minutes)
             openOwnedFile(notebook)
             ideFrame {
                 x { byAccessibleName("Notebook source error") }.shouldBe("Invalid source remains available for repair", present, 2.minutes)
-                assertEquals("{ invalid notebook", notebook.readText())
-                x { byVisibleText("Text") }.click()
+                assertEquals(malformed, notebook.readText())
+                x { byAccessibleName("Text") }.click()
                 codeEditor {
                     click()
                     keyboard { hotKey(KeyEvent.VK_CONTROL, KeyEvent.VK_A) }
                     ui.pasteText(repaired)
                 }
                 invokeAction("SaveAll")
-                x { byVisibleText("Notebook") }.click()
+                x { byAccessibleName("Notebook") }.click()
                 x { byVisibleText("Cells 1–1 of 1") }.shouldBe("The notebook reloads the repaired shared document", present, 2.minutes)
             }
             awaitCondition("The native save preserves the repaired notebook") { notebook.readText() == repaired }
@@ -76,5 +79,29 @@ class NotebookFilesUiTest {
         VmIde.assertNoConsentCrash()
     }
 
+
+    @Test
+    fun newNotebookUsesTheNativeSaveChooserAndCreatesAnEmptyCodeCell() {
+        val project = VmIde.project("new notebook")
+        val notebook = project.resolve("created-via-ui.ipynb")
+        VmIde.context("new-notebook", project).runIdeWithDriver(runTimeout = 20.minutes).useDriverAndCloseIde {
+            waitForPythonIndexing(10.minutes)
+            invokeAction("org.openkaryon.karyoforge.notebook.new", now = false)
+            ui.dialog({ byTitle("New Jupyter Notebook") }) {
+                textField { byClass("JTextField") }.text = notebook.fileName.toString()
+                pressButton("OK")
+            }
+            awaitCondition("The new notebook is created in the owned project directory") { notebook.exists() }
+            ideFrame {
+                x { byAccessibleName("Code cell 1 source") }.shouldBe("A new native Code cell opens", present, 2.minutes)
+            }
+            assertTrue(notebook.readText().contains("\"cell_type\": \"code\""))
+            val original = notebook.readText()
+            invokeAction("org.openkaryon.karyoforge.notebook.new", now = false)
+            ui.dialog({ byTitle("New Jupyter Notebook") }) { pressButton("Cancel") }
+            assertEquals(original, notebook.readText())
+        }
+        VmIde.assertNoConsentCrash()
+    }
 
 }

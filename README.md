@@ -8,8 +8,9 @@ and machine-learning workbench based on IntelliJ IDEA Community.
 This source snapshot provides native Python editing, run/test/debug support,
 native Python project creation, existing/created local environments,
 requirements and standard project installation, module consoles and terminals,
-explicit module interpreter setup, notebook creation, native cell editing and
-saved-output previews with shared JSON save/undo, reversible spell-checking preferences,
+explicit module interpreter setup, notebook creation/cell editing with shared
+JSON Save/Undo, explicit local Python kernels, ordered execution, input/getpass
+and bounded passive rich-output previews, reversible spell-checking preferences,
 a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. Biological editors, usage presets and workflow
 execution are not included. The reference implementation is supplied separately
@@ -56,6 +57,19 @@ Later builds reuse their caches. On Windows x64, `make package-windows` builds
 a standalone IDE installer with bundled Java/PythonCore; `make zip-windows`
 creates a portable application ZIP. See the Windows distribution guide for
 output paths and separate user profiles. Linux packaging is not implemented.
+
+Notebook acceptance has separate explicit commands on Windows x64:
+
+```sh
+make notebook-runtime PYTHON_EXECUTABLE="C:/path/to/base-python-3.14.exe"
+make test-notebook PYTHON_EXECUTABLE="D:/path/to/karyoforge/build/notebook-runtime/venv/Scripts/python.exe"
+make gui-bundle
+```
+
+The runtime target creates an owned virtual environment from SHA-256-locked
+offline wheels. It installs no packages into the supplied base Python. The GUI
+suite runs only on an explicitly configured Windows VM; see its acceptance guide.
+Notebook files themselves never install packages or start Python on opening.
 
 All project-owned packages use `org.openkaryon.karyoforge`. Reference audit
 identifiers are explicitly projected into that namespace; their fingerprints

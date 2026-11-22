@@ -18,9 +18,19 @@ explicit cell mutations and saved outputs independently of IDE services. It
 starts no kernel. `notebook.editor` supplies native cell editing, saved-output
 previews, paging and exclusive notebook creation. Cell edits use independent
 model snapshots and modification-stamp guards before committing a minimal JSON
-range through native commands. `DocumentsEditor` and public Undo identity APIs
-keep the authoritative backing Document's history shared with the Text tab. Its public file-type extension shares raw
-JSON with the native Text editor, and the JSON provider is an explicit dependency.
+range through native commands. The platform `TextEditorWithPreviewProvider`
+owns a real JSON `TextEditor` with the native cell view as its preview, preserving
+project startup, saved editor state and both lifetimes. `DocumentsEditor` in the
+cell view and public Undo identity APIs share the backing Document's history.
+The public file-type extension selects JSON without persistent associations;
+the JSON provider is an explicit dependency.
+`notebook.runtime` resolves per-file workspace Python selections, owns bounded
+metadata probes and local kernel processes, and carries a private JSON-lines
+protocol to a Python helper using the installed Jupyter client. The editor owns
+queue/generation guards, transient input and live output hosts. Previews do not
+create document history; a completed result uses one native document command.
+The model never imports process or IDE services. Test-only hashed Python wheels
+and GUI Driver dependencies are separate from the shipped product.
 See [notebook files and the document contract](NOTEBOOKS.md).
 
 The boundaries below define ownership

@@ -40,6 +40,9 @@ outputs and profile locations. Linux packaging is not implemented.
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
 | `test-ide` | Delegate to Gradle `test`; fail if build prerequisites are absent |
 | `test-python` | Run native Python script/module, selected unittest/pytest and debugger checks with explicit `PYTHON_EXECUTABLE` |
+| `notebook-fixtures` | Prepare and verify the locked offline Windows notebook wheelhouse |
+| `notebook-runtime` | Use explicit base `PYTHON_EXECUTABLE` to create `build/notebook-runtime/venv`; Windows x64 CPython 3.14 required |
+| `test-notebook` | Run native notebook model/editor/probe/kernel/input tests with explicit notebook `PYTHON_EXECUTABLE` |
 | `branding` | Build a resource-only KaryoForge application branding JAR |
 | `test-branding` | Check native branded metadata, both splash images and small SVG rendering in a fresh headless JVM |
 | `run` | Launch the branded development IDE with a separate sandbox configuration |
@@ -74,6 +77,35 @@ and debugger checks require `make test-python PYTHON_EXECUTABLE="/path/to/python
 and the pinned dependencies in `tools/python-test-requirements.txt`. See
 [Python development](PYTHON.md). This suite uses 2 GB of test heap for SDK
 indexing; default platform tests retain the 1 GB limit.
+
+## Notebook test environments
+
+`make notebook-fixtures` downloads only wheel URLs recorded with SHA-256 hashes
+in `tools/notebook-test-wheels.json`; a valid cache is verified and reused.
+The lock is copied byte for byte, keeping its manifest and ownership hashes
+consistent in both LF and CRLF checkouts.
+The lock covers the complete Windows x64 CPython 3.14 dependency graph, including
+jupyter_client 8.10.0 and ipykernel 7.4.0. These are acceptance inputs, not bundled
+application dependencies or a restriction on every user-selected Python setup.
+
+`make notebook-runtime PYTHON_EXECUTABLE="C:/path/to/base-python.exe"` validates
+the base runtime and creates an owned environment under `build/notebook-runtime`.
+Installation uses only the verified local wheelhouse, `--no-index`,
+`--require-hashes`, pinned transitive packages and a final `pip check`. Existing
+unowned/nonempty directories or different lock identities are refused. The
+base interpreter and global package stores are not modified. The standalone
+helper accepts explicit `--fixtures` and `--runtime` paths; `--offline` with
+`--prepare` fails on absent or mismatched wheels rather than downloading them.
+
+`make test-notebook PYTHON_EXECUTABLE="D:/path/to/build/notebook-runtime/venv/Scripts/python.exe"`
+runs the notebook suite, including real local kernels, without starting a
+graphical IDE. Default `make test-ide` excludes real Python/kernel tests; no
+interpreter is discovered or downloaded implicitly. To run both explicit
+runtime suites in one native test invocation, pass `-PpythonRuntimeTests=true`,
+`-PpythonExecutable=...`, `-PnotebookRuntimeTests=true` and
+`-PnotebookPythonExecutable=...` to Gradle `test`.
+
+## Interactive development
 
 `make run` is an explicit interactive action, with development configuration,
 plugins, caches and logs below `.intellijPlatform`; close its IDE to end the task.

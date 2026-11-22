@@ -9,7 +9,7 @@ internal fun notebookFixtureJson(count: Int, firstSource: String): String {
     return """{"nbformat":4,"nbformat_minor":5,"metadata":{"custom":{"preserved":true}},"cells":[$cells]}""" + "\n"
 }
 
-private fun notebookFixtureString(value: String): String = buildString {
+internal fun notebookFixtureString(value: String): String = buildString {
     append('"')
     for (character in value) when (character) {
         '"' -> append("\\\"")
@@ -20,4 +20,12 @@ private fun notebookFixtureString(value: String): String = buildString {
         else -> if (character.code < 32) append("\\u%04x".format(character.code)) else append(character)
     }
     append('"')
+}
+
+internal fun notebookCells(vararg cells: Pair<String, String>): String {
+    val values = cells.mapIndexed { index, (type, source) ->
+        val execution = if (type == "code") ",\"outputs\":[],\"execution_count\":null" else ""
+        """{"id":"cell-$index","cell_type":"$type","metadata":{},"source":${notebookFixtureString(source)}$execution}"""
+    }.joinToString(",")
+    return """{"nbformat":4,"nbformat_minor":5,"metadata":{"custom":{"preserved":true}},"cells":[$values]}""" + "\n"
 }

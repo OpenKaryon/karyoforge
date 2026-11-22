@@ -150,6 +150,35 @@ class TasksTest(unittest.TestCase):
             self.assertIn(f"-PpythonExecutable={interpreter.resolve()}", command)
             self.assertNotIn("shell", run.call_args.kwargs)
 
+    def test_notebook_commands_require_an_explicit_existing_runtime(self):
+        with patch.object(TASKS.subprocess, "run") as run:
+            for task in ("notebook-runtime", "test-notebook"):
+                with self.subTest(task=task):
+                    with self.assertRaisesRegex(ValueError, "PYTHON_EXECUTABLE is required"):
+                        TASKS.execute(task, self.root)
+                    with self.assertRaisesRegex(ValueError, "existing interpreter"):
+                        TASKS.execute(task, self.root, python_executable="missing-runtime")
+            run.assert_not_called()
+
+    def test_notebook_fixture_runtime_and_native_commands_keep_paths_as_arguments(self):
+        python = self.root / "Notebook base runtime.exe"
+        python.write_bytes(b"fixture")
+        with patch.object(TASKS, "gradle_command", side_effect=lambda root, arguments: ["gradlew", *arguments]), \
+                patch.object(TASKS.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            TASKS.execute("notebook-fixtures", self.root)
+            self.assertEqual([TASKS.sys.executable, "tools/notebook_fixtures.py", "--prepare"], run.call_args.args[0])
+            TASKS.execute("notebook-runtime", self.root, python_executable=str(python))
+            command = run.call_args.args[0]
+            self.assertIn(str(python.resolve()), command)
+            self.assertEqual(str(self.root / "build/notebook-runtime"), command[-1])
+            TASKS.execute("test-notebook", self.root, python_executable=str(python))
+            command = run.call_args.args[0]
+            self.assertIn("*Notebook*", command)
+            self.assertIn("-PnotebookRuntimeTests=true", command)
+            self.assertIn(f"-PnotebookPythonExecutable={python.resolve()}", command)
+            self.assertNotIn("shell", run.call_args.kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()
