@@ -56,6 +56,17 @@ launched process stayed alive while the kernel's owned processes were stopped.
 Strict compatibility and archive structure passed. Notebook GUI execution on the
 separate Windows VM remains pending.
 
+## Notebook queue and kernel controls
+
+All 45 targeted notebook native checks passed without failures, errors or
+skips. Additional real-kernel cases cover ordered Run All, non-Code skipping,
+queue termination on error, cancellation on queued-source edits, responsive
+interrupt with retained variables, fresh Restart and explicit Shutdown. A kernel
+that deliberately ignores SIGINT was reset after the five-second watchdog; its
+next execution started with count one and no old variables. Strict compatibility
+and structure passed. This is native acceptance; notebook VM GUI coverage still
+requires an executed run.
+
 ## Verified build inputs
 
 - Gradle 9.1.0 wrapper JAR SHA-256:

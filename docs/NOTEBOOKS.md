@@ -78,6 +78,29 @@ identities, including creation time, and never searches for arbitrary Python
 processes by name. Temporary session files are removed only after owned children
 have stopped. A later explicit Run can create a fresh session.
 
+## Kernel controls
+
+**Run All** captures Code cells in notebook order, skips Markdown/Raw/unknown
+cells and submits only one execution at a time. An error stops the remaining
+queue. Editing the notebook or replacing raw JSON invalidates running and queued
+work, so captured old code cannot overwrite a newer document. Changing the
+selected interpreter closes the old kernel without changing module/project SDKs.
+
+**Stop** cancels queued cells and interrupts the active request. A responsive
+Python kernel keeps its namespace. Native blocking calls and code that ignores
+interrupts may not return promptly; after five seconds the owned kernel is
+forcibly reset with an explicit status message. The next explicit Run starts a
+fresh namespace. In particular, Windows Python may defer a signal during a long
+blocking `time.sleep()`; this uses the same bounded-reset behavior.
+
+**Restart kernel** cancels pending work and creates a fresh ready kernel without
+executing cells. **Shutdown kernel** closes the session; another kernel starts
+only on an explicit Run or Restart. Restart waits for retired owned processes
+before starting its replacement. Closing, selection changes, Stop and pending
+callbacks are scoped by execution generation, preventing an old worker from
+closing or updating a newer session. These controls do not manage unrelated
+Python processes.
+
 ## Cell editing
 
 **Add Code**, **Add Markdown** and **Add Raw** append cells. Each cell offers type

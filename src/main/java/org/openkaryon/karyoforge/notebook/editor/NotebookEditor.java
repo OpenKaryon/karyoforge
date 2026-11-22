@@ -59,6 +59,12 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
     private final List<JButton> editingButtons = new ArrayList<>();
     private final Map<String, NotebookMarkdownPreview> markdownPreviews = new LinkedHashMap<>();
     private NotebookKernelController execution;
+    private org.openkaryon.karyoforge.notebook.runtime.NotebookRuntimePanel runtime;
+    private final JButton runAll = new JButton("Run All");
+    private final JButton stopKernel = new JButton("Stop");
+    private final JButton restartKernel = new JButton("Restart kernel");
+    private final JButton shutdownKernel = new JButton("Shutdown kernel");
+    private boolean applyingExecution;
     private NotebookDocument notebook;
     private long renderedStamp;
     private boolean committing;
@@ -84,7 +90,15 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         status.getAccessibleContext().setAccessibleName("Notebook edit status");
         previous.addActionListener(event -> { pageStart = Math.max(0, pageStart - PAGE_SIZE); render(); });
         next.addActionListener(event -> { pageStart += PAGE_SIZE; render(); });
-        var runtime = new org.openkaryon.karyoforge.notebook.runtime.NotebookRuntimePanel(project, file);
+        toolbar.add(runAll);
+        toolbar.add(stopKernel);
+        toolbar.add(restartKernel);
+        toolbar.add(shutdownKernel);
+        runAll.addActionListener(event -> execution.runAll());
+        stopKernel.addActionListener(event -> execution.stop());
+        restartKernel.addActionListener(event -> execution.restart());
+        shutdownKernel.addActionListener(event -> execution.shutdown("Local kernel shut down. Run explicitly to start another kernel."));
+        runtime = new org.openkaryon.karyoforge.notebook.runtime.NotebookRuntimePanel(project, file);
         Disposer.register(this, runtime);
         var header = new JPanel(new BorderLayout());
         header.add(runtime, BorderLayout.NORTH);
@@ -109,11 +123,15 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         }
         execution = new NotebookKernelController(project, file, () -> notebook, status::setText, this::render,
                 (id, result) -> {
-                    if (edit("Update notebook execution", model -> model.setExecution(id, result.count(), result.outputs()), true)) {
-                        status.setText("Cell execution finished: " + result.status() + ". Ctrl+S saves the result.");
-                    }
+                    applyingExecution = true;
+                    try {
+                        boolean saved = edit("Update notebook execution", model -> model.setExecution(id, result.count(), result.outputs()), true);
+                        if (saved) status.setText("Cell execution finished: " + result.status() + ". Ctrl+S saves the result.");
+                        return saved;
+                    } finally { applyingExecution = false; }
                 });
         Disposer.register(this, execution);
+        runtime.setSelectionChanged(() -> execution.shutdown("Interpreter changed. The previous local kernel was shut down."));
         reload();
     }
 
@@ -243,6 +261,10 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
     }
 
     private void updateEditingButtons() {
+        runAll.setEnabled(canWrite() && execution != null && !execution.isBusy());
+        stopKernel.setEnabled(execution != null && execution.isBusy());
+        restartKernel.setEnabled(canWrite() && execution != null);
+        shutdownKernel.setEnabled(execution != null && (execution.isBusy() || execution.hasSession()));
         for (JButton button : editingButtons) button.setEnabled(canWrite());
     }
 
@@ -319,6 +341,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
             generation++;
             dirty = false;
             status.setText("Notebook updated. Ctrl+S saves; Undo/Redo uses the shared JSON document.");
+            if (!applyingExecution && execution != null) execution.documentEdited();
             if (redraw) render();
             return true;
         } catch (NotebookFormatException | IllegalArgumentException | IllegalStateException rejected) {
@@ -362,7 +385,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
     @Override public boolean isValid() { return !disposed && file.isValid(); }
     @Override public VirtualFile getFile() { return file; }
     @Override public Document @NotNull [] getDocuments() { return document == null ? new Document[0] : new Document[]{document}; }
-    @Override public void selectNotify() { selected = true; if (dirty) reload(); }
+    @Override public void selectNotify() { selected = true; runtime.refreshSelection(); if (dirty) reload(); }
     @Override public void deselectNotify() { selected = false; }
     @Override public void addPropertyChangeListener(@NotNull PropertyChangeListener listener) { changes.addPropertyChangeListener(listener); }
     @Override public void removePropertyChangeListener(@NotNull PropertyChangeListener listener) { changes.removePropertyChangeListener(listener); }

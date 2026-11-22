@@ -29,6 +29,8 @@ public final class NotebookRuntimePanel extends JPanel implements Disposable {
     private long generation;
     private boolean disposed;
     private boolean refreshing;
+    private Path displayedPath;
+    private Runnable selectionChanged = () -> {};
 
     public NotebookRuntimePanel(Project project, VirtualFile file) {
         super(new BorderLayout());
@@ -63,6 +65,17 @@ public final class NotebookRuntimePanel extends JPanel implements Disposable {
         cancel();
         project.getService(NotebookRuntimePreferences.class).select(file.getUrl(), path);
         refresh();
+        selectionChanged.run();
+    }
+
+    public void setSelectionChanged(Runnable listener) { selectionChanged = listener; }
+
+    public void refreshSelection() {
+        if (!java.util.Objects.equals(displayedPath, interpreter().executable())) {
+            cancel();
+            refresh();
+            selectionChanged.run();
+        }
     }
 
     private void refresh() {
@@ -86,6 +99,7 @@ public final class NotebookRuntimePanel extends JPanel implements Disposable {
             choices.setModel(new DefaultComboBoxModel<>(paths.keySet().toArray(String[]::new)));
             choices.setSelectedItem(label);
             var interpreter = interpreter();
+            displayedPath = interpreter.executable();
             check.setEnabled(interpreter.available());
             status.setText(interpreter.available() ? "Dependencies not checked. Opening this file starts no Python process."
                     : interpreter.problem());

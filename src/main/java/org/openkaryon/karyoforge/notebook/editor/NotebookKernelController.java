@@ -24,17 +24,22 @@ final class NotebookKernelController implements Disposable {
     private final Supplier<NotebookDocument> model;
     private final Consumer<String> status;
     private final Runnable refresh;
-    private final BiConsumer<String, LocalNotebookKernel.Execution> completed;
+    private final java.util.function.BiPredicate<String, LocalNotebookKernel.Execution> completed;
     private volatile LocalNotebookKernel kernel;
     private volatile NotebookDependencyCheck probe;
     private Path kernelPython;
     private long generation;
+    private final java.util.ArrayDeque<Target> queue = new java.util.ArrayDeque<>();
+    private final java.util.List<LocalNotebookKernel> ownedKernels = new java.util.ArrayList<>();
+    private record Target(String id, String source) {}
+    private boolean executing;
+    private boolean stopRequested;
     private boolean busy;
     private volatile boolean disposed;
 
     NotebookKernelController(Project project, VirtualFile file, Supplier<NotebookDocument> model,
                              Consumer<String> status, Runnable refresh,
-                             BiConsumer<String, LocalNotebookKernel.Execution> completed) {
+                             java.util.function.BiPredicate<String, LocalNotebookKernel.Execution> completed) {
         this.project = project;
         this.file = file;
         this.model = model;
@@ -44,27 +49,62 @@ final class NotebookKernelController implements Disposable {
     }
 
     boolean isBusy() { return busy; }
-    boolean hasOwnedProcesses() { return kernel != null && kernel.hasOwnedProcesses(); }
+    boolean hasOwnedProcesses() { return ownedKernels.stream().anyMatch(LocalNotebookKernel::hasOwnedProcesses); }
+    boolean hasSession() { return kernel != null && !kernel.isClosed(); }
 
     void run(String id) {
-        if (disposed || busy) return;
+        if (disposed || busy || model.get() == null) return;
+        var cell = model.get().cell(id);
+        queue.add(new Target(id, cell.source()));
+        stopRequested = false;
+        startNext();
+    }
+
+    void runAll() {
+        if (disposed || busy || model.get() == null) return;
+        for (var cell : model.get().cells()) if (cell.type() == CellType.CODE) queue.add(new Target(cell.id(), cell.source()));
+        stopRequested = false;
+        if (queue.isEmpty()) status.accept("This notebook has no Code cells to run.");
+        else startNext();
+    }
+
+    private void startNext() {
+        if (disposed || busy || queue.isEmpty()) return;
+        Target target = queue.removeFirst();
+        if (target.id() != null) {
+            try {
+                var cell = model.get().cell(target.id());
+                if (cell.type() != CellType.CODE || !target.source().equals(cell.source())) throw new IllegalArgumentException();
+            } catch (RuntimeException changed) {
+                queue.clear();
+                status.accept("Queued execution cancelled because a cell changed.");
+                refresh.run();
+                return;
+            }
+        }
+        runTarget(target);
+    }
+
+    private void runTarget(Target target) {
+        String id = target.id();
         NotebookDocument document = model.get();
-        if (document == null) return;
-        var cell = document.cell(id);
-        if (cell.type() != CellType.CODE) return;
-        String source = cell.source();
+        if (document == null) { queue.clear(); return; }
+        String source = target.source();
+        if (source.length() > 1_000_000) { queue.clear(); status.accept("Cell source exceeds the execution transport bound."); return; }
         var metadata = document.metadata();
         var language = metadata.has("language_info") && metadata.get("language_info").isJsonObject()
                 ? metadata.getAsJsonObject("language_info").get("name") : null;
         var specLanguage = metadata.has("kernelspec") && metadata.get("kernelspec").isJsonObject()
                 ? metadata.getAsJsonObject("kernelspec").get("language") : null;
         if (!pythonLanguage(language) || !pythonLanguage(specLanguage)) {
+            queue.clear();
             status.accept("Only local Python notebooks can execute. Notebook language metadata was preserved.");
             return;
         }
         var interpreter = NotebookInterpreter.resolve(project, file);
-        if (!interpreter.available()) { status.accept(interpreter.problem()); return; }
+        if (!interpreter.available()) { queue.clear(); status.accept(interpreter.problem()); return; }
         if (file.getParent() == null || !file.isInLocalFileSystem()) {
+            queue.clear();
             status.accept("Kernel execution requires a local notebook directory."); return;
         }
         busy = true;
@@ -76,6 +116,8 @@ final class NotebookKernelController implements Disposable {
             existing.close();
             existing = null;
         }
+        ownedKernels.removeIf(owned -> owned.isClosed() && !owned.hasOwnedProcesses());
+        var retired = java.util.List.copyOf(ownedKernels);
         LocalNotebookKernel reusable = existing;
         var operation = new NotebookDependencyCheck();
         probe = operation;
@@ -83,6 +125,11 @@ final class NotebookKernelController implements Disposable {
             LocalNotebookKernel session = reusable;
             try {
                 if (session == null) {
+                    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+                    while (retired.stream().anyMatch(LocalNotebookKernel::hasOwnedProcesses)) {
+                        if (System.nanoTime() > deadline) throw new java.io.IOException("The previous owned kernel has not stopped yet.");
+                        Thread.sleep(25);
+                    }
                     var dependencies = operation.run(interpreter.executable(), Path.of(file.getParent().getPath()), Duration.ofSeconds(20));
                     if (!dependencies.ready()) throw new java.io.IOException(dependencies.summary());
                     var next = new LocalNotebookKernel(interpreter.executable(), Path.of(file.getParent().getPath()));
@@ -90,6 +137,7 @@ final class NotebookKernelController implements Disposable {
                     if (!onEdt(() -> {
                         if (!current(expected, id, source, interpreter.executable())) return false;
                         kernel = next;
+                        ownedKernels.add(next);
                         kernelPython = interpreter.executable();
                         return true;
                     })) {
@@ -97,30 +145,52 @@ final class NotebookKernelController implements Disposable {
                     }
                     next.start();
                 }
+                if (id == null) {
+                    onEdt(() -> {
+                        if (generation != expected) return false;
+                        status.accept("Local Python kernel restarted. No cells were executed.");
+                        return true;
+                    });
+                    return;
+                }
                 if (!onEdt(() -> {
-                    if (!current(expected, id, source, interpreter.executable())) return false;
-                    status.accept("Running the selected cell in local Python...");
+                    if (!current(expected, id, source, interpreter.executable())) { queue.clear(); return false; }
+                    status.accept("Submitting the selected cell to local Python...");
                     return true;
                 })) return;
-                var result = session.execute(source);
+                var result = session.execute(source, () -> onEdt(() -> {
+                    if (generation != expected) return false;
+                    executing = true;
+                    status.accept("Running the selected cell in local Python...");
+                    return true;
+                }));
                 onEdt(() -> {
                     if (!current(expected, id, source, interpreter.executable())) {
+                        queue.clear();
                         status.accept("Cell results were discarded because the source, interpreter or document changed.");
                         return false;
                     }
-                    completed.accept(id, result);
-                    return true;
+                    boolean saved = completed.test(id, result);
+                    if (!saved || !"ok".equals(result.status())) queue.clear();
+                    if (saved && stopRequested) status.accept("Cell stopped. The responsive local kernel keeps its namespace.");
+                    return saved;
                 });
             } catch (Exception failure) {
                 if (session != null) session.close();
                 onEdt(() -> {
-                    if (generation == expected) status.accept("Notebook execution failed: " + failure.getMessage());
+                    if (generation == expected) {
+                        queue.clear();
+                        status.accept("Notebook execution failed: " + failure.getMessage());
+                    }
                     return false;
                 });
             } finally {
                 operation.close();
                 onEdt(() -> {
-                    if (generation == expected) { probe = null; busy = false; refresh.run(); }
+                    if (generation == expected) {
+                        probe = null; busy = false; executing = false; refresh.run();
+                        if (!stopRequested) startNext();
+                    }
                     return true;
                 });
             }
@@ -133,6 +203,7 @@ final class NotebookKernelController implements Disposable {
         if (!selected.available() || !python.equals(selected.executable())) return false;
         var document = model.get();
         if (document == null) return false;
+        if (id == null) return true;
         try { var cell = document.cell(id); return cell.type() == CellType.CODE && source.equals(cell.source()); }
         catch (IllegalArgumentException removed) { return false; }
     }
@@ -154,14 +225,58 @@ final class NotebookKernelController implements Disposable {
         catch (Exception failure) { result.cancel(false); return false; }
     }
 
+    void stop() {
+        if (disposed || !busy) return;
+        queue.clear();
+        stopRequested = true;
+        LocalNotebookKernel owned = kernel;
+        if (!executing || owned == null) { shutdown("Kernel startup cancelled."); return; }
+        long expected = generation;
+        status.accept("Interrupting the running cell...");
+        Thread.ofVirtual().name("notebook-kernel-interrupt").start(() -> {
+            try { owned.interrupt(); } catch (java.io.IOException failure) { owned.abort(); }
+            try { Thread.sleep(5000); } catch (InterruptedException ignored) { return; }
+            if (onEdt(() -> {
+                if (generation != expected || !busy || !stopRequested) return false;
+                invalidate();
+                status.accept("The kernel did not stop within five seconds and was reset. Run explicitly to start another kernel.");
+                refresh.run();
+                return true;
+            })) owned.abort();
+        });
+    }
+
+    void restart() {
+        if (disposed) return;
+        invalidate();
+        queue.add(new Target(null, ""));
+        stopRequested = false;
+        startNext();
+    }
+
+    void shutdown(String message) {
+        invalidate();
+        status.accept(message);
+        refresh.run();
+    }
+
+    void documentEdited() {
+        if (!busy) return;
+        invalidate();
+        status.accept("Running and queued cells cancelled because the notebook was edited.");
+        ApplicationManager.getApplication().invokeLater(() -> { if (!disposed && !project.isDisposed()) refresh.run(); });
+    }
+
     /** Raw/external JSON changes invalidate pending execution rather than overwriting them. */
     void invalidate() {
         generation++;
         busy = false;
+        executing = false;
+        queue.clear();
         var operation = probe;
         if (operation != null) operation.close();
-        var owned = kernel;
-        if (owned != null) owned.close();
+        for (var owned : ownedKernels) owned.close();
+        kernel = null;
     }
 
     @Override public void dispose() { disposed = true; invalidate(); }

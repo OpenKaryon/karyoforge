@@ -73,13 +73,16 @@ public final class LocalNotebookKernel implements AutoCloseable {
         if (!"ready".equals(ready.get("event").getAsString())) throw new IOException("The local kernel did not become ready.");
     }
 
-    public Execution execute(String code) throws Exception {
+    public Execution execute(String code) throws Exception { return execute(code, () -> {}); }
+
+    public Execution execute(String code, Runnable submitted) throws Exception {
         String request = UUID.randomUUID().toString();
         var command = new JsonObject();
         command.addProperty("command", "execute");
         command.addProperty("request", request);
         command.addProperty("code", code);
         send(command);
+        submitted.run();
         var outputs = new JsonArray();
         int size = 0;
         while (true) {
@@ -99,6 +102,19 @@ public final class LocalNotebookKernel implements AutoCloseable {
                 default -> throw new IOException("Unexpected kernel execution event.");
             }
         }
+    }
+
+    public void interrupt() throws IOException {
+        var command = new JsonObject();
+        command.addProperty("command", "interrupt");
+        send(command);
+    }
+
+    public void abort() {
+        Process owned = process;
+        if (owned != null && owned.isAlive()) { observeChildren(); owned.destroyForcibly(); }
+        for (var child : children.values()) child.stop();
+        close();
     }
 
     private JsonObject take(Duration timeout) throws Exception {
