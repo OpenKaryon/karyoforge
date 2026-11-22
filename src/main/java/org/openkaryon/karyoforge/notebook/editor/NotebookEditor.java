@@ -65,6 +65,11 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
     private final JButton restartKernel = new JButton("Restart kernel");
     private final JButton shutdownKernel = new JButton("Shutdown kernel");
     private boolean applyingExecution;
+    private final Map<String, org.openkaryon.karyoforge.notebook.runtime.NotebookOutputBuffer.Snapshot> liveOutputs = new LinkedHashMap<>();
+    private final Map<String, JPanel> outputHosts = new LinkedHashMap<>();
+    private final Map<String, JPanel> codePanels = new LinkedHashMap<>();
+    private final Map<String, JButton> runButtons = new LinkedHashMap<>();
+    private final NotebookInputPanel input = new NotebookInputPanel(() -> { if (execution != null) execution.stop(); });
     private NotebookDocument notebook;
     private long renderedStamp;
     private boolean committing;
@@ -90,10 +95,12 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         status.getAccessibleContext().setAccessibleName("Notebook edit status");
         previous.addActionListener(event -> { pageStart = Math.max(0, pageStart - PAGE_SIZE); render(); });
         next.addActionListener(event -> { pageStart += PAGE_SIZE; render(); });
-        toolbar.add(runAll);
-        toolbar.add(stopKernel);
-        toolbar.add(restartKernel);
-        toolbar.add(shutdownKernel);
+        var kernelActions = new JPanel(new FlowLayout(FlowLayout.LEADING));
+        kernelActions.add(runAll);
+        kernelActions.add(stopKernel);
+        kernelActions.add(restartKernel);
+        kernelActions.add(shutdownKernel);
+        kernelActions.add(new JLabel("Live previews; completed results use Save."));
         runAll.addActionListener(event -> execution.runAll());
         stopKernel.addActionListener(event -> execution.stop());
         restartKernel.addActionListener(event -> execution.restart());
@@ -102,10 +109,15 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         Disposer.register(this, runtime);
         var header = new JPanel(new BorderLayout());
         header.add(runtime, BorderLayout.NORTH);
-        header.add(toolbar, BorderLayout.SOUTH);
+        header.add(toolbar, BorderLayout.CENTER);
+        header.add(kernelActions, BorderLayout.SOUTH);
         component.add(header, BorderLayout.NORTH);
         component.add(new JScrollPane(cells), BorderLayout.CENTER);
-        component.add(status, BorderLayout.SOUTH);
+        var footer = new JPanel(new BorderLayout());
+        footer.add(status, BorderLayout.NORTH);
+        footer.add(input, BorderLayout.CENTER);
+        component.add(footer, BorderLayout.SOUTH);
+        Disposer.register(this, input);
         component.getAccessibleContext().setAccessibleName("KaryoForge notebook");
         if (document != null) {
             document.addDocumentListener(new DocumentListener() {
@@ -121,15 +133,17 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
                 }
             }, this);
         }
-        execution = new NotebookKernelController(project, file, () -> notebook, status::setText, this::render,
+        execution = new NotebookKernelController(project, file, () -> notebook, status::setText, this::refreshExecutionView,
                 (id, result) -> {
                     applyingExecution = true;
                     try {
-                        boolean saved = edit("Update notebook execution", model -> model.setExecution(id, result.count(), result.outputs()), true);
+                        boolean saved = edit("Update notebook execution", model -> model.setExecution(id, result.count(), result.outputs()), false);
                         if (saved) status.setText("Cell execution finished: " + result.status() + ". Ctrl+S saves the result.");
                         return saved;
                     } finally { applyingExecution = false; }
-                });
+                }, (id, output) -> { liveOutputs.put(id, output); refreshExecutionView(); },
+                request -> { if (request == null) input.clear(); else input.showRequest(request); },
+                () -> { liveOutputs.clear(); input.clear(); refreshExecutionView(); });
         Disposer.register(this, execution);
         runtime.setSelectionChanged(() -> execution.shutdown("Interpreter changed. The previous local kernel was shut down."));
         reload();
@@ -165,7 +179,6 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         previous.setEnabled(pageStart > 0);
         next.setEnabled(end < size);
         pageLabel.setText(size == 0 ? "No cells" : "Cells " + (pageStart + 1) + "–" + end + " of " + size);
-        var outputs = new NotebookOutputPreview();
         for (int index = pageStart; index < end; index++) {
             NotebookDocument.Cell cell = notebook.cellAt(index);
             var panel = new JPanel(new BorderLayout());
@@ -224,18 +237,44 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
                     scroll.setPreferredSize(new Dimension(720, Math.min(300, Math.max(60, preview.getPreferredSize().height + 8))));
                     panel.add(scroll, BorderLayout.SOUTH);
                 }
-                if (cell.type() == CellType.CODE && !cell.outputs().isEmpty()) {
-                    var saved = outputs.create(cell.outputs());
-                    var scroll = new JScrollPane(saved);
-                    scroll.setPreferredSize(new Dimension(720, Math.min(300, Math.max(40, saved.getPreferredSize().height + 8))));
-                    panel.add(scroll, BorderLayout.SOUTH);
+                if (cell.type() == CellType.CODE) {
+                    var host = new JPanel(new BorderLayout());
+                    outputHosts.put(cell.id(), host);
+                    codePanels.put(cell.id(), panel);
+                    panel.add(host, BorderLayout.SOUTH);
                 }
             }
             cells.add(panel);
         }
         if (size == 0) cells.add(new JLabel("Add a Code, Markdown or Raw cell, or edit the complete JSON in the Text view."));
+        refreshExecutionView();
         cells.revalidate();
         cells.repaint();
+    }
+
+    private void refreshExecutionView() {
+        if (disposed) return;
+        updateEditingButtons();
+        if (notebook == null) return;
+        var previews = new NotebookOutputPreview();
+        for (var entry : outputHosts.entrySet()) {
+            String id = entry.getKey();
+            var cell = notebook.cell(id);
+            var live = liveOutputs.get(id);
+            var values = live == null ? cell.outputs() : live.outputs();
+            JPanel host = entry.getValue();
+            host.removeAll();
+            if (!values.isEmpty()) {
+                var saved = previews.create(values);
+                var scroll = new JScrollPane(saved);
+                scroll.setPreferredSize(new Dimension(720, Math.min(300, Math.max(40, saved.getPreferredSize().height + 8))));
+                host.add(scroll, BorderLayout.CENTER);
+            }
+            String count = execution != null && id.equals(execution.activeCell()) ? "*" : cell.executionCount() == null ? " " : cell.executionCount().toString();
+            codePanels.get(id).setBorder(BorderFactory.createTitledBorder("Cell " + (notebook.indexOf(id) + 1) + " · Code · In [" + count + "]"));
+            host.revalidate(); host.repaint();
+        }
+        cells.revalidate(); cells.repaint();
     }
 
     private void showError(String message) {
@@ -265,6 +304,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         stopKernel.setEnabled(execution != null && execution.isBusy());
         restartKernel.setEnabled(canWrite() && execution != null);
         shutdownKernel.setEnabled(execution != null && (execution.isBusy() || execution.hasSession()));
+        for (var run : runButtons.values()) run.setEnabled(canWrite() && execution != null && !execution.isBusy());
         for (JButton button : editingButtons) button.setEnabled(canWrite());
     }
 
@@ -318,6 +358,7 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         if (cell.type() == CellType.CODE) {
             var run = new JButton("Run cell");
             run.getAccessibleContext().setAccessibleName("Run cell " + (index + 1));
+            runButtons.put(cell.id(), run);
             run.setEnabled(canWrite() && execution != null && !execution.isBusy());
             run.addActionListener(event -> execution.run(cell.id()));
             controls.add(run);
@@ -371,6 +412,9 @@ public final class NotebookEditor extends UserDataHolderBase implements Document
         sourceLifetimes.clear();
         cellEditors.clear();
         markdownPreviews.clear();
+        outputHosts.clear();
+        codePanels.clear();
+        runButtons.clear();
         for (Editor editor : sourceEditors) EditorFactory.getInstance().releaseEditor(editor);
         sourceEditors.clear();
     }

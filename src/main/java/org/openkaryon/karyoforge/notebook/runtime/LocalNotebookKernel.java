@@ -36,6 +36,8 @@ public final class LocalNotebookKernel implements AutoCloseable {
     private volatile Path temporary;
     private BufferedWriter writer;
     private volatile String diagnostics = "";
+    private volatile String activeRequest;
+    private final java.util.concurrent.atomic.AtomicReference<InputRequest> currentInput = new java.util.concurrent.atomic.AtomicReference<>();
 
     public record Execution(JsonArray outputs, Integer count, String status) {}
     private record Identity(ProcessHandle handle, Instant started) {
@@ -76,35 +78,82 @@ public final class LocalNotebookKernel implements AutoCloseable {
     public Execution execute(String code) throws Exception { return execute(code, () -> {}); }
 
     public Execution execute(String code, Runnable submitted) throws Exception {
+        return execute(code, submitted, ignored -> {}, input -> {
+            throw new IllegalStateException("An input request needs an interactive notebook editor.");
+        });
+    }
+
+    public Execution execute(String code, Runnable submitted,
+                             java.util.function.Consumer<NotebookOutputBuffer> progress,
+                             java.util.function.Consumer<InputRequest> input) throws Exception {
         String request = UUID.randomUUID().toString();
+        activeRequest = request;
         var command = new JsonObject();
         command.addProperty("command", "execute");
         command.addProperty("request", request);
         command.addProperty("code", code);
-        send(command);
-        submitted.run();
-        var outputs = new JsonArray();
-        int size = 0;
-        while (true) {
-            JsonObject event = take(null);
-            if (!event.has("request") || !request.equals(event.get("request").getAsString())) throw new IOException("Kernel returned an unrelated execution event.");
-            switch (event.get("event").getAsString()) {
-                case "output" -> {
-                    var output = event.getAsJsonObject("output");
-                    size += output.toString().length();
-                    if (size > 9 * 1024 * 1024 || outputs.size() > 1000) throw new IOException("Kernel output exceeds its transport bound.");
-                    outputs.add(output);
+        var buffer = new NotebookOutputBuffer();
+        long size = 0;
+        int received = 0;
+        try {
+            send(command);
+            submitted.run();
+            progress.accept(buffer);
+            while (true) {
+                JsonObject event = take(null);
+                if (!event.has("request") || !request.equals(event.get("request").getAsString())) throw new IOException("Kernel returned an unrelated execution event.");
+                size += event.toString().length();
+                if (++received > 10_000 || size > 10 * 1024 * 1024) throw new IOException("Kernel output exceeds its execution transport bound.");
+                switch (event.get("event").getAsString()) {
+                    case "output", "display_update", "clear", "count" -> { buffer.accept(event); progress.accept(buffer); }
+                    case "input" -> {
+                        var prompt = new InputRequest(this, request, event.get("inputId").getAsString(),
+                                event.get("prompt").getAsString(), event.get("password").getAsBoolean());
+                        currentInput.set(prompt);
+                        input.accept(prompt);
+                    }
+                    case "done" -> {
+                        var count = event.get("count");
+                        return new Execution(buffer.snapshot().outputs(), count == null || count.isJsonNull() ? null : count.getAsInt(), event.get("status").getAsString());
+                    }
+                    default -> throw new IOException("Unexpected kernel execution event.");
                 }
-                case "done" -> {
-                    var count = event.get("count");
-                    return new Execution(outputs, count == null || count.isJsonNull() ? null : count.getAsInt(), event.get("status").getAsString());
-                }
-                default -> throw new IOException("Unexpected kernel execution event.");
             }
+        } finally { activeRequest = null; currentInput.set(null); }
+    }
+
+    public static final class InputRequest {
+        private final LocalNotebookKernel owner;
+        private final String request;
+        private final String id;
+        private final String prompt;
+        private final boolean password;
+
+        private InputRequest(LocalNotebookKernel owner, String request, String id, String prompt, boolean password) {
+            this.owner = owner; this.request = request; this.id = id; this.prompt = prompt; this.password = password;
+        }
+        public String prompt() { return prompt; }
+        public boolean password() { return password; }
+        public boolean isPending() { return !owner.closed && request.equals(owner.activeRequest) && owner.currentInput.get() == this; }
+
+        /** The response travels only to kernel stdin. It is never logged or stored by the bridge. */
+        public boolean reply(char[] value) throws IOException {
+            try {
+                if (value.length > 65_536) throw new IOException("Notebook input exceeds 65,536 characters.");
+                if (!isPending() || !owner.currentInput.compareAndSet(this, null)) return false;
+                var command = new JsonObject();
+                command.addProperty("command", "input");
+                command.addProperty("request", request);
+                command.addProperty("inputId", id);
+                command.addProperty("value", new String(value));
+                owner.send(command);
+                return true;
+            } finally { java.util.Arrays.fill(value, (char) 0); }
         }
     }
 
     public void interrupt() throws IOException {
+        currentInput.set(null);
         var command = new JsonObject();
         command.addProperty("command", "interrupt");
         send(command);
@@ -150,7 +199,9 @@ public final class LocalNotebookKernel implements AutoCloseable {
                     bytes.write(value);
                 }
                 if (value == -1) throw new IOException("The kernel event channel closed. " + diagnostics);
-                var event = JsonParser.parseString(bytes.toString(StandardCharsets.UTF_8)).getAsJsonObject();
+                String frame = bytes.toString(StandardCharsets.UTF_8);
+                checkDepth(frame);
+                var event = JsonParser.parseString(frame).getAsJsonObject();
                 if (event.get("protocol").getAsInt() != 1 || !token.equals(event.get("token").getAsString()))
                     throw new IOException("Invalid kernel protocol identity.");
                 while (!closed && !events.offer(event, 100, TimeUnit.MILLISECONDS)) { /* bounded backpressure */ }
@@ -161,6 +212,21 @@ public final class LocalNotebookKernel implements AutoCloseable {
             event.addProperty("message", "Kernel communication failed: " + failure.getMessage());
             events.clear();
             events.offer(event);
+        }
+    }
+
+    private static void checkDepth(String frame) throws IOException {
+        boolean quoted = false, escaped = false;
+        int depth = 0;
+        for (int index = 0; index < frame.length(); index++) {
+            char character = frame.charAt(index);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+            } else if (character == '"') quoted = true;
+            else if (character == '{' || character == '[') { if (++depth > 128) throw new IOException("Kernel frame nesting exceeds its bound."); }
+            else if (character == '}' || character == ']') depth--;
         }
     }
 
@@ -187,6 +253,7 @@ public final class LocalNotebookKernel implements AutoCloseable {
         synchronized (this) {
             if (closed) return;
             closed = true;
+            currentInput.set(null);
         }
         Thread.ofVirtual().name("notebook-kernel-shutdown").start(() -> {
             try {

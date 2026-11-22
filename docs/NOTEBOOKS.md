@@ -68,8 +68,12 @@ bound, not a memory or time sandbox for explicitly executed Python code.
 Completed streams, expression results, rich MIME bundles, errors and execution
 counts update only the original Code cell if its identity, source, interpreter
 and backing document still match. They use the same native JSON document,
-Save and Undo history as cell editing. Results appear after execution completes;
-saved-output rendering retains its passive preview rules. A rejected excessive
+Save and Undo history as cell editing. While a cell runs, bounded previews update without replacing source editors.
+The completed result is committed once to the document and native Undo history;
+Ctrl+S during execution saves the last accepted document, rather than an
+incomplete preview. A transport failure or forced reset discards incomplete
+previews and retains the last accepted JSON. Saved/live rendering uses the same
+passive preview rules. A rejected excessive
 document update retains the last accepted JSON and reports the error.
 
 Closing the editor/project or replacing the raw JSON invalidates pending work
@@ -77,6 +81,31 @@ and shuts down its owned helper/kernel. Cleanup tracks observed process
 identities, including creation time, and never searches for arbitrary Python
 processes by name. Temporary session files are removed only after owned children
 have stopped. A later explicit Run can create a fresh session.
+
+## Input and live output
+
+`input()` and `getpass.getpass()` use a nonmodal field below the notebook.
+Password requests mask characters. **Submit input** sends the response only to
+the active kernel stdin request; **Cancel input** stops that cell and its queue.
+Input fields are cleared on submission, cancellation, interpreter changes and
+closure. Responses have a 65,536-character bound, are not echoed or saved by the
+IDE/helper, and cannot satisfy a stale request after Stop or session replacement.
+Python code that explicitly prints a response creates ordinary cell output.
+
+Live streams coalesce adjacent fragments. `clear_output(wait=False)` clears the
+current preview immediately; `wait=True` retains it until the next output.
+Display-ID updates replace matching MIME bundles within the currently executing
+cell. Live display IDs are session routing data and are omitted from saved JSON;
+finished cells keep their saved results. Cross-cell/background display routing,
+interactive widgets and remote kernels are not supported.
+
+Text, local PNG/JPEG and rich MIME preservation share the preview bounds below.
+HTML, SVG and JavaScript are retained with a notice and are never loaded into a
+browser. Protocol frames have a 16 MiB/128-level nesting bound; each execution
+accepts at most 10,000 events and 10 MiB of protocol data in addition to the
+helper's stricter output-payload bound. Live snapshots are refreshed at most
+five times per second and do not add streaming fragments to the document's Undo
+history.
 
 ## Kernel controls
 

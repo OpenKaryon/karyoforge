@@ -114,6 +114,7 @@ tasks.test {
         exclude("**/NotebookProbeProcessTest.class")
         exclude("**/LocalNotebookKernelTest.class")
         exclude("**/NotebookExecutionIntegrationTest.class")
+        exclude("**/NotebookInputIntegrationTest.class")
     }
     systemProperty("karyoforge.notebook.python", providers.gradleProperty("notebookPythonExecutable").orElse("").get())
     systemProperty("karyoforge.python.executable", providers.gradleProperty("pythonExecutable").orElse("").get())

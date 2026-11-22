@@ -171,6 +171,41 @@ public final class LocalNotebookKernelTest extends TestCase {
         }
     }
 
+    public void testInterruptedInputRejectsAndClearsALateResponse() throws Exception {
+        Path directory = Files.createTempDirectory("notebook-input-acceptance-");
+        var kernel = new LocalNotebookKernel(python, directory);
+        try {
+            kernel.start();
+            var prompt = new CompletableFuture<LocalNotebookKernel.InputRequest>();
+            var result = new CompletableFuture<LocalNotebookKernel.Execution>();
+            Thread.ofVirtual().start(() -> {
+                try { result.complete(kernel.execute("input('Waiting: ')", () -> {}, ignored -> {}, prompt::complete)); }
+                catch (Exception failure) { result.completeExceptionally(failure); }
+            });
+            var input = prompt.get(10, TimeUnit.SECONDS);
+            assertTrue(input.isPending());
+            assertFalse(input.password());
+            kernel.interrupt();
+            assertEquals("error", result.get(10, TimeUnit.SECONDS).status());
+            char[] discarded = "late-synthetic-response".toCharArray();
+            assertFalse(input.reply(discarded));
+            for (char value : discarded) assertEquals((char) 0, value);
+            assertTrue(kernel.execute("print('still-responsive')").outputs().toString().contains("still-responsive"));
+        } finally { stop(kernel); Files.deleteIfExists(directory); }
+    }
+
+    public void testOversizedKernelOutputBecomesAnExplicitBoundedNotice() throws Exception {
+        Path directory = Files.createTempDirectory("notebook-output-bound-");
+        var kernel = new LocalNotebookKernel(python, directory);
+        try {
+            kernel.start();
+            var result = kernel.execute("print('x' * (9 * 1024 * 1024))");
+            assertEquals("ok", result.status());
+            assertTrue(result.outputs().toString().contains("output limit reached"));
+            assertTrue(result.outputs().toString().length() < 2048);
+        } finally { stop(kernel); Files.deleteIfExists(directory); }
+    }
+
     private static void stop(LocalNotebookKernel kernel) throws Exception {
         Path runtime = kernel.runtimeDirectory();
         kernel.close();

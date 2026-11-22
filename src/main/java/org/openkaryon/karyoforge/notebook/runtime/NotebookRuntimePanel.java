@@ -38,6 +38,7 @@ public final class NotebookRuntimePanel extends JPanel implements Disposable {
         this.file = file;
         choices.getAccessibleContext().setAccessibleName("Notebook Python interpreter");
         choices.putClientProperty("html.disable", true);
+        choices.setPreferredSize(new java.awt.Dimension(440, choices.getPreferredSize().height));
         status.putClientProperty("html.disable", true);
         status.getAccessibleContext().setAccessibleName("Notebook dependency status");
         var actions = new JPanel(new FlowLayout(FlowLayout.LEADING));

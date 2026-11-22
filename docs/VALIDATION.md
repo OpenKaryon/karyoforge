@@ -67,6 +67,22 @@ next execution started with count one and no old variables. Strict compatibility
 and structure passed. This is native acceptance; notebook VM GUI coverage still
 requires an executed run.
 
+## Notebook input and live-output acceptance
+
+All 53 targeted notebook native checks passed without failures, errors or skips.
+The real input/getpass checks cover password masking, cleared transient fields,
+no automatic echo/persistence, cancellation of queued cells and rejection of
+late responses after interruption. Live-output checks retain native source
+editor identities, keep incomplete previews out of the backing document,
+coalesce streams, implement deferred clear/current-cell display updates and
+preserve passive rich MIME. Native Undo/Redo restores one completed result
+without executing code. A nine-MiB print produces an explicit bounded notice.
+The complete preceding 101-test run identified one test-readiness race in the
+deliberately ignored-interrupt case; its corrected command-submission wait and
+all notebook cases passed the targeted rerun. Strict compatibility, structure
+and VM-only GUI compilation passed. Executed notebook GUI acceptance remains
+separate.
+
 ## Verified build inputs
 
 - Gradle 9.1.0 wrapper JAR SHA-256:

@@ -9,6 +9,7 @@ import queue
 import sys
 import threading
 import time
+import uuid
 
 PROTOCOL = 1
 MAX_FRAME = 16 * 1024 * 1024
@@ -75,6 +76,8 @@ def main() -> int:
     output_bytes = 0
     output_count = 0
     output_limited = False
+    pending_input = None
+    interrupted = False
     try:
         # No kernelspec registration, server, inherited Jupyter configuration or log pipe.
         environment = dict(os.environ)
@@ -103,12 +106,22 @@ def main() -> int:
                     code = command['code']
                     if not isinstance(request, str) or not isinstance(code, str) or len(code) > 1_000_000:
                         raise ValueError('Invalid cell execution request')
-                    active = (request, client.execute(code, store_history=True, allow_stdin=False,
+                    active = (request, client.execute(code, store_history=True, allow_stdin=True,
                                                       stop_on_error=True))
                     idle, reply = False, None
+                    pending_input, interrupted = None, False
                     output_bytes, output_count, output_limited = 0, 0, False
                 elif kind == 'interrupt' and active:
+                    interrupted = True
+                    pending_input = None
                     manager.interrupt_kernel()
+                elif kind == 'input':
+                    if active and pending_input and command.get('request') == active[0] and command.get('inputId') == pending_input:
+                        value = command.get('value')
+                        if not isinstance(value, str) or len(value) > 65536:
+                            raise ValueError('Input response exceeds its bound')
+                        client.input(value)
+                        pending_input = None
                 elif kind not in ('interrupt',):
                     raise ValueError('Unsupported IDE command')
             if active:
@@ -121,19 +134,43 @@ def main() -> int:
                     kind, content = message['msg_type'], message['content']
                     if kind == 'status' and content.get('execution_state') == 'idle':
                         idle = True
-                    elif kind in ('stream', 'display_data', 'execute_result', 'error'):
+                    elif kind == 'execute_input':
+                        emit('count', request=request, count=content.get('execution_count'))
+                    elif kind == 'clear_output':
+                        emit('clear', request=request, wait=bool(content.get('wait', False)))
+                        output_limited = False
+                    elif kind in ('stream', 'display_data', 'execute_result', 'error', 'update_display_data'):
                         output = dict(content, output_type=kind)
                         # Transient routing data is not portable output metadata.
-                        output.pop('transient', None)
+                        transient = output.pop('transient', {})
+                        display_id = transient.get('display_id') if isinstance(transient, dict) else None
+                        if not isinstance(display_id, str) or len(display_id) > 1024:
+                            display_id = None
                         encoded = json.dumps(output, ensure_ascii=True, allow_nan=False)
                         output_bytes += len(encoded)
                         output_count += 1
                         if output_bytes <= MAX_OUTPUT and output_count <= MAX_OUTPUTS:
-                            emit('output', request=request, output=output)
+                            if kind == 'update_display_data':
+                                if display_id is not None:
+                                    emit('display_update', request=request, displayId=display_id,
+                                         data=content.get('data', {}), metadata=content.get('metadata', {}))
+                            elif display_id is not None:
+                                emit('output', request=request, output=output, displayId=display_id)
+                            else:
+                                emit('output', request=request, output=output)
                         elif not output_limited:
                             emit('output', request=request, output={'output_type': 'stream', 'name': 'stderr',
                                  'text': '[KaryoForge output limit reached; further output is not saved.]\n'})
                             output_limited = True
+                try:
+                    message = client.get_stdin_msg(timeout=0)
+                except queue.Empty:
+                    message = None
+                if message and not interrupted and message.get('parent_header', {}).get('msg_id') == message_id and message['msg_type'] == 'input_request':
+                    content = message['content']
+                    pending_input = uuid.uuid4().hex
+                    emit('input', request=request, inputId=pending_input, prompt=str(content.get('prompt', ''))[:2048],
+                         password=bool(content.get('password', False)))
                 try:
                     message = client.get_shell_msg(timeout=0)
                 except queue.Empty:
@@ -143,6 +180,7 @@ def main() -> int:
                 if idle and reply is not None:
                     emit('done', request=request, status=reply.get('status', 'error'), count=reply.get('execution_count'))
                     active = None
+                    pending_input = None
             else:
                 time.sleep(0.02)
             if time.monotonic() - last_alive > 1:

@@ -25,6 +25,17 @@ final class NotebookKernelController implements Disposable {
     private final Consumer<String> status;
     private final Runnable refresh;
     private final java.util.function.BiPredicate<String, LocalNotebookKernel.Execution> completed;
+    private final BiConsumer<String, org.openkaryon.karyoforge.notebook.runtime.NotebookOutputBuffer.Snapshot> preview;
+    private final Consumer<LocalNotebookKernel.InputRequest> input;
+    private final Runnable clearPreview;
+    private final javax.swing.Timer previews;
+    private static final class Progress {
+        final String id;
+        final java.util.concurrent.atomic.AtomicReference<org.openkaryon.karyoforge.notebook.runtime.NotebookOutputBuffer> buffer = new java.util.concurrent.atomic.AtomicReference<>();
+        long revision = -1;
+        Progress(String id) { this.id = id; }
+    }
+    private Progress progress;
     private volatile LocalNotebookKernel kernel;
     private volatile NotebookDependencyCheck probe;
     private Path kernelPython;
@@ -39,14 +50,31 @@ final class NotebookKernelController implements Disposable {
 
     NotebookKernelController(Project project, VirtualFile file, Supplier<NotebookDocument> model,
                              Consumer<String> status, Runnable refresh,
-                             java.util.function.BiPredicate<String, LocalNotebookKernel.Execution> completed) {
+                             java.util.function.BiPredicate<String, LocalNotebookKernel.Execution> completed,
+                             BiConsumer<String, org.openkaryon.karyoforge.notebook.runtime.NotebookOutputBuffer.Snapshot> preview,
+                             Consumer<LocalNotebookKernel.InputRequest> input, Runnable clearPreview) {
         this.project = project;
         this.file = file;
         this.model = model;
         this.status = status;
         this.refresh = refresh;
         this.completed = completed;
+        this.preview = preview;
+        this.input = input;
+        this.clearPreview = clearPreview;
+        previews = new javax.swing.Timer(200, event -> flushPreview());
     }
+
+    private void flushPreview() {
+        Progress current = progress;
+        if (disposed || !busy || current == null || current.id == null) return;
+        var buffer = current.buffer.get();
+        if (buffer == null) return;
+        var snapshot = buffer.snapshotAfter(current.revision);
+        if (snapshot != null) { current.revision = snapshot.revision(); preview.accept(current.id, snapshot); }
+    }
+
+    String activeCell() { return busy && progress != null ? progress.id : null; }
 
     boolean isBusy() { return busy; }
     boolean hasOwnedProcesses() { return ownedKernels.stream().anyMatch(LocalNotebookKernel::hasOwnedProcesses); }
@@ -109,6 +137,8 @@ final class NotebookKernelController implements Disposable {
         }
         busy = true;
         long expected = ++generation;
+        Progress visible = progress = new Progress(id);
+        previews.start();
         status.accept("Starting local Python for the selected cell...");
         refresh.run();
         LocalNotebookKernel existing = kernel;
@@ -163,6 +193,11 @@ final class NotebookKernelController implements Disposable {
                     executing = true;
                     status.accept("Running the selected cell in local Python...");
                     return true;
+                }), visible.buffer::set, prompt -> onEdt(() -> {
+                    if (!current(expected, id, source, interpreter.executable()) || stopRequested) return false;
+                    flushPreview();
+                    input.accept(prompt);
+                    return true;
                 }));
                 onEdt(() -> {
                     if (!current(expected, id, source, interpreter.executable())) {
@@ -188,6 +223,7 @@ final class NotebookKernelController implements Disposable {
                 operation.close();
                 onEdt(() -> {
                     if (generation == expected) {
+                        previews.stop(); progress = null; clearPreview.run(); input.accept(null);
                         probe = null; busy = false; executing = false; refresh.run();
                         if (!stopRequested) startNext();
                     }
@@ -229,6 +265,7 @@ final class NotebookKernelController implements Disposable {
         if (disposed || !busy) return;
         queue.clear();
         stopRequested = true;
+        input.accept(null);
         LocalNotebookKernel owned = kernel;
         if (!executing || owned == null) { shutdown("Kernel startup cancelled."); return; }
         long expected = generation;
@@ -270,6 +307,7 @@ final class NotebookKernelController implements Disposable {
     /** Raw/external JSON changes invalidate pending execution rather than overwriting them. */
     void invalidate() {
         generation++;
+        previews.stop(); progress = null; clearPreview.run(); input.accept(null);
         busy = false;
         executing = false;
         queue.clear();
