@@ -13,6 +13,7 @@ import com.intellij.testFramework.FileEditorManagerTestCase;
 import com.intellij.testFramework.LightProjectDescriptor;
 import com.intellij.testFramework.fixtures.TempDirTestFixture;
 import com.intellij.testFramework.fixtures.impl.TempDirTestFixtureImpl;
+import org.openkaryon.karyoforge.biology.preview.BiologyPreviewProvider;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -115,6 +116,29 @@ public final class PreviewEditorIntegrationTest extends FileEditorManagerTestCas
             if (previous == null) System.clearProperty(key);
             else System.setProperty(key, previous);
         }
+    }
+
+    public void testVcfOffersMetadataWithoutReplacingNativeTextOrClaimingCompressedFiles() throws Exception {
+        String header = "##fileformat=VCFv4.3\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+        var file = myFixture.getTempDirFixture().createFile("native.vcf", header + "chr1\t17\t.\tA\tC\t.\tPASS\t.\n");
+        var compressed = myFixture.getTempDirFixture().createFile("not-plain.vcf.gz", "");
+        var provider = FileEditorProvider.EP_FILE_EDITOR_PROVIDER.getExtensionList().stream()
+                .filter(BiologyPreviewProvider.class::isInstance).findFirst().orElseThrow();
+        assertFalse(provider.accept(getProject(), compressed));
+        var manager = FileEditorManager.getInstance(getProject());
+        try {
+            var editors = manager.openFile(file, true);
+            assertTrue(Arrays.stream(editors).anyMatch(TextEditor.class::isInstance));
+            var preview = Arrays.stream(editors).filter(PreviewEditor.class::isInstance)
+                    .map(PreviewEditor.class::cast).findFirst().orElseThrow();
+            if (manager.getSelectedEditor(file) != preview) manager.setSelectedEditor(file, BiologyPreviewProvider.ID);
+            var table = (JTable) preview.getPreferredFocusedComponent();
+            PlatformTestUtil.waitWithEventsDispatching("VCF appears in the native preview", () -> table.getRowCount() == 1, 20);
+            assertEquals("17", table.getValueAt(0, 1));
+            button(preview, "Metadata / headers").doClick();
+            assertTrue(button(preview, "Record details").isVisible());
+            assertEquals(header + "chr1\t17\t.\tA\tC\t.\tPASS\t.\n", Files.readString(file.toNioPath()));
+        } finally { manager.closeFile(file); }
     }
 
     private static JButton button(PreviewEditor editor, String name) {

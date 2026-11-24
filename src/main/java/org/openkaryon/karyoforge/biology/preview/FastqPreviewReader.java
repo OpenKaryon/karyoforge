@@ -7,11 +7,11 @@ import java.io.IOException;
 import java.util.List;
 
 final class FastqPreviewReader extends PreviewReader {
-    @Override protected List<String> readColumns(PreviewInput input) {
-        return List.of("Identifier", "Description", "Length", "Sequence", "Quality");
+    @Override protected Header readHeader(PreviewInput input) {
+        return new Header(List.of("Identifier", "Description", "Length", "Sequence", "Quality"));
     }
 
-    @Override protected List<String> readRecord(PreviewInput input, List<String> columns) throws IOException {
+    @Override protected List<String> readRecord(PreviewInput input, Header documentHeader) throws IOException {
         var header = SequencePreview.readName(input, '@', "FASTQ");
         var sequence = new SequencePreview();
         while (input.peek() != '+') {

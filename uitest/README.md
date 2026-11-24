@@ -6,8 +6,8 @@ runtime is separate from the Java product plugin. The bundle includes the
 pinned SDK's Performance Testing plugin as test-only data. Each owned profile
 installs that plugin to provide Driver's server bridge; the public IDE archives
 do not include it. No GUI task runs an IDE on
-the development desktop. Database, genomic and private setup dialogs are outside this suite because the
-public distribution does not provide them. Notebook scenarios cover the public
+the development desktop. Database, indexed genomic tracks and private setup dialogs are outside this
+suite because the public distribution does not provide them. Notebook scenarios cover the public
 local Python implementation.
 
 ## Build and run
@@ -279,3 +279,12 @@ Undo/Redo restores saved output without executing code. Input cancellation
 prevents a later queued marker from running, including after editor reopening.
 All input values are synthetic test data, and every project/runtime/profile is
 owned by the run.
+
+## Local file preview scenarios
+
+`DelimitedPreviewUiTest` checks a literal CSV/TSV preview, byte-preserving
+pagination and the native Text tab. `FastaPreviewUiTest` uses a synthetic long
+record and verifies its full length and the next page. `FastqPreviewUiTest`
+covers multiline raw quality and a length mismatch. `VcfPreviewUiTest` checks
+metadata, pagination and literal sample fields. All four compare the source bytes
+before and after browsing the preview.

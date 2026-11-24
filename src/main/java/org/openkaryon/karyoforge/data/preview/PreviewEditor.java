@@ -24,6 +24,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.FlowLayout;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
@@ -40,11 +41,16 @@ public final class PreviewEditor extends UserDataHolderBase implements Documents
     private final JPanel panel = new JPanel(new BorderLayout());
     private final JBTable table = new JBTable();
     private final JTextArea details = new JTextArea();
+    private final JTextArea metadata = new JTextArea();
+    private final CardLayout infoLayout = new CardLayout();
+    private final JPanel info = new JPanel(infoLayout);
     private final JLabel status = new JLabel();
     private final JButton reload = button("Reload preview", () -> load(null, Navigation.RELOAD));
     private final JButton previous = button("Previous page", this::previousPage);
     private final JButton next = button("Next page", this::nextPage);
     private final JButton stop = button("Stop reading", this::stopReading);
+    private final JButton metadataButton = button("Metadata / headers", this::toggleMetadata);
+    private boolean showingMetadata;
     private final ArrayList<PreviewReader.Cursor> history = new ArrayList<>();
     private PreviewReader.Page page;
     private Read active;
@@ -62,6 +68,8 @@ public final class PreviewEditor extends UserDataHolderBase implements Documents
         controls.add(previous);
         controls.add(next);
         controls.add(stop);
+        metadataButton.setVisible(false);
+        controls.add(metadataButton);
         panel.add(controls, BorderLayout.NORTH);
 
         table.getAccessibleContext().setAccessibleName("Preview records");
@@ -76,7 +84,12 @@ public final class PreviewEditor extends UserDataHolderBase implements Documents
         details.getAccessibleContext().setAccessibleName("Preview record details");
         details.setEditable(false);
         details.setLineWrap(true);
-        var split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JBScrollPane(table), new JBScrollPane(details));
+        metadata.getAccessibleContext().setAccessibleName("Preview metadata");
+        metadata.setEditable(false);
+        metadata.setLineWrap(true);
+        info.add(new JBScrollPane(details), "details");
+        info.add(new JBScrollPane(metadata), "metadata");
+        var split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JBScrollPane(table), info);
         split.setResizeWeight(0.75);
         panel.add(split, BorderLayout.CENTER);
 
@@ -182,8 +195,19 @@ public final class PreviewEditor extends UserDataHolderBase implements Documents
         if (!disposed) report("Reading stopped.");
     }
 
+    private void toggleMetadata() {
+        showingMetadata = !showingMetadata;
+        infoLayout.show(info, showingMetadata ? "metadata" : "details");
+        metadataButton.setText(showingMetadata ? "Record details" : "Metadata / headers");
+    }
+
     private void showPage() {
         var shown = page;
+        var headers = shown.start().header().metadata();
+        metadataButton.setVisible(!headers.isEmpty());
+        if (headers.isEmpty() && showingMetadata) toggleMetadata();
+        metadata.setText(String.join("\n", headers));
+        metadata.setCaretPosition(0);
         int width = shown.columns().size();
         for (var row : shown.rows()) width = Math.max(width, row.values().size());
         int columns = width;

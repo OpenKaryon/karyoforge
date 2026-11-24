@@ -33,9 +33,10 @@ The model never imports process or IDE services. Test-only hashed Python wheels
 and GUI Driver dependencies are separate from the shipped product.
 See [notebook files and the document contract](NOTEBOOKS.md).
 
-The local CSV/TSV viewer in `data.preview` adds a passive native preview beside
-the platform Text editor. It pages by byte offsets, binds navigation to the
-original file snapshot and cancels owned background reads on Stop or disposal.
+The file viewers share a passive native preview in `data.preview` beside the
+platform Text editor. CSV/TSV parsing lives there, and FASTA, FASTQ and VCF
+parsing lives in `biology.preview`. Page cursors retain byte offsets and source
+snapshots. Stop or editor disposal cancels the owned background read.
 See [local data previews](DATA_PREVIEWS.md).
 
 The boundaries below define ownership

@@ -1,6 +1,6 @@
 # Local validation evidence
 
-Updated: 2026-11-23 on Windows 11 x64, Temurin JDK 21.0.11+10.
+Updated: 2026-11-25 on Windows 11 x64, Temurin JDK 21.0.11+10.
 The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 
 ## Executed checks
@@ -9,7 +9,7 @@ The public plugin ID is `org.openkaryon.karyoforge`, version `0.1.0-SNAPSHOT`.
 | --- | --- |
 | Source lint, tool tests and namespace/inventory audit | Passed; 55 Python tool tests, including Windows process ownership, branding and distribution input boundaries |
 | Plugin ZIP build and structure validation | Passed against the pinned SDK |
-| Native headless integration tests | 106 tests passed, no failures/errors/skips: 48 platform/Python cases and 58 notebook cases |
+| Native headless integration tests | 121 tests passed, no failures/errors/skips: 48 platform/Python, 58 notebook and 15 local file preview cases |
 | IntelliJ Plugin Verifier 1.410 | Compatible with IC-252.28539.97, offline dependency resolution |
 | Archive contents | Correct identity/build bounds/notices; project classes under the public namespace; PythonCore declared as a separate dependency |
 | Consent regression | The fresh-JVM probe reproduced the original `consentMap` failure before the fix, then passed with the vendor resource; two branded native tests cover permissions and Python inspections without accepted-consent writes |
@@ -32,7 +32,7 @@ the owner's normal IDE profile. These warnings are not hidden by editing SDK JAR
 
 ## Notebook acceptance
 
-All 58 notebook native tests passed within the complete 106-test regression
+All 58 notebook native tests passed within the complete 121-test regression
 suite. The same notebook suite passed through `make test-notebook` against an
 environment created by `make notebook-runtime`. Its CPython 3.14.6 runtime uses
 jupyter_client 8.10.0, ipykernel 7.4.0 and a complete graph of 28 SHA-256-locked
@@ -130,8 +130,8 @@ public provider bridge; internal APIs remain rejected.
 Reports are written to `build/reports/tests/test` and
 `build/reports/pluginVerifier`; native XML results are in `build/test-results`.
 The default native test task now runs with the branding overlay and isolated
-AppData directories. Seventy-one native tests are available without runtime opt-in. The complete
-explicit-runtime invocation passed 106 cases, including fifteen Python runtime
+AppData directories. Eighty-six native tests are available without runtime
+opt-in. The complete explicit-runtime invocation passed 121 cases, including fifteen Python runtime
 cases and twenty real notebook probe/kernel/editor cases. The remaining checks
 cover passive models, native editing, scope, settings and provider integration.
 
@@ -190,7 +190,27 @@ config/cache/log paths and exposed both public and Python settings successfully.
 
 Raw local diagnostics and cache paths are not committed as product evidence.
 
-## Windows VM GUI acceptance
+## Local file preview acceptance
+
+Fifteen parser and native editor checks cover CSV/TSV, FASTA, FASTQ and VCF.
+Tests include byte-aligned pagination, complete sequence lengths, raw quality
+and sample fields, metadata bounds, malformed UTF-8 or records, source changes,
+cancellation and disposal. The native editor manager opened the preview beside
+Text, and the preview alone did not create a source document or change file bytes.
+
+The Windows portable ZIP SHA-256 is
+`eec758168c3b4829279dc638d79884952775ac7abaa91fe8e4c7e437eda8ce6a`.
+The archive contains the four readers and both native editor registrations. It
+passed structure checks and headless startup with bundled Java and PythonCore.
+Six GUI scenarios passed on a separate Windows 11 VMware guest using this
+archive. The scenarios covered CSV/TSV pagination and the native Text tab,
+long FASTA records, raw FASTQ quality and length errors, VCF metadata and
+sample values, distribution startup and passive notebook opening. The four
+preview scenarios verified that browsing left their source files unchanged.
+JUnit reports for runs `058530451606`, `2b5ef94ee676` and `5be53407b240` are
+stored in ignored build output.
+
+## Notebook distribution GUI acceptance
 
 All 24 unique GUI methods passed in completed per-method JUnit reports from the
 same public portable IDE archive on a separate Windows 11 VMware guest. The
@@ -221,7 +241,7 @@ proves notebook result Undo/Redo does not execute code again. Ordinary/password
 input is synthetic, masked where requested and absent from saved notebook data.
 Input cancellation prevents the later queued marker, including after reopening.
 
-The final accepted IDE archive SHA-256 is `8f7ff2e0cf91cc2ba2b7bcb098ec1c4dfcd3db0a7919da90dca3c9d7a705af0a`.
+The notebook distribution archive tested here has SHA-256 `8f7ff2e0cf91cc2ba2b7bcb098ec1c4dfcd3db0a7919da90dca3c9d7a705af0a`.
 Completed evidence is recorded under ignored `build/ui-test-results/<run-id>`;
 accepted run IDs are `29df737be56b`, `8c7d3301d43a`, `ab18904c5eee`, `d45d836ddd84`, `df3b61200b1e`. Each environment report identifies the same
 SHA-256-owned IDE cache, the selected payload, memory limits and runtime inputs.

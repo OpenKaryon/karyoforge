@@ -15,20 +15,25 @@ public final class DelimitedPreviewReader extends PreviewReader {
         delimiter = csv ? ',' : '\t';
     }
 
-    @Override protected List<String> readColumns(PreviewInput input) throws IOException {
-        return input.peek() == -1 ? List.of() : readFields(input);
+    @Override protected Header readHeader(PreviewInput input) throws IOException {
+        return new Header(input.peek() == -1 ? List.of() : readFields(input, delimiter, csv));
     }
 
-    @Override protected List<String> readRecord(PreviewInput input, List<String> columns) throws IOException {
-        return readFields(input);
+    @Override protected List<String> readRecord(PreviewInput input, Header header) throws IOException {
+        return readFields(input, delimiter, csv);
     }
 
-    private List<String> readFields(PreviewInput input) throws IOException {
+    /** Read a literal tab-separated record, with the same bounds used for TSV previews. */
+    public static List<String> readTabRecord(PreviewInput input) throws IOException {
+        return readFields(input, '\t', false);
+    }
+
+    private static List<String> readFields(PreviewInput input, int delimiter, boolean csv) throws IOException {
         long start = input.offset();
         var fields = new ArrayList<String>();
         while (true) {
             if (fields.size() == MAX_COLUMNS) throw input.error("Record exceeds the 256-column preview limit");
-            fields.add(readField(input, start));
+            fields.add(readField(input, start, delimiter, csv));
             int next = input.peek();
             if (next == -1 || next == '\r' || next == '\n') {
                 if (next != -1) input.endLine();
@@ -39,7 +44,7 @@ public final class DelimitedPreviewReader extends PreviewReader {
         }
     }
 
-    private String readField(PreviewInput input, long start) throws IOException {
+    private static String readField(PreviewInput input, long start, int delimiter, boolean csv) throws IOException {
         var field = new ByteArrayOutputStream();
         if (csv && input.peek() == '"') {
             consume(input, start);
@@ -63,12 +68,12 @@ public final class DelimitedPreviewReader extends PreviewReader {
     }
 
     private static int consume(PreviewInput input, long start) throws IOException {
-        if (input.offset() - start >= MAX_RECORD_BYTES) throw input.error("CSV/TSV record exceeds the 128 KiB preview limit");
+        if (input.offset() - start >= MAX_RECORD_BYTES) throw input.error("Record exceeds the 128 KiB preview limit");
         return input.take();
     }
 
     private static void append(ByteArrayOutputStream field, int value, PreviewInput input) throws IOException {
-        if (field.size() == MAX_FIELD_BYTES) throw input.error("CSV/TSV field exceeds the 16 KiB preview limit");
+        if (field.size() == MAX_FIELD_BYTES) throw input.error("Field exceeds the 16 KiB preview limit");
         field.write(value);
     }
 }

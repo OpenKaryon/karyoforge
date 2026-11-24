@@ -40,13 +40,15 @@ public final class BiologyPreviewProvider implements FileEditorProvider, DumbAwa
         return switch (file.getExtension().toLowerCase(Locale.ROOT)) {
             case "fa", "fasta", "fna", "faa", "fas" -> Format.FASTA;
             case "fq", "fastq" -> Format.FASTQ;
+            case "vcf" -> Format.VCF;
             default -> null;
         };
     }
 
     private enum Format {
         FASTA(FastaPreviewReader::new),
-        FASTQ(FastqPreviewReader::new);
+        FASTQ(FastqPreviewReader::new),
+        VCF(VcfPreviewReader::new);
 
         private final Supplier<PreviewReader> reader;
 
