@@ -1,6 +1,6 @@
 # Local data previews
 
-Open a supported local CSV, TSV, TAB or FASTA file to see its saved records in the **Preview**
+Open a supported local CSV, TSV, TAB, FASTA or FASTQ file to see its saved records in the **Preview**
 tab. The IDE's ordinary **Text** tab remains available for editing and uses the
 platform's large file editor when applicable. The preview neither loads a source
 document nor changes its bytes.
@@ -33,3 +33,11 @@ can contain UTF-8 descriptions. Sequence characters are printable ASCII.
 
 A page request reads up to 64 MiB of source data. If a single record exceeds
 that limit, the preview reports its position and Text remains available.
+
+## FASTQ reads
+
+FASTQ previews open local .fq and .fastq files. Each record shows its
+identifier, description, sequence length and the first 512 characters of
+the sequence and quality. Both fields can span multiple lines. Quality is
+shown as raw printable ASCII, including leading @ or + characters. The
+reader compares full sequence and quality lengths before displaying the record.

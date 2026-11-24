@@ -11,7 +11,7 @@ requirements and standard project installation, module consoles and terminals,
 explicit module interpreter setup, notebook creation/cell editing with shared
 JSON Save/Undo, explicit local Python kernels, ordered execution, input/getpass
 and bounded passive rich-output previews, reversible spell-checking preferences,
-bounded local CSV/TSV and FASTA previews, a pinned IntelliJ plugin foundation
+bounded local CSV/TSV, FASTA and FASTQ previews, a pinned IntelliJ plugin foundation
 and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. Usage presets and workflow execution are not included. The reference implementation is supplied separately
 when running its audit.
