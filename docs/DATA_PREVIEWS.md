@@ -1,6 +1,6 @@
 # Local data previews
 
-Open a local CSV, TSV or TAB file to see its saved records in the **Preview**
+Open a supported local CSV, TSV, TAB or FASTA file to see its saved records in the **Preview**
 tab. The IDE's ordinary **Text** tab remains available for editing and uses the
 platform's large file editor when applicable. The preview neither loads a source
 document nor changes its bytes.
@@ -22,3 +22,14 @@ retained text, and selected-row details are clipped at 32 Ki UTF-16 code units.
 Oversized or malformed input produces a message with its source byte offset.
 The reader accepts UTF-8, including an optional byte order mark, with LF, CRLF or
 CR line endings. A previously loaded page stays visible if the next read fails.
+
+## FASTA sequences
+
+FASTA previews open local .fa, .fasta, .fna, .faa and .fas files. Each record
+shows its identifier, description, complete sequence length and the first 512
+sequence characters. The reader streams wrapped and unwrapped sequence lines
+and excludes spaces and tabs from the displayed sequence and length. Headers
+can contain UTF-8 descriptions. Sequence characters are printable ASCII.
+
+A page request reads up to 64 MiB of source data. If a single record exceeds
+that limit, the preview reports its position and Text remains available.

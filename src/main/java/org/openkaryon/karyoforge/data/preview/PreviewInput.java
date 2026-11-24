@@ -1,11 +1,13 @@
 package org.openkaryon.karyoforge.data.preview;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
@@ -69,6 +71,18 @@ public final class PreviewInput implements Closeable {
                 take();
             }
         }
+    }
+
+    /** Read a bounded UTF-8 line and consume its original line ending. */
+    public String readLine(int limit, String label) throws IOException {
+        var bytes = new ByteArrayOutputStream();
+        int value;
+        while ((value = peek()) != -1 && value != '\r' && value != '\n') {
+            if (bytes.size() == limit) throw error(label + " exceeds " + limit + " bytes");
+            bytes.write(take());
+        }
+        if (value != -1) endLine();
+        return bytes.toString(StandardCharsets.UTF_8);
     }
 
     public void endLine() throws IOException {
