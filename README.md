@@ -11,7 +11,7 @@ requirements and standard project installation, module consoles and terminals,
 explicit module interpreter setup, notebook creation/cell editing with shared
 JSON Save/Undo, explicit local Python kernels, ordered execution, input/getpass
 and bounded passive rich-output previews, reversible spell-checking preferences,
-a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
+bounded local CSV/TSV previews, a pinned IntelliJ plugin foundation and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. Biological editors, usage presets and workflow
 execution are not included. The reference implementation is supplied separately
 when running its audit.
@@ -21,6 +21,7 @@ when running its audit.
 - [Product branding](docs/BRANDING.md)
 - [Python development](docs/PYTHON.md)
 - [Jupyter notebook files](docs/NOTEBOOKS.md)
+- [Local data previews](docs/DATA_PREVIEWS.md)
 - [Editing preferences](docs/EDITING.md)
 - [Build and validation commands](docs/DEVELOPMENT.md)
 - [Executed local validation](docs/VALIDATION.md)

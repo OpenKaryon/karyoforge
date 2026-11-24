@@ -17,6 +17,8 @@
     <depends>org.toml.lang</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <fileTypeOverrider implementation="org.openkaryon.karyoforge.data.preview.DelimitedPreviewProvider$TextType"/>
+        <fileEditorProvider implementation="org.openkaryon.karyoforge.data.preview.DelimitedPreviewProvider"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.notebook.editor.NotebookJsonType" order="first"/>
         <fileEditorProvider implementation="org.openkaryon.karyoforge.notebook.editor.NotebookEditorProvider" order="first"/>
         <applicationConfigurable parentId="tools" id="org.openkaryon.karyoforge.settings"

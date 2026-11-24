@@ -1,0 +1,24 @@
+# Local data previews
+
+Open a local CSV, TSV or TAB file to see its saved records in the **Preview**
+tab. The IDE's ordinary **Text** tab remains available for editing and uses the
+platform's large file editor when applicable. The preview neither loads a source
+document nor changes its bytes.
+
+The first CSV or TSV record supplies column headings. CSV fields can contain
+commas or line breaks inside quotes, and doubled quotes represent a literal
+quote. TSV preserves quotes literally and splits on tabs. Values remain
+strings, so leading zeros, precision and empty fields are preserved. Select a
+row to see its values and the original byte offset.
+
+**Next page** reads at the next record boundary. **Previous page** retains up to
+64 page positions. **Stop reading** cancels the current request. Use
+**Reload preview** after a saved edit or external file change. When the native
+editor has unsaved changes, save them before reading the preview.
+
+Each page holds up to 200 records. A CSV/TSV field is limited to 16 KiB, a record
+to 128 KiB and a record to 256 columns. A page can end early to bound its
+retained text, and selected-row details are clipped at 32 Ki UTF-16 code units.
+Oversized or malformed input produces a message with its source byte offset.
+The reader accepts UTF-8, including an optional byte order mark, with LF, CRLF or
+CR line endings. A previously loaded page stays visible if the next read fails.
