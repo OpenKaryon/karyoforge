@@ -112,6 +112,39 @@ public final class SqliteJdbcSessionTest {
         }
     }
 
+    @Test public void bindsTypedAndRepeatedSqliteValuesWithoutInterpolatingText() throws Exception {
+        try (var session = new JdbcSession(fixture())) {
+            session.connect();
+            var query = SqlText.compile("SELECT :n, :payload, :n, :missing, :truth, :decimal, :day, :time, :stamp");
+            String text = "O'Reilly; SELECT 2";
+            var bound = new java.util.HashMap<String, SqlValue>();
+            bound.put("n", SqlValue.of(SqlValue.Type.INTEGER, "9223372036854775807", false));
+            bound.put("payload", SqlValue.of(SqlValue.Type.TEXT, text, false));
+            bound.put("missing", SqlValue.of(SqlValue.Type.TEXT, "", true));
+            bound.put("truth", SqlValue.of(SqlValue.Type.BOOLEAN, "true", false));
+            bound.put("decimal", SqlValue.of(SqlValue.Type.DECIMAL, "1234567890123456789.000001", false));
+            bound.put("day", SqlValue.of(SqlValue.Type.DATE, "2026-11-25", false));
+            bound.put("time", SqlValue.of(SqlValue.Type.TIME, "09:30:02", false));
+            bound.put("stamp", SqlValue.of(SqlValue.Type.TIMESTAMP, "2026-11-25 09:30:02", false));
+            var row = session.execute(query, bound, new QueryRequest()).rows().getFirst().cells();
+            assertEquals("9223372036854775807", row.get(0).value());
+            assertEquals(text, row.get(1).value());
+            assertEquals(row.get(0), row.get(2));
+            assertEquals(QueryPage.Cell.Kind.NULL, row.get(3).kind());
+            assertEquals("1", row.get(4).value());
+            assertEquals("1234567890123456789.000001", row.get(5).value());
+            assertEquals("2026-11-25", row.get(6).value());
+            assertEquals("09:30:02", row.get(7).value());
+            assertEquals("2026-11-25T09:30:02", row.get(8).value());
+
+            var position = SqlText.compile("SELECT ? AS bound");
+            var empty = SqlValue.of(SqlValue.Type.TEXT, "", false);
+            assertEquals("", session.execute(position, java.util.Map.of("1", empty), new QueryRequest())
+                    .rows().getFirst().cells().getFirst().value());
+            assertThrows(IllegalArgumentException.class, () -> session.execute(position, java.util.Map.of(), new QueryRequest()));
+        }
+    }
+
     private static boolean inDriver(Thread thread) {
         return Arrays.stream(thread.getStackTrace()).anyMatch(frame -> frame.getClassName().equals("org.sqlite.core.NativeDB")
                 && frame.getMethodName().equals("step"));

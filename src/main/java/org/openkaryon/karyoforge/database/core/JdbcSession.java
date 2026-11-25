@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /** Owns the connection and retained cursor. Except for QueryRequest.stop, use one command lane. */
@@ -81,14 +82,33 @@ public final class JdbcSession implements AutoCloseable {
     }
 
     public QueryPage execute(String sql, QueryRequest request) {
+        return execute(SqlText.compile(sql), Map.of(), request);
+    }
+
+    public QueryPage execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
         checkReady();
-        SqliteReadStatement.validate(sql);
+        if (!command.keyword().equals("SELECT") && !command.keyword().equals("WITH")) {
+            throw new IllegalArgumentException("Enter one SELECT or WITH query.");
+        }
+        var bindings = Map.copyOf(values);
+        if (!bindings.keySet().containsAll(command.parameters()) || bindings.size() != command.parameters().size()) {
+            throw new IllegalArgumentException("Provide one value for each SQL parameter.");
+        }
         request.check();
         closeCursor();
         return requestPage(request, () -> {
-            cursor = new Cursor(connection.createStatement());
-            request.attach(cursor.statement);
-            cursor.rows = cursor.statement.executeQuery(sql);
+            var statement = connection.prepareStatement(command.sql());
+            cursor = new Cursor(statement);
+            request.attach(statement);
+            if (statement.getParameterMetaData().getParameterCount() != command.bindingOrder().size()) {
+                throw new DatabaseProblem("The driver's SQL parameter count differs from the console's bindings.");
+            }
+            int index = 1;
+            for (String name : command.bindingOrder()) {
+                request.check();
+                bindings.get(name).bind(statement, index++);
+            }
+            cursor.rows = statement.executeQuery();
             cursor.columns = columns(cursor.rows.getMetaData());
             return readPage(cursor, request);
         });

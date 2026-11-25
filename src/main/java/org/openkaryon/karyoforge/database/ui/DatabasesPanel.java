@@ -15,6 +15,8 @@ import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.JdbcSession;
 import org.openkaryon.karyoforge.database.core.QueryPage;
 import org.openkaryon.karyoforge.database.core.QueryRequest;
+import org.openkaryon.karyoforge.database.core.SqlText;
+import org.openkaryon.karyoforge.database.core.SqlValue;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -24,6 +26,7 @@ import java.awt.FlowLayout;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -200,10 +203,22 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     private void runSql() {
         if (!connected || busy) return;
-        String selection = sql.getSelectedText();
-        String statement = selection == null ? sql.getText() : selection;
+        SqlText.Command command;
+        try {
+            command = SqlText.compile(SqlText.activeStatement(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd()));
+        } catch (IllegalArgumentException malformed) {
+            report(malformed.getMessage());
+            return;
+        }
+        Map<String, SqlValue> values = Map.of();
+        if (!command.parameters().isEmpty()) {
+            var dialog = new SqlParametersDialog(project, command.parameters());
+            if (!dialog.showAndGet()) return;
+            values = dialog.values();
+        }
         var request = new QueryRequest();
-        submit("Running SQL…", request, () -> session.execute(statement, request), this::showPage);
+        var bindings = values;
+        submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showPage);
     }
 
     private void next() {

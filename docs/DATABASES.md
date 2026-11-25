@@ -9,8 +9,15 @@ and checksum you trust. The IDE neither ships nor downloads JDBC drivers.
 
 SQLite opens the file in read-only mode and verifies the connection's
 query-only setting. Select a table or view and choose **Show Rows**, or enter
-one SELECT or WITH statement. **Run SQL** and Ctrl+Enter use the selection when
-there is one. The connection also enforces read-only access for WITH statements.
+a SELECT or WITH query. **Run SQL** and Ctrl+Enter run one statement, using
+the selection or the statement at the caret. The connection also enforces
+read-only access for WITH statements.
+
+Use named `:name` or positional `?` parameters in one statement. The SQL
+Parameters dialog binds text, integers, decimals, booleans, ISO dates, times,
+timestamps and explicit NULL values. Repeated names share a value. Literal and
+comment text is left intact. Cancelling the dialog leaves the existing result
+and database session untouched.
 
 Results show 200 rows per page. **Next Result Page** continues the active cursor.
 The preview is bounded to 10,000 rows, 8 MiB of detached cell text, 256 columns
