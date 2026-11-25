@@ -205,10 +205,17 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var mysql = new JMenuItem("MySQL");
         mysql.addActionListener(event -> editSource(null, SqlText.Dialect.MYSQL));
         menu.add(mysql);
+        var maria = new JMenuItem("MariaDB");
+        maria.addActionListener(event -> editSource(null, SqlText.Dialect.MYSQL, MysqlSource.Variant.MARIADB));
+        menu.add(maria);
         menu.show(addServer, 0, addServer.getHeight());
     }
 
     private void editSource(DatabaseSources.Profile profile, SqlText.Dialect dialect) {
+        editSource(profile, dialect, MysqlSource.Variant.MYSQL);
+    }
+
+    private void editSource(DatabaseSources.Profile profile, SqlText.Dialect dialect, MysqlSource.Variant mysqlVariant) {
         var existing = profile == null ? null : profile.source();
         DatabaseSource source = switch (dialect) {
             case SQLITE -> {
@@ -220,7 +227,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
                 yield dialog.showAndGet() ? dialog.source() : null;
             }
             case MYSQL -> {
-                var dialog = new MysqlSourceDialog(project, (MysqlSource) existing);
+                var dialog = new MysqlSourceDialog(project, (MysqlSource) existing, mysqlVariant);
                 yield dialog.showAndGet() ? dialog.source() : null;
             }
         };

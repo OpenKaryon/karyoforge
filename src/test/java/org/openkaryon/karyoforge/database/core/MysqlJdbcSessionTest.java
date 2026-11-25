@@ -15,7 +15,8 @@ import static org.junit.Assert.*;
 public final class MysqlJdbcSessionTest {
     @Test public void verifiesReadOnlyTypedPagesCatalogAndExplain() {
         try (var session = open(false)) {
-            assertEquals("1", scalar(session, "SELECT @@session.transaction_read_only"));
+            String accessMode = variant() == MysqlSource.Variant.MYSQL ? "transaction_read_only" : "tx_read_only";
+            assertEquals("1", scalar(session, "SELECT @@session." + accessMode));
             var catalog = session.schema();
             var table = catalog.stream().filter(object -> object.name().equals("samples")).findFirst().orElseThrow();
             assertEquals("`karyoforge_acceptance`.`samples`", table.qualified());
@@ -31,10 +32,10 @@ public final class MysqlJdbcSessionTest {
             assertEquals(200, session.openTable(table, new QueryRequest()).data().rows().size());
             assertFalse(((QueryPage) run(session, "EXPLAIN SELECT * FROM samples WHERE id=1")).rows().isEmpty());
             assertThrows(IllegalArgumentException.class, () -> run(session, "EXPLAIN /* comment */ ANALYZE SELECT * FROM samples"));
-            var failure = assertThrows(DatabaseProblem.class, () -> run(session,
-                    "WITH chosen AS (SELECT 1 AS id) DELETE FROM samples WHERE id IN (SELECT id FROM chosen)"));
+            var failure = assertThrows(DatabaseProblem.class, () -> run(session, "SELECT fixture_write()"));
             assertTrue(failure.getMessage().toLowerCase(Locale.ROOT).replace('-', ' ').contains("read only"));
             assertEquals("205", scalar(session, "SELECT count(*) FROM samples"));
+            assertEquals("sample-1", scalar(session, "SELECT note FROM samples WHERE id=1"));
         }
     }
 
@@ -45,6 +46,7 @@ public final class MysqlJdbcSessionTest {
             assertEquals(new SqlResult.UpdateCount(1), writer.execute(change, values, new QueryRequest()));
             assertThrows(IllegalArgumentException.class, () -> run(writer, "CREATE TABLE implicit (id int)"));
             assertThrows(IllegalArgumentException.class, () -> run(writer, "SELECT 1 /*! ; SELECT 2 */"));
+            assertThrows(IllegalArgumentException.class, () -> run(writer, "SELECT 1 /*M! ; SELECT 2 */"));
             assertEquals("sample-205", scalar(observer, "SELECT note FROM samples WHERE id=205"));
             writer.finishTransaction(false);
             assertEquals("sample-205", scalar(writer, "SELECT note FROM samples WHERE id=205"));
@@ -86,10 +88,14 @@ public final class MysqlJdbcSessionTest {
         }
     }
 
+    private static MysqlSource.Variant variant() {
+        return MysqlSource.Variant.valueOf(System.getenv("KARYOFORGE_TEST_MYSQL_VARIANT"));
+    }
+
     private static JdbcSession open(boolean writable) {
-        var source = new MysqlSource("Owned MySQL", "127.0.0.1", Integer.parseInt(System.getenv("KARYOFORGE_TEST_MYSQL_PORT")),
+        var source = new MysqlSource("Owned " + variant().title(), "127.0.0.1", Integer.parseInt(System.getenv("KARYOFORGE_TEST_MYSQL_PORT")),
                 "karyoforge_acceptance", System.getenv("KARYOFORGE_TEST_MYSQL_USER"),
-                Path.of(System.getProperty("karyoforge.database.mysql.driver")), writable);
+                Path.of(System.getProperty("karyoforge.database.mysql.driver")), writable, variant());
         var session = new JdbcSession(source);
         char[] password = System.getenv("KARYOFORGE_TEST_MYSQL_PASSWORD").toCharArray();
         try {

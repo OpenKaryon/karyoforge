@@ -24,12 +24,15 @@ final class MysqlSourceDialog extends DialogWrapper {
     private final TextFieldWithBrowseButton driver = new TextFieldWithBrowseButton();
     private final JBCheckBox writable = new JBCheckBox("Allow writes (manual Commit and Rollback)");
 
-    MysqlSourceDialog(Project project, MysqlSource existing) {
+    private final MysqlSource.Variant variant;
+
+    MysqlSourceDialog(Project project, MysqlSource existing, MysqlSource.Variant variant) {
         super(project);
-        setTitle(existing == null ? "Add MySQL Data Source" : "Edit MySQL Data Source");
+        this.variant = existing == null ? variant : existing.variant();
+        setTitle((existing == null ? "Add " : "Edit ") + this.variant.title() + " Data Source");
         setOKButtonText("Save");
         driver.addBrowseFolderListener(project, FileChooserDescriptorFactory.singleFile()
-                .withTitle("Choose MySQL Connector/J 26.7.0").withFileFilter(file -> "jar".equalsIgnoreCase(file.getExtension())));
+                .withTitle("Choose " + this.variant.connector()).withFileFilter(file -> "jar".equalsIgnoreCase(file.getExtension())));
         if (existing != null) {
             name.setText(existing.name());
             host.setText(existing.host());
@@ -45,11 +48,11 @@ final class MysqlSourceDialog extends DialogWrapper {
     MysqlSource source() {
         try {
             return new MysqlSource(name.getText(), host.getText(), Integer.parseInt(port.getText().strip()),
-                    database.getText(), user.getText(), Path.of(driver.getText().strip()), writable.isSelected());
+                    database.getText(), user.getText(), Path.of(driver.getText().strip()), writable.isSelected(), variant);
         } catch (NumberFormatException invalid) {
-            throw new IllegalArgumentException("Enter a valid MySQL port.");
+            throw new IllegalArgumentException("Enter a valid database port.");
         } catch (java.nio.file.InvalidPathException invalid) {
-            throw new IllegalArgumentException("Choose a valid MySQL Connector/J path.");
+            throw new IllegalArgumentException("Choose a valid Connector/J path.");
         }
     }
 
@@ -69,9 +72,11 @@ final class MysqlSourceDialog extends DialogWrapper {
                 .addLabeledComponent("Port", port)
                 .addLabeledComponent("Database", database)
                 .addLabeledComponent("User", user)
-                .addLabeledComponent("MySQL Connector/J 26.7.0", driver)
+                .addLabeledComponent(variant.connector(), driver)
                 .addComponent(writable)
-                .addComponent(new JBLabel("Saving the source does not open a connection."))
+                .addComponent(new JBLabel(variant == MysqlSource.Variant.MARIADB
+                        ? "Keep the two verified SLF4J 2.0.17 JARs beside the MariaDB driver."
+                        : "Saving the source does not open a connection."))
                 .getPanel();
     }
 

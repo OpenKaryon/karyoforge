@@ -130,6 +130,22 @@ The owned test fixture runs MySQL 8.4.11 with Connector/J 26.7.0
 make test-mysql MYSQL_DRIVER="/path/to/mysql-connector-j-26.7.0.jar"
 ```
 
+## MariaDB
+
+Choose **Add Server Source → MariaDB** for a loopback MariaDB connection.
+Select MariaDB Connector/J 3.5.10 and keep `slf4j-api-2.0.17.jar` and
+`slf4j-nop-2.0.17.jar` beside it. The IDE verifies all three files before
+loading the driver.
+
+The MariaDB catalog, typed SQL pages, plan-only EXPLAIN and transaction
+controls follow the MySQL behavior above. MariaDB uses its own server-side
+read-only setting. The owned fixture runs MariaDB 11.8.9 and exercises
+read-only access, cancellation and transaction visibility.
+
+```sh
+make test-mariadb MARIADB_DRIVER="/path/to/mariadb-java-client-3.5.10.jar"
+```
+
 ## Checks
 
 The SQLite tests use an owned database and an explicit local JDBC JAR. The

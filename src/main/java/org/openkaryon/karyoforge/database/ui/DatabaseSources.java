@@ -53,7 +53,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     if (postgres.forwarding() != null) row.ssh = new SshEntry(postgres.forwarding());
                 }
                 case MysqlSource mysql -> {
-                    row.kind = "mysql";
+                    row.kind = mysql.variant() == MysqlSource.Variant.MARIADB ? "mariadb" : "mysql";
                     row.host = mysql.host();
                     row.port = mysql.port();
                     row.database = mysql.database();
@@ -77,8 +77,9 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
                             Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile),
                             entry.ssh == null ? null : entry.ssh.forwarding());
-                    case "mysql" -> new MysqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
-                            Path.of(entry.driver), entry.writable);
+                    case "mysql", "mariadb" -> new MysqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
+                            Path.of(entry.driver), entry.writable,
+                            "mariadb".equals(entry.kind) ? MysqlSource.Variant.MARIADB : MysqlSource.Variant.MYSQL);
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
                 profiles.putIfAbsent(id, new Profile(id, source));

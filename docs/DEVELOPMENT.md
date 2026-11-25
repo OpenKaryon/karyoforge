@@ -38,6 +38,7 @@ outputs and profile locations. Linux packaging is not implemented.
 | `audit-reference-check` | Check the same inputs for drift without rewriting the inventory |
 | `build` | Delegate to Gradle `buildPlugin verifyPluginStructure`; fail if build prerequisites are absent |
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
+| `test-mariadb` | Run MariaDB in an owned Docker container with a verified `MARIADB_DRIVER` and its two companion JARs |
 | `test-mysql` | Run MySQL in an owned Docker container with a verified `MYSQL_DRIVER` |
 | `test-postgresql` | Run PostgreSQL in an owned Docker container with an explicit local `POSTGRES_DRIVER` |
 | `test-database` | Run SQLite fixture integration tests with an explicit local `SQLITE_DRIVER` |

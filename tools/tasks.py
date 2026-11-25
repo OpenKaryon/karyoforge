@@ -40,6 +40,8 @@ HELP = """KaryoForge local commands:
                                 Real PostgreSQL tests in an owned loopback Docker container
   make test-mysql MYSQL_DRIVER="/path/to/mysql-connector-j.jar"
                                 Real MySQL tests in an owned loopback Docker container
+  make test-mariadb MARIADB_DRIVER="/path/to/mariadb-java-client.jar"
+                                Real MariaDB tests in an owned loopback Docker container
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
   make notebook-fixtures        Prepare SHA-256-locked offline Windows notebook wheels
@@ -204,10 +206,11 @@ def execute(task: str, root: Path, reference: str = "", output: str = "",
         command = [sys.executable, "tools/postgres_fixture.py", "--driver", postgres_driver]
         if openssh.strip():
             command.extend(["--openssh", openssh])
-    elif task == "test-mysql":
+    elif task in {"test-mysql", "test-mariadb"}:
+        engine = task.removeprefix("test-")
         if not mysql_driver.strip():
-            raise ValueError("MYSQL_DRIVER is required; supply the verified MySQL JDBC JAR")
-        command = [sys.executable, "tools/mysql_fixture.py", "--driver", mysql_driver]
+            raise ValueError(f"{engine.upper()}_DRIVER is required; supply the verified JDBC JAR")
+        command = [sys.executable, "tools/mysql_fixture.py", "--engine", engine, "--driver", mysql_driver]
     elif task == "notebook-fixtures":
         command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
     elif task in {"notebook-runtime", "test-notebook"}:

@@ -40,7 +40,7 @@ interface JdbcBackend {
         return switch (source) {
             case SqliteSource sqlite -> new SqliteBackend(sqlite);
             case PostgresqlSource postgres -> new PostgresqlBackend(postgres);
-            case MysqlSource mysql -> new MysqlBackend(mysql);
+            case MysqlSource mysql -> new MysqlFamilyBackend(mysql);
         };
     }
 }
