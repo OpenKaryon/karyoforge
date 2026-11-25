@@ -251,6 +251,8 @@ def run(args: argparse.Namespace) -> int:
     bundle = ROOT / "build/ui-test-bundle"
     if not ide_archive.is_file() or not (bundle / "classes").is_dir():
         raise ValueError("Missing built GUI bundle or portable public distribution")
+    if args.dismiss_openjdk_firewall and not (bundle / "dismiss-openjdk-firewall.ps1").is_file():
+        raise ValueError("Rebuild the GUI bundle to enable OpenJDK dialog dismissal")
     run_id = uuid.uuid4().hex[:12]
     transfer = ROOT / "build/ui-test-transfer" / run_id
     runtime = archive_tree(bundle / "runtime", transfer / "runtime.zip")
@@ -276,7 +278,7 @@ def run(args: argparse.Namespace) -> int:
     local.mkdir(parents=True)
     request = {"runId": run_id, "controller": controller, "ide": home, "runtime": libraries,
                "payload": source, "python": args.python, "select": selectors, "timeoutMinutes": args.timeout,
-               "ideMemoryMb": args.ide_memory}
+               "ideMemoryMb": args.ide_memory, "dismissOpenJdkFirewall": args.dismiss_openjdk_firewall}
     request_json = json.dumps(request, ensure_ascii=True)
     (local / "request.json").write_text(request_json + "\n", encoding="utf-8")
     task = "OpenKaryon.KaryoForge.Ui." + run_id
@@ -355,6 +357,9 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--ide-memory", type=int, default=1024, help="IDE heap limit in MiB (default: 1024)")
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--dismiss-openjdk-firewall", action="store_true",
+                        default=os.getenv("KARYOFORGE_UI_DISMISS_OPENJDK_FIREWALL") == "1",
+                        help="In the test VM, select Cancel on recognized OpenJDK and KaryoForge firewall prompts")
     parser.add_argument("--ssh", default="ssh")
     parser.add_argument("--scp", default="scp")
     args = parser.parse_args()

@@ -49,6 +49,16 @@ first-login setup and close system prompts before running acceptance. Driver
 and its event bus communicate within the guest; external network firewall
 permission is not required.
 
+Pass `--dismiss-openjdk-firewall` to the controller, or set
+`KARYOFORGE_UI_DISMISS_OPENJDK_FIREWALL=1` for `make test-gui`, to use the
+prompt helper on a Russian Windows 11 test desktop. The helper runs only
+during acceptance in the unlocked guest. It matches the Windows Security
+title, the product and publisher (OpenJDK and JetBrains or KaryoForge and
+OpenKaryon), and **Cancel**. It then verifies that the
+foreground Windows dialog owns that button. It uses the standard input API
+to select Cancel. Attempts are recorded in `openjdk-firewall.log`.
+A different Windows locale, scale or dialog layout can require manual dismissal.
+
 ## Isolation and results
 
 Each run owns a new `C:/KaryoForgeUi/runs/<id>` directory, fresh sample projects,

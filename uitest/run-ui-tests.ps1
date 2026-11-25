@@ -91,6 +91,18 @@ public static class KaryoForgeUiPower {
         throw 'Could not keep the test guest awake for GUI acceptance'
     }
     $powerRequestActive = $true
+    $dismissOpenJdkFirewall = $request.dismissOpenJdkFirewall -eq $true
+    $firewallLog = Join-Path $results 'openjdk-firewall.log'
+    if ($dismissOpenJdkFirewall) {
+        try {
+            . (Join-Path $PSScriptRoot 'dismiss-openjdk-firewall.ps1')
+            Initialize-KaryoForgeOpenJdkPrompt
+        } catch {
+            "Could not initialize OpenJDK prompt dismissal ($($_.Exception.GetType().Name))." |
+                Set-Content -Encoding UTF8 -LiteralPath $firewallLog
+            $dismissOpenJdkFirewall = $false
+        }
+    }
     $notebookFixtures = Join-Path $request.payload 'notebook-fixtures'
     $notebookPython = ''
     $includeNotebook = -not $request.select.Count -or @($request.select | Where-Object { $_ -cmatch '^org\.openkaryon\.karyoforge\.uitest\.Notebook' }).Count -gt 0
@@ -149,6 +161,16 @@ public static class KaryoForgeUiPower {
     do {
         if (-not [KaryoForgeUiPower]::HasUnlockedDesktop()) {
             throw 'The Windows test session locked or became inactive during GUI acceptance; unlock the desktop before restarting'
+        }
+        if ($dismissOpenJdkFirewall -and -not $process.HasExited) {
+            try {
+                $dismissed = [KaryoForgeOpenJdkPrompt]::Dismiss()
+                if ($dismissed) { $dismissed | Add-Content -Encoding UTF8 -LiteralPath $firewallLog }
+            } catch {
+                "Stopped OpenJDK prompt dismissal ($($_.Exception.GetType().Name))." |
+                    Add-Content -Encoding UTF8 -LiteralPath $firewallLog
+                $dismissOpenJdkFirewall = $false
+            }
         }
         $queue = New-Object Collections.Generic.Queue[int]
         $queue.Enqueue($process.Id)
