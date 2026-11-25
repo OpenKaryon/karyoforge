@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 /** Statement ranges and prepared bindings. Access mode is enforced by the connection. */
 public final class SqlText {
@@ -110,6 +111,39 @@ public final class SqlText {
         }
         return new Command(dialect, compiled.toString(), segment.keyword(),
                 names.isEmpty() ? order : new ArrayList<>(names), order);
+    }
+
+    private static final Set<String> TABLE_CLAUSES = Set.of("EXCEPT", "FETCH", "FOR", "FORMAT", "GROUP", "HAVING",
+            "INTERSECT", "INTO", "LIMIT", "OFFSET", "ORDER", "PREWHERE", "QUALIFY", "RETURNING", "SELECT", "SETTINGS",
+            "UNION", "WHERE", "WINDOW", "WITH");
+
+    static String tableExpression(String input, Dialect dialect, String label) {
+        String text = Objects.requireNonNull(input).strip();
+        if (text.length() > 4096) throw new IllegalArgumentException(label + " accepts up to 4096 characters.");
+        var spans = scan(text, dialect, false).spans();
+        var error = label + " requires a SQL expression without another clause, comment or statement separator.";
+        int depth = 0;
+        int spanIndex = 0;
+        for (int index = 0; index < text.length();) {
+            if (spanIndex < spans.size() && spans.get(spanIndex).start() == index) {
+                if (commentEnd(text, index, dialect) > index) throw new IllegalArgumentException(error);
+                index = spans.get(spanIndex++).end();
+                continue;
+            }
+            char c = text.charAt(index);
+            if (c == ';') throw new IllegalArgumentException(error);
+            if (c == '(') depth++;
+            if (c == ')' && --depth < 0) throw new IllegalArgumentException(error);
+            if (depth == 0 && identifierStart(text, index)) {
+                int start = index++;
+                while (index < text.length() && identifierPart(text.charAt(index))) index++;
+                if (TABLE_CLAUSES.contains(text.substring(start, index).toUpperCase(Locale.ROOT))) {
+                    throw new IllegalArgumentException(error);
+                }
+            } else index++;
+        }
+        if (depth != 0) throw new IllegalArgumentException(error);
+        return text;
     }
 
     static String followingKeyword(Command command) {

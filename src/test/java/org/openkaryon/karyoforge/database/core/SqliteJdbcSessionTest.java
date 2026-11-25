@@ -176,6 +176,33 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test public void filtersAndPagesATableWithoutIssuingAnEditableSnapshot() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            var table = session.schema().getFirst();
+            var filtered = session.openTable(new TableQuery(table, "id > 2 AND ';' = ';'", "id DESC"), new QueryRequest());
+            assertTrue(filtered.data().hasNext());
+            assertEquals("205", filtered.data().rows().getFirst().cells().getFirst().value());
+            assertFalse(filtered.protection().isEmpty());
+            var last = session.next(new QueryRequest());
+            assertEquals(3, last.rows().size());
+            assertEquals("3", last.rows().getLast().cells().getFirst().value());
+            assertThrows(DatabaseProblem.class,
+                    () -> session.applyTableChanges(filtered, List.of(), new QueryRequest()));
+
+            for (String boundary : List.of("id > 2; SELECT 1", "id > 2 -- comment", "(id > 2", "id > :bound")) {
+                assertThrows(boundary, IllegalArgumentException.class, () -> new TableQuery(table, boundary, ""));
+            }
+            assertThrows(IllegalArgumentException.class, () -> new TableQuery(table, "", "id LIMIT 2"));
+            var initial = session.openTable(new TableQuery(table, "", ""), new QueryRequest());
+            assertFalse(initial.data().hasNext());
+            assertEquals("1", initial.data().rows().getFirst().cells().getFirst().value());
+            assertTrue(initial.protection().isEmpty());
+        }
+    }
+
     @Test public void describesActualSchemaColumnsAndStoredDdl() throws Exception {
         var source = fixture();
         var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);

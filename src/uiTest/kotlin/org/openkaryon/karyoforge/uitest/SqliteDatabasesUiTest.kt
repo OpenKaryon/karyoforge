@@ -144,8 +144,26 @@ class SqliteDatabasesUiTest {
                 button { byVisibleText("Open Table") }.click()
                 x { contains(byVisibleText("samples · 200 rows")) }
                     .shouldBe("The first table page opens", present, 1.minutes)
+                val where = textField { byAccessibleName("Table WHERE expression") }
+                val order = textField { byAccessibleName("Table ORDER BY expression") }
+                where.text = "id >= 3"
+                order.text = "id DESC"
+                button { byVisibleText("Reload Table") }.click()
+                x { contains(byVisibleText("Filtered rows are read-only.")) }
+                    .shouldBe("Filters open a read-only table view", present, 1.minutes)
                 val grid = x { byAccessibleName("Database table data") }
-                driver.cast(grid.component, QueryGrid::class).setRowSelectionInterval(0, 0)
+                val table = driver.cast(grid.component, QueryGrid::class)
+                assertEquals("205", table.getValueAt(0, 1))
+                button { byVisibleText("Next Table Page") }.click()
+                x { contains(byVisibleText("samples · 3 rows · Page 2")) }
+                    .shouldBe("Filtered rows have their own next page", present, 1.minutes)
+                assertEquals("5", table.getValueAt(0, 1))
+                where.text = ""
+                order.text = ""
+                button { byVisibleText("Reload Table") }.click()
+                x { contains(byVisibleText("samples · 200 rows")) }
+                    .shouldBe("Clearing filters restores an editable snapshot", present, 1.minutes)
+                table.setRowSelectionInterval(0, 0)
                 button { byVisibleText("Edit Row") }.click()
             }
             ui.dialog({ byTitle("Edit Table Row") }) {

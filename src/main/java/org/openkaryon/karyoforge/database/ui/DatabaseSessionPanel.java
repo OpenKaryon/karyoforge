@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
 import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
@@ -21,6 +22,7 @@ import org.openkaryon.karyoforge.database.core.SqlText;
 import org.openkaryon.karyoforge.database.core.SqlValue;
 import org.openkaryon.karyoforge.database.core.TableDefinition;
 import org.openkaryon.karyoforge.database.core.TableSnapshot;
+import org.openkaryon.karyoforge.database.core.TableQuery;
 import org.openkaryon.karyoforge.database.results.FetchedResults;
 import org.openkaryon.karyoforge.database.results.ResultExport;
 
@@ -51,6 +53,8 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final JBTable table = new JBTable();
     private final JBTable structure = new JBTable();
     private final JBTable dataGrid = new JBTable();
+    private final JBTextField where = new JBTextField(17);
+    private final JBTextField orderBy = new JBTextField(13);
     private final JPanel tableDataTab = new JPanel(new BorderLayout());
     private final JBTextArea definition = new JBTextArea();
     private final JTabbedPane details = new JTabbedPane();
@@ -67,6 +71,9 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final JButton deleteRow = button("Delete Row", this::deleteRow);
     private final JButton undoRow = button("Discard Row Draft", this::undoRow);
     private final JButton applyRows = button("Review & Apply", this::applyRows);
+    private final JButton reloadTable = button("Reload Table", this::reloadTable);
+    private final JButton nextTablePage = button("Next Table Page", this::nextTablePage);
+    private final JButton stopTable = button("Stop Table Query", this::stop);
     private final JButton refresh = button("Refresh Schema", this::refreshSchema);
     private final JButton commit = button("Commit", () -> finishTransaction(true));
     private final JButton rollback = button("Rollback", () -> finishTransaction(false));
@@ -93,6 +100,8 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private List<FetchedResults.Filter> filters = List.of();
     private List<FetchedResults.Sort> ordering = List.of();
     private TableSnapshot editableTable;
+    private JdbcSession.SchemaObject tableObject;
+    private QueryPage tablePage;
     private final TreeMap<Integer, RowDraft> drafts = new TreeMap<>();
 
     DatabaseSessionPanel(Project project, DatabaseSources.Profile profile, DatabaseEditorBridge editorBridge,
@@ -136,6 +145,12 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         details.addTab("DDL", new JBScrollPane(definition));
         details.setEnabledAt(1, false);
         details.setEnabledAt(2, false);
+        where.getAccessibleContext().setAccessibleName("Table WHERE expression");
+        orderBy.getAccessibleContext().setAccessibleName("Table ORDER BY expression");
+        where.addActionListener(event -> { if (reloadTable.isEnabled()) reloadTable(); });
+        orderBy.addActionListener(event -> { if (reloadTable.isEnabled()) reloadTable(); });
+        tableDataTab.add(controls(new JBLabel("WHERE"), where, new JBLabel("ORDER BY"), orderBy, reloadTable, nextTablePage, stopTable),
+                BorderLayout.NORTH);
         tableDataTab.add(new JBScrollPane(dataGrid), BorderLayout.CENTER);
         tableDataTab.add(controls(editRow, deleteRow, undoRow, applyRows), BorderLayout.SOUTH);
         details.addTab("Table Data", tableDataTab);
@@ -345,15 +360,48 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private void openTable() {
         var object = schema.getSelectedValue();
         if (object == null || !discardTableDraft()) return;
+        where.setText("");
+        orderBy.setText("");
+        loadTable(new TableQuery(object, "", ""));
+    }
+
+    private void reloadTable() {
+        if (tableObject == null) return;
+        TableQuery query;
+        try {
+            query = new TableQuery(tableObject, where.getText(), orderBy.getText());
+        } catch (IllegalArgumentException invalid) {
+            report(invalid.getMessage());
+            return;
+        }
+        if (!confirmDiscardTableDraft()) return;
+        drafts.clear();
+        editableTable = null;
+        tablePage = null;
+        loadTable(query);
+    }
+
+    private void loadTable(TableQuery query) {
         var request = new QueryRequest();
-        submit("Opening table data…", request, () -> session.openTable(object, request), this::showTable);
+        submit("Opening table data…", request, () -> session.openTable(query, request), this::showTable);
     }
 
     private void showTable(TableSnapshot snapshot) {
         clearResult();
         showDefinition(snapshot.definition());
         editableTable = snapshot;
-        var result = snapshot.data();
+        tableObject = snapshot.definition().object();
+        showTablePage(snapshot.data());
+    }
+
+    private void nextTablePage() {
+        if (tablePage == null || !tablePage.hasNext()) return;
+        var request = new QueryRequest();
+        submit("Reading the next table page…", request, () -> session.next(request), this::showTablePage);
+    }
+
+    private void showTablePage(QueryPage result) {
+        tablePage = result;
         dataGrid.setModel(new AbstractTableModel() {
             @Override public int getRowCount() { return result.rows().size(); }
             @Override public int getColumnCount() { return result.columns().size() + 1; }
@@ -369,9 +417,11 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         });
         details.setEnabledAt(3, true);
         details.setSelectedComponent(tableDataTab);
-        report(snapshot.definition().object().name() + " · " + result.rows().size() + " rows"
+        String protection = editableTable == null ? "" : editableTable.protection();
+        report(tableObject.name() + " · " + result.rows().size() + " rows"
+                + (result.page() == 1 ? "" : " · Page " + result.page())
                 + (result.notice().isEmpty() ? "" : " · " + result.notice())
-                + (snapshot.protection().isEmpty() ? "" : " · " + snapshot.protection()));
+                + (protection.isEmpty() ? "" : " · " + protection));
     }
 
     private void editRow() {
@@ -446,15 +496,21 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         return row >= 0 && editableTable != null && editableTable.rowProtection(row).isEmpty();
     }
 
+    private boolean confirmDiscardTableDraft() {
+        return drafts.isEmpty() || Messages.showYesNoDialog(project, "Discard unapplied table drafts?",
+                "Discard Table Drafts", Messages.getQuestionIcon()) == Messages.YES;
+    }
+
     private boolean discardTableDraft() {
-        if (!drafts.isEmpty() && Messages.showYesNoDialog(project, "Discard unapplied table drafts?",
-                "Discard Table Drafts", Messages.getQuestionIcon()) != Messages.YES) return false;
+        if (!confirmDiscardTableDraft()) return false;
         resetTableData();
         return true;
     }
 
     private void resetTableData() {
         editableTable = null;
+        tablePage = null;
+        tableObject = null;
         drafts.clear();
         if (details.getSelectedComponent() == tableDataTab) details.setSelectedComponent(resultsTab);
         details.setEnabledAt(3, false);
@@ -580,6 +636,9 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         if (cursorMayHaveClosed && page != null && page.hasNext()) {
             page = new QueryPage(page.columns(), page.rows(), page.page(), page.totalRows(), false, page.notice());
         }
+        if (cursorMayHaveClosed && tablePage != null && tablePage.hasNext()) {
+            tablePage = new QueryPage(tablePage.columns(), tablePage.rows(), tablePage.page(), tablePage.totalRows(), false, tablePage.notice());
+        }
         report(message);
     }
 
@@ -587,6 +646,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         QueryRequest request = active;
         if (request == null) return;
         stop.setEnabled(false);
+        stopTable.setEnabled(false);
         status.setText("Stopping the current database request…");
         cancels.execute(request::stop);
     }
@@ -724,6 +784,10 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         deleteRow.setEnabled(readyRow && (draft == null || !draft.delete()));
         undoRow.setEnabled(!busy && draft != null);
         applyRows.setEnabled(!busy && !drafts.isEmpty());
+        reloadTable.setEnabled(!busy && connected && tableObject != null);
+        nextTablePage.setEnabled(reloadTable.isEnabled() && tablePage != null && tablePage.hasNext());
+        where.setEnabled(reloadTable.isEnabled());
+        orderBy.setEnabled(reloadTable.isEnabled());
         if (row >= 0 && editableTable != null) {
             String reason = editableTable.rowProtection(row);
             editRow.setToolTipText(reason.isEmpty() ? null : reason);
@@ -734,6 +798,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         export.setEnabled(hasResults);
         next.setEnabled(!busy && connected && page != null && page.hasNext());
         stop.setEnabled(busy && active != null);
+        stopTable.setEnabled(stop.isEnabled());
         onStateChanged.run();
     }
 

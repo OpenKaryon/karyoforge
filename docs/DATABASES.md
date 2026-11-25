@@ -84,8 +84,14 @@ destination with hard-link support.
 
 ## Table editing
 
-On a writable source, **Open Table** loads a bounded first page. Select a row
-in **Table Data** to stage changes with **Edit Row** or **Delete Row**.
+On a writable source, **Open Table** loads a bounded first page. In **Table
+Data**, enter a WHERE condition or ORDER BY expression and choose **Reload
+Table** to filter or sort on the server. **Next Table Page** continues those
+read-only results. Clear both fields and reload to restore an editable
+snapshot where the engine and table support it.
+
+Select a row in that snapshot to stage changes with **Edit Row** or
+**Delete Row**.
 **Review & Apply** lists the whole batch and applies it to the current
 transaction. **Commit** saves the database changes and **Rollback** discards
 them. Cancelling the review keeps local drafts.

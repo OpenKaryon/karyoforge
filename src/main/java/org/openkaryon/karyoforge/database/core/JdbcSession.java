@@ -80,6 +80,18 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
+    public TableSnapshot openTable(TableQuery query, QueryRequest request) {
+        if (query.filtered() == null) return openTable(query.object(), request);
+        checkReady();
+        request.check();
+        TableDefinition definition = describe(query.object());
+        if (!(execute(query.filtered(), Map.of(), request) instanceof QueryPage page)) {
+            throw new DatabaseProblem("The table filter did not return a result.");
+        }
+        return new TableSnapshot(definition, page, "Filtered rows are read-only. Clear WHERE and ORDER BY to edit an eligible table.",
+                0, List.of(), column -> null);
+    }
+
     public TableSnapshot openTable(SchemaObject object, QueryRequest request) {
         checkReady();
         request.check();
