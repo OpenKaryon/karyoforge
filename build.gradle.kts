@@ -131,6 +131,9 @@ tasks.test {
     val postgresDriver = providers.gradleProperty("postgresDriver").orElse("").get()
     if (postgresDriver.isBlank()) exclude("**/PostgresqlJdbcSessionTest.class")
     systemProperty("karyoforge.database.postgresql.driver", postgresDriver)
+    val mysqlDriver = providers.gradleProperty("mysqlDriver").orElse("").get()
+    if (mysqlDriver.isBlank()) exclude("**/MysqlJdbcSessionTest.class")
+    systemProperty("karyoforge.database.mysql.driver", mysqlDriver)
     if (!providers.gradleProperty("postgresSshTests").orElse("false").get().toBoolean()) {
         exclude("**/PostgresqlSshJdbcSessionTest.class")
     }

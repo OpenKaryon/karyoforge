@@ -39,7 +39,7 @@ public final class JdbcSession implements AutoCloseable {
     public void connect(char[] password) {
         if (lease != null || connection != null) throw new DatabaseProblem("Disconnect before reopening this data source.");
         try {
-            lease = DriverLease.open(backend.selectDriver(source.driver()), backend.driverClass());
+            lease = DriverLease.open(backend.selectDrivers(source.driver()), backend.driverClass());
         } catch (DatabaseProblem unavailable) {
             close();
             throw unavailable;
@@ -286,11 +286,23 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
-    public record SchemaObject(String name, String type, String schema) {
-        public SchemaObject(String name, String type) { this(name, type, "main"); }
+    public record SchemaObject(String name, String type, String schema, SqlText.Dialect dialect) {
+        public SchemaObject(String name, String type) { this(name, type, "main", SqlText.Dialect.SQLITE); }
+        public SchemaObject(String name, String type, String schema) { this(name, type, schema, SqlText.Dialect.POSTGRESQL); }
 
-        public String qualified() { return (schema.equals("main") ? "main" : quote(schema)) + "." + quote(name); }
+        public String qualified() {
+            return (schema.equals("main") && dialect != SqlText.Dialect.MYSQL ? "main" : identifier(schema)) + "." + identifier(name);
+        }
+
+        String identifier(String value) {
+            return dialect == SqlText.Dialect.MYSQL ? mysqlQuote(value) : quote(value);
+        }
         public String selectSql() { return "SELECT * FROM " + qualified(); }
+
+        private static String mysqlQuote(String identifier) {
+            String quote = Character.toString(96);
+            return quote + identifier.replace(quote, quote + quote) + quote;
+        }
 
         static String quote(String identifier) { return "\"" + identifier.replace("\"", "\"\"") + "\""; }
 

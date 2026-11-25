@@ -57,6 +57,7 @@ public record PostgresqlSource(String name, String host, int port, String databa
                 + URLEncoder.encode(database, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
+    @Override public boolean usesPassword() { return true; }
     @Override public String engine() { return "PostgreSQL"; }
 
     @Override public SqlText.Dialect dialect() { return SqlText.Dialect.POSTGRESQL; }

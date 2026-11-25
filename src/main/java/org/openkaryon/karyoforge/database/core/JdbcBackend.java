@@ -18,11 +18,17 @@ interface JdbcBackend {
     List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException;
     TableDefinition describe(Connection connection, JdbcSession.SchemaObject object) throws SQLException;
     void validate(SqlText.Command command);
-    TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException;
-    int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
-                          QueryRequest request, Runnable quarantine) throws SQLException;
+    default TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException {
+        return ReadOnlyTable.open(connection, definition, request);
+    }
+
+    default int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
+                                 QueryRequest request, Runnable quarantine) throws SQLException {
+        throw new DatabaseProblem("This engine's table grid is read-only.");
+    }
 
     default Path selectDriver(Path driver) throws IOException { return driver; }
+    default List<Path> selectDrivers(Path driver) throws IOException { return List.of(selectDriver(driver)); }
     default void closeTransport() throws IOException {}
     default void releaseDriverFiles() throws IOException {}
 
@@ -34,6 +40,7 @@ interface JdbcBackend {
         return switch (source) {
             case SqliteSource sqlite -> new SqliteBackend(sqlite);
             case PostgresqlSource postgres -> new PostgresqlBackend(postgres);
+            case MysqlSource mysql -> new MysqlBackend(mysql);
         };
     }
 }

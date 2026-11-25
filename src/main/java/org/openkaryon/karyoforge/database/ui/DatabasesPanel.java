@@ -13,6 +13,7 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.table.JBTable;
 import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 import org.openkaryon.karyoforge.database.core.JdbcSession;
@@ -58,11 +59,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JPanel resultsTab = new JPanel(new BorderLayout());
     private final JScrollPane structureTab = new JBScrollPane(structure);
     private final JBLabel status = new JBLabel("Choose or add a data source.");
-    private final JButton add = button("Add SQLite Source", () -> editSource(null, false));
-    private final JButton addPostgresql = button("Add PostgreSQL Source", () -> editSource(null, true));
+    private final JButton add = button("Add SQLite Source", () -> editSource(null, SqlText.Dialect.SQLITE));
+    private final JButton addServer = button("Add Server Source", this::addServerSource);
     private final JButton edit = button("Edit Source", () -> {
         var profile = selectedSource();
-        if (profile != null) editSource(profile, profile.source() instanceof PostgresqlSource);
+        if (profile != null) editSource(profile, profile.source().dialect());
     });
     private final JButton remove = button("Remove Source", this::removeSource);
     private final JButton connect = button("Connect", this::connect);
@@ -125,7 +126,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setCellRenderer(literalListRenderer());
         profiles.setRenderer(literalListRenderer());
 
-        var sourceControls = controls(profiles, add, addPostgresql, edit, remove, connect, disconnect, commit, rollback);
+        var sourceControls = controls(profiles, add, addServer, edit, remove, connect, disconnect, commit, rollback);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
@@ -196,17 +197,34 @@ final class DatabasesPanel extends JPanel implements Disposable {
         }
     }
 
-    private void editSource(DatabaseSources.Profile profile, boolean postgresql) {
-        DatabaseSource source;
-        if (postgresql) {
-            var dialog = new PostgresqlSourceDialog(project, profile == null ? null : (PostgresqlSource) profile.source());
-            if (!dialog.showAndGet()) return;
-            source = dialog.source();
-        } else {
-            var dialog = new SqliteSourceDialog(project, profile == null ? null : (SqliteSource) profile.source());
-            if (!dialog.showAndGet()) return;
-            source = dialog.source();
-        }
+    private void addServerSource() {
+        var menu = new JPopupMenu();
+        var postgres = new JMenuItem("PostgreSQL");
+        postgres.addActionListener(event -> editSource(null, SqlText.Dialect.POSTGRESQL));
+        menu.add(postgres);
+        var mysql = new JMenuItem("MySQL");
+        mysql.addActionListener(event -> editSource(null, SqlText.Dialect.MYSQL));
+        menu.add(mysql);
+        menu.show(addServer, 0, addServer.getHeight());
+    }
+
+    private void editSource(DatabaseSources.Profile profile, SqlText.Dialect dialect) {
+        var existing = profile == null ? null : profile.source();
+        DatabaseSource source = switch (dialect) {
+            case SQLITE -> {
+                var dialog = new SqliteSourceDialog(project, (SqliteSource) existing);
+                yield dialog.showAndGet() ? dialog.source() : null;
+            }
+            case POSTGRESQL -> {
+                var dialog = new PostgresqlSourceDialog(project, (PostgresqlSource) existing);
+                yield dialog.showAndGet() ? dialog.source() : null;
+            }
+            case MYSQL -> {
+                var dialog = new MysqlSourceDialog(project, (MysqlSource) existing);
+                yield dialog.showAndGet() ? dialog.source() : null;
+            }
+        };
+        if (source == null) return;
         String id = sources.save(profile == null ? null : profile.id(), source);
         refreshProfiles(id);
         report("Data source saved.");
@@ -227,8 +245,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var profile = selectedSource();
         if (profile == null) return;
         char[] password = new char[0];
-        if (profile.source() instanceof PostgresqlSource) {
-            var dialog = new ConnectionPasswordDialog(project);
+        if (profile.source().usesPassword()) {
+            var dialog = new ConnectionPasswordDialog(project, profile.source().engine());
             if (!dialog.showAndGet()) return;
             password = dialog.takePassword();
         }
@@ -674,7 +692,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean selected = selectedSource() != null;
         profiles.setEnabled(canManage);
         add.setEnabled(canManage);
-        addPostgresql.setEnabled(canManage);
+        addServer.setEnabled(canManage);
         edit.setEnabled(canManage && selected);
         remove.setEnabled(canManage && selected);
         connect.setEnabled(canManage && selected);

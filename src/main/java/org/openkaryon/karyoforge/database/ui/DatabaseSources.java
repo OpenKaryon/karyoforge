@@ -6,6 +6,7 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import org.jetbrains.annotations.NotNull;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 import org.openkaryon.karyoforge.database.core.SshForwarding;
@@ -51,6 +52,13 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     if (postgres.verifiedTls()) row.caFile = postgres.caFile().toString();
                     if (postgres.forwarding() != null) row.ssh = new SshEntry(postgres.forwarding());
                 }
+                case MysqlSource mysql -> {
+                    row.kind = "mysql";
+                    row.host = mysql.host();
+                    row.port = mysql.port();
+                    row.database = mysql.database();
+                    row.user = mysql.user();
+                }
             }
             state.entries.add(row);
         }
@@ -69,6 +77,8 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
                             Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile),
                             entry.ssh == null ? null : entry.ssh.forwarding());
+                    case "mysql" -> new MysqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
+                            Path.of(entry.driver), entry.writable);
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
                 profiles.putIfAbsent(id, new Profile(id, source));

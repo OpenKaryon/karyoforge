@@ -67,7 +67,7 @@ batch while keeping earlier pending SQL changes.
 
 ## PostgreSQL
 
-Choose **Add PostgreSQL Source** and an explicitly selected pgJDBC JAR.
+Choose **Add Server Source → PostgreSQL** and an explicitly selected pgJDBC JAR.
 Connections without TLS are limited to loopback. For verified TLS, enable
 **Verify server TLS certificate and host name** and select the server's CA
 certificate. The connection requires that CA and that the certificate match
@@ -106,6 +106,28 @@ SSH server and generated keys.
 ```sh
 make test-postgresql POSTGRES_DRIVER="/path/to/postgresql-42.7.14.jar"
 make test-postgresql POSTGRES_DRIVER="/path/to/postgresql-42.7.14.jar" OPENSSH_EXECUTABLE="/path/to/ssh"
+```
+
+## MySQL
+
+Choose **Add Server Source → MySQL**, a loopback endpoint and a verified
+MySQL Connector/J 26.7.0 JAR. The connection verifies the server's transaction
+access mode and SQL quoting mode. By default it opens read-only. A writable
+profile supports transaction-safe SQL with explicit **Commit** or
+**Rollback**. The table grid remains a read-only view. A read-only connection
+uses the server's transaction isolation; reconnect to start a fresh snapshot.
+
+The catalog shows tables and views in the selected database. **Inspect**
+uses declared keys, columns and the server's SHOW CREATE definition.
+Use EXPLAIN SELECT or EXPLAIN WITH for a query plan. The SQL console accepts
+one statement and refuses session changes, executable comments and
+implicit-commit commands. Direct connections use loopback without TLS.
+
+The owned test fixture runs MySQL 8.4.11 with Connector/J 26.7.0
+(SHA-256 `69084713593a4aa8d07c383619b9639276f08bccf8faf1c562178147d389b1e1`).
+
+```sh
+make test-mysql MYSQL_DRIVER="/path/to/mysql-connector-j-26.7.0.jar"
 ```
 
 ## Checks

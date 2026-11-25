@@ -6,6 +6,9 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Driver;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -26,17 +29,19 @@ public final class DriverLease implements AutoCloseable {
     }
 
     public static DriverLease open(Path path, String driverClass) throws IOException {
-        Path file = path.toRealPath();
-        if (!Files.isRegularFile(file) || !file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar")) {
-            throw new IOException("Choose an existing JDBC driver JAR.");
+        return open(List.of(path), driverClass);
+    }
+
+    public static DriverLease open(List<Path> paths, String driverClass) throws IOException {
+        var jars = new ArrayList<URL>();
+        var unique = new HashSet<Path>();
+        for (Path path : paths) {
+            Path file = checkedJar(path);
+            if (!unique.add(file)) throw new IOException("A JDBC bundle cannot contain duplicate JARs.");
+            jars.add(file.toUri().toURL());
         }
-        try (var jar = new JarFile(file.toFile())) {
-            var manifest = jar.getManifest();
-            if (manifest != null && manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH) != null) {
-                throw new IOException("The driver JAR must not declare an implicit classpath.");
-            }
-        }
-        var loader = new Loader(file.toUri().toURL());
+        if (jars.isEmpty()) throw new IOException("Choose a JDBC driver JAR.");
+        var loader = new Loader(jars.toArray(URL[]::new));
         try {
             Class<?> bridge = loader.loadClass(BRIDGE);
             Driver driver = (Driver) bridge.getMethod("create", String.class).invoke(null, driverClass);
@@ -47,6 +52,20 @@ public final class DriverLease implements AutoCloseable {
         }
     }
 
+    private static Path checkedJar(Path path) throws IOException {
+        Path file = path.toRealPath();
+        if (!Files.isRegularFile(file) || !file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar")) {
+            throw new IOException("Choose an existing JDBC driver JAR.");
+        }
+        try (var jar = new JarFile(file.toFile())) {
+            var manifest = jar.getManifest();
+            if (manifest != null && manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH) != null) {
+                throw new IOException("The driver JAR must not declare an implicit classpath.");
+            }
+        }
+        return file;
+    }
+
     public Driver driver() {
         if (closed) throw new IllegalStateException("The driver lease is closed.");
         return driver;
@@ -55,6 +74,7 @@ public final class DriverLease implements AutoCloseable {
     @Override public void close() throws IOException {
         if (closed) return;
         try {
+            registration.getMethod("shutdown", String.class).invoke(null, driver.getClass().getName());
             registration.getMethod("clear").invoke(null);
         } catch (ReflectiveOperationException | LinkageError failure) {
             throw new IOException("The driver registrations could not be released.");
@@ -64,8 +84,8 @@ public final class DriverLease implements AutoCloseable {
     }
 
     private static final class Loader extends URLClassLoader {
-        private Loader(URL jar) {
-            super(new URL[]{jar}, ClassLoader.getPlatformClassLoader());
+        private Loader(URL[] jars) {
+            super(jars, ClassLoader.getPlatformClassLoader());
         }
 
         @Override protected Class<?> findClass(String name) throws ClassNotFoundException {

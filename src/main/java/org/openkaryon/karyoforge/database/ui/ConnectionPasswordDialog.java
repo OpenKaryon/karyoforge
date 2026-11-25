@@ -11,11 +11,11 @@ import javax.swing.JPasswordField;
 final class ConnectionPasswordDialog extends DialogWrapper {
     private final JPasswordField password = new JPasswordField(25);
 
-    ConnectionPasswordDialog(Project project) {
+    ConnectionPasswordDialog(Project project, String engine) {
         super(project);
-        setTitle("PostgreSQL Password");
+        setTitle(engine + " Password");
         setOKButtonText("Connect");
-        password.getAccessibleContext().setAccessibleName("PostgreSQL password");
+        password.getAccessibleContext().setAccessibleName(engine + " password");
         init();
     }
 

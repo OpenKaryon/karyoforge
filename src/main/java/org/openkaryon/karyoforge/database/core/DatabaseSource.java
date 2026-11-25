@@ -3,12 +3,13 @@ package org.openkaryon.karyoforge.database.core;
 import java.nio.file.Path;
 import java.util.Objects;
 
-public sealed interface DatabaseSource permits SqliteSource, PostgresqlSource {
+public sealed interface DatabaseSource permits SqliteSource, PostgresqlSource, MysqlSource {
     String name();
     Path driver();
     boolean writable();
     String engine();
     SqlText.Dialect dialect();
+    default boolean usesPassword() { return false; }
 
     static String name(String value) {
         return text(value, "a data source name", 100);

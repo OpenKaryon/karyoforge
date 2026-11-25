@@ -11,7 +11,7 @@ public final class SqlText {
     private static final int MAX_CHARS = 256 * 1024;
     private static final int MAX_BINDINGS = 64;
 
-    public enum Dialect { SQLITE, POSTGRESQL }
+    public enum Dialect { SQLITE, POSTGRESQL, MYSQL }
 
     public static String activeStatement(String text, int start, int end) {
         return activeStatement(text, start, end, Dialect.SQLITE);
@@ -112,6 +112,23 @@ public final class SqlText {
                 names.isEmpty() ? order : new ArrayList<>(names), order);
     }
 
+    static String followingKeyword(Command command) {
+        int start = command.keyword().length();
+        String sql = command.sql();
+        while (start < sql.length()) {
+            if (whitespace(sql.charAt(start))) {
+                start++;
+                continue;
+            }
+            int comment = commentEnd(sql, start, command.dialect());
+            if (comment <= start) break;
+            start = comment;
+        }
+        int end = start;
+        while (end < sql.length() && identifierPart(sql.charAt(end))) end++;
+        return sql.substring(start, end).toUpperCase(Locale.ROOT);
+    }
+
     private static String single(Scan scan) {
         Segment segment = requireSingle(scan);
         return scan.text().substring(segment.start(), segment.end());
@@ -164,14 +181,16 @@ public final class SqlText {
                 keyword = text.substring(index, end).toUpperCase(Locale.ROOT);
             }
             String dollar = dialect == Dialect.POSTGRESQL ? dollarDelimiter(text, index) : null;
-            boolean quote = c == '\'' || c == '"' || dialect == Dialect.SQLITE && (c == '`' || c == '[');
+            boolean quote = c == '\'' || c == '"' || dialect != Dialect.POSTGRESQL && c == '`'
+                    || dialect == Dialect.SQLITE && c == '[';
             if (quote || dollar != null) {
                 int end;
                 if (dollar != null) {
                     int closing = text.indexOf(dollar, index + dollar.length());
                     end = closing < 0 ? -1 : closing + dollar.length();
                 } else {
-                    boolean escapes = dialect == Dialect.POSTGRESQL && c == '\'' && index > 0
+                    boolean escapes = dialect == Dialect.MYSQL && (c == '\'' || c == '"')
+                            || dialect == Dialect.POSTGRESQL && c == '\'' && index > 0
                             && (text.charAt(index - 1) == 'E' || text.charAt(index - 1) == 'e')
                             && (index < 2 || !identifierPart(text.charAt(index - 2)));
                     end = quotedEnd(text, index, c, escapes);
@@ -193,12 +212,17 @@ public final class SqlText {
     }
 
     private static int commentEnd(String text, int index, Dialect dialect) {
-        if (text.startsWith("--", index)) {
+        boolean mysql = dialect == Dialect.MYSQL;
+        if ((text.startsWith("--", index) && (!mysql || index + 2 == text.length() || text.charAt(index + 2) <= ' '))
+                || mysql && text.charAt(index) == '#') {
             int end = text.indexOf('\n', index + 2);
             return end < 0 ? text.length() : end;
         }
         if (text.startsWith("/*", index)) {
-            if (dialect == Dialect.SQLITE) {
+            if (mysql && (text.startsWith("/*!", index) || text.regionMatches(true, index, "/*M!", 0, 4))) {
+                throw new IllegalArgumentException("Executable MySQL or MariaDB comments are unavailable.");
+            }
+            if (dialect != Dialect.POSTGRESQL) {
                 int end = text.indexOf("*/", index + 2);
                 return end < 0 ? -1 : end + 2;
             }
