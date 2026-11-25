@@ -30,6 +30,44 @@ Headless settings-index generation also retains stock shared-index, theme/grid
 and local recent-projects IPC warnings. It completed successfully without using
 the owner's normal IDE profile. These warnings are not hidden by editing SDK JARs.
 
+## Database acceptance
+
+The complete native regression passed 158 tests with zero failures, errors or
+skips. It includes 37 database tests and the existing platform, Python, notebook
+and preview checks. SQLite and DuckDB use explicitly selected local JDBC
+drivers. The networked engines run in separate disposable loopback fixtures.
+
+| Engine | Owned fixture | JDBC and transport checks |
+| --- | --- | --- |
+| SQLite | Xerial SQLite JDBC 3.53.2.0 | 15 file-backed tests cover typed results, live cancellation and timeout, transactions, filtered paging, and reviewed keyed editing |
+| DuckDB | DuckDB JDBC 1.5.6.0 | 3 file-backed tests cover typed access, connection restrictions, transactions and cancellation |
+| PostgreSQL | PostgreSQL 17.11 and pgJDBC 42.7.14 | 5 direct JDBC tests plus 1 native OpenSSH test cover certificate and hostname validation, observed Stop, transaction recovery and concurrent keyed edits |
+| MySQL | MySQL 8.4.11 and Connector/J 26.7.0 | 3 tests cover the server read-only policy, typed results, plan-only EXPLAIN, Stop and transaction visibility |
+| MariaDB | MariaDB 11.8.9 and Connector/J 3.5.10 | 3 tests cover the MariaDB session policy, scoped cancellation and transaction visibility |
+| ClickHouse | ClickHouse 26.8.20.9 and JDBC V2 0.10.0-all | 2 tests cover exact typed pages, SELECT-only grants, catalog estimates and independent confirmation of an owned Stop |
+
+The native editor fixture loads and pages a real SQLite table through the
+registered editor provider. It exercises independent SQL result views and
+cursor ownership. The PasswordSafe fixture checks opt-in key scoping through
+the SDK with temporary entries. OS credential-store persistence is a manual
+acceptance check.
+
+The standalone Windows ZIP passed its bundled-Java startup probe. The strict
+plugin verifier reported Compatible with IC-252.28539.97. The ZIP has SHA-256
+`89b8f849a5ed68fd021acd50b7faa91bf088f19e8ed59078b211f00f70d205ca`.
+The opt-in Windows VM runner selected **Cancel** on both the OpenJDK and
+KaryoForge firewall dialogs on this archive. The test runner logged both
+cancellations while the desktop remained available to the GUI tests.
+The separate Windows VM passed the writable SQLite scenario on this archive.
+The test opened the native table editor, filtered and paged the rows, reviewed
+an update, committed it, and verified the resulting value with an independent
+SQLite reader. The same archive passed the read-only scenario, which exercised
+Test Connection, catalog browsing, result paging and Ctrl+Enter in the native
+console. A second source completed its query while the first source was busy.
+The test stopped the first query, confirmed the second source retained its
+result, and verified the original database bytes. See [Databases](DATABASES.md)
+for the supported scopes and commands.
+
 ## Notebook acceptance
 
 All 58 notebook native tests passed within the complete 121-test regression

@@ -2,12 +2,12 @@
 
 Open **KaryoForge Databases** in a project and choose **Add SQLite Source**.
 Name the source and select an existing SQLite file and a trusted local Xerial
-SQLite JDBC JAR. The name and paths are saved in application settings. The IDE
-opens the file and loads the driver only when you choose **Connect**. A JDBC
-driver runs executable code in the IDE process. Use an artifact whose origin
-and checksum you trust. The IDE neither ships nor downloads JDBC drivers.
-Use **Test Connection** to open and close a temporary session for the selected
-profile. It leaves the project's active connections and catalogs in place.
+SQLite JDBC JAR. Saving stores the name and paths in application settings.
+**Connect** opens a working session and loads the driver. Use **Test Connection**
+to open and close a temporary session for the selected profile. It leaves the
+project's active connections and catalogs in place. A JDBC driver runs executable
+code in the IDE process. Use a trusted artifact and verify its checksum before
+connecting. Supply the driver JAR from your own local files.
 Select another profile to connect while existing sessions stay open. Each
 connected source keeps its own results, cursor, row drafts, transaction and
 Stop control. A query running on one source leaves the other sources available.
@@ -268,5 +268,6 @@ make gui-bundle SQLITE_DRIVER="/path/to/sqlite-jdbc-3.53.2.0.jar"
 ```
 
 The optional JAR travels with the VM test bundle, separately from the IDE
-distribution. The VM test seeds its own SQLite file and checks schema browsing,
-result paging and cancellation. See the [GUI suite runner](../uitest/README.md).
+distribution. The VM tests seed their own SQLite files and exercise schema
+browsing, paging, native SQL execution, independent connections, cancellation
+and reviewed editing with explicit Commit. See the [GUI suite runner](../uitest/README.md).
