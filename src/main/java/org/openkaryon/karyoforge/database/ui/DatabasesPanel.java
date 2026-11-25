@@ -45,7 +45,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     });
     private final JButton remove = button("Remove Source", this::removeSource);
     private final JButton limits = button("Query Limits", this::editLimits);
-    private final JPanel toolbar = controls(profiles, add, addDuck, addServer, edit, remove, limits);
+    private final JPanel toolbar = new JPanel(new BorderLayout());
     private DatabaseSessionPanel selected;
     private boolean refreshing;
     private boolean disposed;
@@ -59,6 +59,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         profiles.setRenderer(literalListRenderer());
         empty.getAccessibleContext().setAccessibleName("Database status");
         empty.putClientProperty("html.disable", true);
+        toolbar.add(controls(profiles, add, addDuck, addServer, edit, remove, limits), BorderLayout.NORTH);
         add(toolbar, BorderLayout.NORTH);
         add(viewer, BorderLayout.CENTER);
         profiles.addActionListener(event -> {
@@ -100,7 +101,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
                     id -> new DatabaseSessionPanel(project, profile, editorBridge, this::updateControls));
             selected.updateProfile(profile);
             selected.selectEditorResult(editorBridge.selectedEditor());
-            toolbar.add(selected.actionButtons());
+            toolbar.add(selected.actionButtons(), BorderLayout.SOUTH);
             viewer.add(selected, BorderLayout.CENTER);
         }
         String id = profile == null ? null : profile.id();

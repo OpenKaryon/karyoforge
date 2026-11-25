@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.util.ui.WrapLayout;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
@@ -214,7 +215,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     static JPanel controls(JComponent... components) {
-        var bar = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 2));
+        var bar = new JPanel(new WrapLayout(FlowLayout.LEADING, 4, 2));
         for (var component : components) bar.add(component);
         return bar;
     }
