@@ -104,6 +104,54 @@ public final class PostgresqlJdbcSessionTest {
     }
 
 
+
+    @Test public void guardsKeyedRowsAgainstAConcurrentUpdateAndKeepsEarlierPendingWork() {
+        try (var writer = open(true); var concurrent = open(true); var observer = open(false)) {
+            run(writer, """
+                    CREATE TABLE edited_rows (
+                        project integer NOT NULL,
+                        code text NOT NULL,
+                        value text,
+                        changed_at timestamp with time zone,
+                        payload bytea,
+                        PRIMARY KEY (project, code)
+                    )
+                    """);
+            run(writer, "CREATE TABLE unrelated_pending (value text)");
+            run(writer, """
+                    INSERT INTO edited_rows VALUES (1, 'a', 'one', '2026-11-25T12:00:00+00', decode('00aa','hex')),
+                         (1, 'b', 'two', '2026-11-25T13:00:00+00', decode('00bb','hex'))
+                    """);
+            writer.finishTransaction(true);
+            run(writer, "INSERT INTO unrelated_pending VALUES ('keep this')");
+            var table = new JdbcSession.SchemaObject("edited_rows", "table", "public");
+            var snapshot = writer.openTable(table, new QueryRequest());
+            assertEquals("", snapshot.protection());
+            assertEquals("", snapshot.rowProtection(0));
+            assertNull(snapshot.columnType(0));
+            assertEquals(SqlValue.Type.TIMESTAMPTZ, snapshot.columnType(3));
+            assertEquals("00aa", snapshot.data().rows().getFirst().cells().get(4).value());
+
+            run(concurrent, "UPDATE edited_rows SET value='from other session' WHERE project=1 AND code='b'");
+            concurrent.finishTransaction(true);
+            var update = new TableSnapshot.Change(0, false, Map.of(2, SqlValue.of(SqlValue.Type.TEXT, "reviewed", false)));
+            var remove = new TableSnapshot.Change(1, true, Map.of());
+            var conflict = assertThrows(DatabaseProblem.class,
+                    () -> writer.applyTableChanges(snapshot, List.of(update, remove), new QueryRequest()));
+            assertTrue(conflict.getMessage().contains("original row changed"));
+            assertEquals("one", scalar(writer, "SELECT value FROM edited_rows WHERE code='a'"));
+            assertEquals("keep this", scalar(writer, "SELECT value FROM unrelated_pending"));
+
+            var fresh = writer.openTable(table, new QueryRequest());
+            assertEquals(2, writer.applyTableChanges(fresh, List.of(update, remove), new QueryRequest()));
+            assertEquals("2", scalar(observer, "SELECT count(*) FROM edited_rows"));
+            writer.finishTransaction(true);
+            assertEquals("1", scalar(observer, "SELECT count(*) FROM edited_rows"));
+            assertEquals("reviewed", scalar(observer, "SELECT value FROM edited_rows WHERE code='a'"));
+            assertEquals("keep this", scalar(observer, "SELECT value FROM unrelated_pending"));
+        }
+    }
+
     @Test public void verifiesTheExplicitTlsCaAndServerNameWithoutPlaintextFallback() {
         Path trusted = Path.of(System.getenv("KARYOFORGE_TEST_PG_CA"));
         Path unrelated = Path.of(System.getenv("KARYOFORGE_TEST_PG_OTHER_CA"));

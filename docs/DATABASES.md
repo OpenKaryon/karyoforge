@@ -83,6 +83,12 @@ declared column and key metadata. PostgreSQL **DDL** is a description assembled
 from catalog definitions. Use **Show Rows** or run typed SQL. For a PostgreSQL
 JSON operator written as a bare question mark, use pgJDBC's `??` escape.
 
+**Open Table** supports reviewed updates and deletes on writable ordinary
+PostgreSQL tables with a complete declared key and supported column types.
+The batch matches the original key, row values and PostgreSQL's `xmin`.
+Views, foreign tables, partitioned or inherited tables and identity or
+generated fields are protected.
+
 The owned acceptance fixture uses PostgreSQL 17.11 and pgJDBC 42.7.14
 (SHA-256 `73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c`).
 Run the test with an available Docker engine and the explicit driver.

@@ -1,5 +1,6 @@
 package org.openkaryon.karyoforge.database.core;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.Driver;
@@ -152,7 +153,7 @@ final class PostgresqlBackend implements JdbcBackend {
                     boolean generated = !rows.getString(5).isEmpty();
                     String identity = rows.getString(6);
                     String expression = rows.getString(7);
-                    columns.add(new TableDefinition.Column(name, type, notNull, rows.getInt(4), generated ? 3 : 0));
+                    columns.add(new TableDefinition.Column(name, type, notNull, rows.getInt(4), generated ? 3 : !identity.isEmpty() ? 4 : 0));
                     String declaration = JdbcSession.SchemaObject.quote(name) + " " + type;
                     if (generated && expression != null) declaration += " GENERATED ALWAYS AS (" + expression + ") STORED";
                     else if (!identity.isEmpty()) declaration += " GENERATED " + (identity.equals("a") ? "ALWAYS" : "BY DEFAULT") + " AS IDENTITY";
@@ -180,6 +181,16 @@ final class PostgresqlBackend implements JdbcBackend {
         String ddl = "-- PostgreSQL table description from catalog metadata\nCREATE TABLE " + object.qualified()
                 + " (\n    " + String.join(",\n    ", declarations) + "\n);";
         return TableDefinition.snapshot(object, columns, ddl);
+    }
+
+    @Override public TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request)
+            throws SQLException, IOException {
+        return PostgresqlTableEditor.browse(connection, definition, source.writable(), request);
+    }
+
+    @Override public int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
+                                           QueryRequest request, Runnable quarantine) throws SQLException {
+        return PostgresqlTableEditor.apply(connection, this, snapshot, changes, request, quarantine);
     }
 
     @Override public void validate(SqlText.Command command) {

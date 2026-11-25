@@ -81,9 +81,8 @@ public final class JdbcSession implements AutoCloseable {
         request.check();
         closeCursor();
         editableSnapshot = null;
-        if (!(source instanceof SqliteSource)) throw new DatabaseProblem("Use Show Rows to browse this data source.");
         TableDefinition definition = describe(object);
-        var result = requestResult("Reading table data", request, () -> SqliteTableEditor.browse(connection, definition, source.writable(), request));
+        var result = requestResult("Reading table data", request, () -> backend.openTable(connection, definition, request));
         editableSnapshot = result;
         return result;
     }
@@ -96,7 +95,7 @@ public final class JdbcSession implements AutoCloseable {
         }
         editableSnapshot = null;
         closeCursor();
-        return requestResult("Applying table changes", request, () -> SqliteTableEditor.apply(connection, snapshot, changes, request,
+        return requestResult("Applying table changes", request, () -> backend.applyTableChanges(connection, snapshot, changes, request,
                 () -> quarantined = true));
     }
 
@@ -203,7 +202,7 @@ public final class JdbcSession implements AutoCloseable {
                 request.check();
                 int remaining = MAX_BYTES - owner.totalBytes - rowBytes;
                 if (remaining < 4) { limited = true; break; }
-                var cell = JdbcValues.sqlite(owner.rows, index, Math.min(MAX_CELL_CHARS, remaining / 4));
+                var cell = JdbcValues.read(owner.rows, index, Math.min(MAX_CELL_CHARS, remaining / 4));
                 rowBytes += JdbcValues.bytes(cell);
                 if (rowBytes > MAX_BYTES - owner.totalBytes) { limited = true; break; }
                 cells.add(cell);

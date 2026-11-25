@@ -7,6 +7,7 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -19,7 +20,7 @@ public final class SqlValue {
         TEXT("Text", Types.VARCHAR), INTEGER("Integer", Types.BIGINT), DECIMAL("Decimal", Types.DECIMAL),
         BINARY("Hexadecimal BLOB", Types.VARBINARY), BOOLEAN("Boolean", Types.BOOLEAN),
         DATE("Date", Types.DATE), TIME("Time", Types.TIME),
-        TIMESTAMP("Timestamp", Types.TIMESTAMP);
+        TIMESTAMP("Timestamp", Types.TIMESTAMP), TIMESTAMPTZ("Timestamp with offset", Types.TIMESTAMP_WITH_TIMEZONE);
 
         private final String label;
         private final int jdbcType;
@@ -51,6 +52,7 @@ public final class SqlValue {
                 case DATE -> LocalDate.parse(value);
                 case TIME -> LocalTime.parse(value);
                 case TIMESTAMP -> LocalDateTime.parse(value.replace(' ', 'T'));
+                case TIMESTAMPTZ -> OffsetDateTime.parse(value.replace(' ', 'T'));
             });
         } catch (DateTimeParseException | IllegalArgumentException invalid) {
             throw new IllegalArgumentException("Enter a valid " + type + " parameter.");
@@ -84,7 +86,7 @@ public final class SqlValue {
             case DECIMAL -> statement.setBigDecimal(index, (BigDecimal) parsed);
             case BINARY -> statement.setBytes(index, (byte[]) parsed);
             case BOOLEAN -> statement.setBoolean(index, (Boolean) parsed);
-            case DATE, TIME, TIMESTAMP -> statement.setObject(index, parsed, type.jdbcType);
+            case DATE, TIME, TIMESTAMP, TIMESTAMPTZ -> statement.setObject(index, parsed, type.jdbcType);
         }
     }
 }

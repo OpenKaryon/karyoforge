@@ -90,6 +90,15 @@ final class SqliteBackend implements JdbcBackend {
         return TableDefinition.snapshot(object, columns, ddl);
     }
 
+    @Override public TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException {
+        return SqliteTableEditor.browse(connection, definition, source.writable(), request);
+    }
+
+    @Override public int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
+                                           QueryRequest request, Runnable quarantine) throws SQLException {
+        return SqliteTableEditor.apply(connection, snapshot, changes, request, quarantine);
+    }
+
     @Override public void validate(SqlText.Command command) {
         var allowed = source.writable() ? WRITE_COMMANDS : READ_COMMANDS;
         if (!allowed.contains(command.keyword())) {

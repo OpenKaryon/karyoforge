@@ -80,7 +80,7 @@ final class SqliteTableEditor {
         var headers = columns.stream().map(column -> new QueryPage.Column(column.name(), column.type())).toList();
         var grid = new QueryPage(headers, displayRows, 1, displayRows.size(), false,
                 more ? "Only the bounded first table page is displayed." : "");
-        return new TableSnapshot(definition, grid, protection, version, originals);
+        return new TableSnapshot(definition, grid, protection, version, originals, SqliteTableEditor::editableType);
     }
 
     private static TableSnapshot.OriginalCell original(ResultSet rows, int offset) throws SQLException {
@@ -134,8 +134,8 @@ final class SqliteTableEditor {
         if (changes.isEmpty() || changes.size() > snapshot.originals.size()) {
             throw new IllegalArgumentException("Choose at least one row from this table snapshot.");
         }
-        if (schemaVersion(connection) != snapshot.schemaVersion) throw new DatabaseProblem("The table definition changed. Reload the table.");
-        var plans = new ArrayList<Mutation>();
+        if (schemaVersion(connection) != snapshot.objectVersion) throw new DatabaseProblem("The table definition changed. Reload the table.");
+        var plans = new ArrayList<JdbcEditBatch.Mutation>();
         var seen = new HashSet<Integer>();
         for (var change : changes) {
             request.check();
@@ -145,40 +145,10 @@ final class SqliteTableEditor {
             }
             plans.add(mutation(snapshot, change));
         }
-        var checkpoint = connection.setSavepoint();
-        try {
-            for (var plan : plans) {
-                request.check();
-                try (var statement = connection.prepareStatement(plan.sql())) {
-                    request.attach(statement);
-                    try {
-                        int index = 1;
-                        for (var value : plan.bindings()) value.bind(statement, index++);
-                        if (statement.executeUpdate() != 1) {
-                            throw new DatabaseProblem("An original row changed or no longer exists. The edit batch was rolled back.");
-                        }
-                    } finally {
-                        request.detach(statement);
-                    }
-                }
-            }
-            if (request.finish()) throw new DatabaseProblem("Stop could not be confirmed. Disconnect this data source.");
-            request.check();
-            connection.releaseSavepoint(checkpoint);
-            return plans.size();
-        } catch (SQLException | RuntimeException failure) {
-            try {
-                connection.rollback(checkpoint);
-                connection.releaseSavepoint(checkpoint);
-            } catch (SQLException cleanupFailure) {
-                quarantine.run();
-                throw new DatabaseProblem("The edit savepoint could not be released. Disconnect this data source.");
-            }
-            throw failure;
-        }
+        return JdbcEditBatch.apply(connection, request, quarantine, () -> plans);
     }
 
-    private static Mutation mutation(TableSnapshot snapshot, TableSnapshot.Change change) {
+    private static JdbcEditBatch.Mutation mutation(TableSnapshot snapshot, TableSnapshot.Change change) {
         var columns = snapshot.definition().columns();
         var assignments = new ArrayList<String>();
         var predicates = new ArrayList<String>();
@@ -218,7 +188,7 @@ final class SqliteTableEditor {
         }
         String target = table(snapshot.definition());
         String command = change.delete() ? "DELETE FROM " + target : "UPDATE " + target + " SET " + String.join(", ", assignments);
-        return new Mutation(command + " WHERE " + String.join(" AND ", predicates), List.copyOf(values));
+        return new JdbcEditBatch.Mutation(command + " WHERE " + String.join(" AND ", predicates), values);
     }
 
     private static SqlValue nativeValue(QueryPage.Cell value) {
@@ -248,6 +218,4 @@ final class SqliteTableEditor {
     }
 
     private static String quote(String identifier) { return "\"" + identifier.replace("\"", "\"\"") + "\""; }
-
-    private record Mutation(String sql, List<SqlValue> bindings) {}
 }

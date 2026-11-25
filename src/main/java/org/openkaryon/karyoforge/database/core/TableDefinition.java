@@ -24,6 +24,7 @@ public record TableDefinition(JdbcSession.SchemaObject object, List<Column> colu
                 case 1 -> "Hidden";
                 case 2 -> "Generated (virtual)";
                 case 3 -> "Generated (stored)";
+                case 4 -> "Identity";
                 default -> "";
             };
         }

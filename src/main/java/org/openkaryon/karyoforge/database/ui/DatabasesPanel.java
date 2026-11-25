@@ -112,7 +112,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         definition.getAccessibleContext().setAccessibleName("Database object definition");
         definition.setEditable(false);
         structure.setDefaultRenderer(Object.class, literalRenderer());
-        dataGrid.getAccessibleContext().setAccessibleName("SQLite table data");
+        dataGrid.getAccessibleContext().setAccessibleName("Database table data");
         dataGrid.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         dataGrid.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         dataGrid.setDefaultRenderer(Object.class, literalRenderer());
@@ -687,7 +687,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
         show.setEnabled(canBrowse);
         inspect.setEnabled(canBrowse);
-        openTable.setEnabled(canBrowse && activeSource instanceof SqliteSource);
+        openTable.setEnabled(canBrowse);
         int row = dataGrid.getSelectedRow();
         boolean readyRow = !busy && canEditRow(row);
         var draft = drafts.get(row);

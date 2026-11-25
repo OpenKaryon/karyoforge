@@ -102,7 +102,7 @@ class SqliteDatabasesUiTest {
                 button { byVisibleText("Open Table") }.click()
                 x { contains(byVisibleText("samples · 200 rows")) }
                     .shouldBe("The first table page opens", present, 1.minutes)
-                val grid = x { byAccessibleName("SQLite table data") }
+                val grid = x { byAccessibleName("Database table data") }
                 driver.cast(grid.component, QueryGrid::class).setRowSelectionInterval(0, 0)
                 button { byVisibleText("Edit Row") }.click()
             }
@@ -117,7 +117,7 @@ class SqliteDatabasesUiTest {
                 x { byVisibleText("1 local row drafts.") }.shouldBe("The edit is a local draft", present, 1.minutes)
                 button { byVisibleText("Review & Apply") }.click()
             }
-            ui.dialog({ byTitle("Review SQLite Changes") }) {
+            ui.dialog({ byTitle("Review Table Changes") }) {
                 val review = x { byAccessibleName("Table change preview") }.nativeDocumentText()
                 check(review.contains("Key id = 1") && review.contains("sample-1") && review.contains("owned updated row"))
                 pressButton("Apply Pending Changes")

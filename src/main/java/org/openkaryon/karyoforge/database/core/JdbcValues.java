@@ -12,7 +12,7 @@ import static org.openkaryon.karyoforge.database.core.QueryPage.Cell.Kind;
 final class JdbcValues {
     private JdbcValues() {}
 
-    static QueryPage.Cell sqlite(ResultSet rows, int index, int limit) throws SQLException, IOException {
+    static QueryPage.Cell read(ResultSet rows, int index, int limit) throws SQLException, IOException {
         // SQLite column affinities do not determine every row's value type.
         int type = rows.getMetaData().getColumnType(index);
         return switch (type) {

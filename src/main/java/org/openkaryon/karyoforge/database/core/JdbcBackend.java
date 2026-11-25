@@ -1,5 +1,6 @@
 package org.openkaryon.karyoforge.database.core;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.PreparedStatement;
@@ -16,6 +17,9 @@ interface JdbcBackend {
     List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException;
     TableDefinition describe(Connection connection, JdbcSession.SchemaObject object) throws SQLException;
     void validate(SqlText.Command command);
+    TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException;
+    int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
+                          QueryRequest request, Runnable quarantine) throws SQLException;
 
     default void beforeStatement(Connection connection) throws SQLException {}
     default void configureStatement(PreparedStatement statement) throws SQLException {}

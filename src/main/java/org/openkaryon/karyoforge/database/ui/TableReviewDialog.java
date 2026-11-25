@@ -16,7 +16,7 @@ final class TableReviewDialog extends DialogWrapper {
     TableReviewDialog(Project project, String preview) {
         super(project);
         this.preview = preview;
-        setTitle("Review SQLite Changes");
+        setTitle("Review Table Changes");
         setOKButtonText("Apply Pending Changes");
         init();
     }
