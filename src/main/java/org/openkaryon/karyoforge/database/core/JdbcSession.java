@@ -30,6 +30,7 @@ public final class JdbcSession implements AutoCloseable {
     private DriverLease lease;
     private Connection connection;
     private Cursor cursor;
+    private TableSnapshot editableSnapshot;
     private boolean ready;
     private boolean quarantined;
 
@@ -128,6 +129,29 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
+    public TableSnapshot openTable(SchemaObject object, QueryRequest request) {
+        checkReady();
+        request.check();
+        closeCursor();
+        editableSnapshot = null;
+        TableDefinition definition = describe(object);
+        var result = requestResult(request, () -> SqliteTableEditor.browse(connection, definition, source.writable(), request));
+        editableSnapshot = result;
+        return result;
+    }
+
+    public int applyTableChanges(TableSnapshot snapshot, List<TableSnapshot.Change> changes, QueryRequest request) {
+        checkReady();
+        request.check();
+        if (!source.writable() || snapshot == null || editableSnapshot != snapshot) {
+            throw new DatabaseProblem("Reload this editable table before applying changes.");
+        }
+        editableSnapshot = null;
+        closeCursor();
+        return requestResult(request, () -> SqliteTableEditor.apply(connection, snapshot, changes, request,
+                () -> quarantined = true));
+    }
+
     public SqlResult execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
         checkReady();
         if (!allowedCommands().contains(command.keyword())) {
@@ -141,6 +165,7 @@ public final class JdbcSession implements AutoCloseable {
         }
         request.check();
         closeCursor();
+        editableSnapshot = null;
         return this.<SqlResult>requestResult(request, () -> {
             var statement = connection.prepareStatement(command.sql());
             cursor = new Cursor(statement);
@@ -171,7 +196,7 @@ public final class JdbcSession implements AutoCloseable {
         });
     }
 
-    private <T extends SqlResult> T requestResult(QueryRequest request, ReadResult<T> work) {
+    private <T> T requestResult(QueryRequest request, ReadResult<T> work) {
         T result = null;
         try {
             result = work.run();
@@ -194,6 +219,7 @@ public final class JdbcSession implements AutoCloseable {
         checkReady();
         if (!source.writable()) throw new DatabaseProblem("This SQLite source is read-only.");
         closeCursor();
+        editableSnapshot = null;
         try {
             if (commit) connection.commit();
             else connection.rollback();
@@ -270,6 +296,7 @@ public final class JdbcSession implements AutoCloseable {
 
     @Override public void close() {
         ready = false;
+        editableSnapshot = null;
         closeCursor();
         try {
             if (connection != null) {
@@ -292,7 +319,7 @@ public final class JdbcSession implements AutoCloseable {
     }
 
     @FunctionalInterface
-    private interface ReadResult<T extends SqlResult> { T run() throws SQLException, IOException; }
+    private interface ReadResult<T> { T run() throws SQLException, IOException; }
 
     private static final class Cursor {
         private final Statement statement;

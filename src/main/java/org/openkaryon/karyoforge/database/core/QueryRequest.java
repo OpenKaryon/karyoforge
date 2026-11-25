@@ -16,6 +16,10 @@ public final class QueryRequest {
         statement = target;
     }
 
+    synchronized void detach(Statement target) {
+        if (statement == target) statement = null;
+    }
+
     public synchronized void stop() {
         if (finished || stopped) return;
         stopped = true;

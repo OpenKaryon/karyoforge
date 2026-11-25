@@ -21,7 +21,7 @@ transaction control and **Refresh Schema** after schema changes.
 
 Use named `:name` or positional `?` parameters in one statement. The SQL
 Parameters dialog binds text, integers, decimals, booleans, ISO dates, times,
-timestamps and explicit NULL values. Repeated names share a value. Literal and
+timestamps, hexadecimal BLOBs and explicit NULL values. Repeated names share a value. Literal and
 comment text is left intact. Cancelling the dialog leaves the existing result
 and database session untouched.
 
@@ -35,6 +35,20 @@ null constraints, primary-key order and hidden/generated columns in **Structure*
 The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
 statement. **Stop** cancels the active query or page request. **Disconnect**
 releases the cursor, connection and driver lease.
+
+## Table editing
+
+On a writable source, **Open Table** loads a bounded first page. Select a row
+in **Table Data** to stage changes with **Edit Row** or **Delete Row**.
+**Review & Apply** lists the whole batch and applies it to the current
+transaction. **Commit** saves the database changes and **Rollback** discards
+them. Cancelling the review keeps local drafts.
+
+Editing requires a declared primary key and complete original values. Key
+fields, hidden and generated columns, unsupported values, views and virtual
+tables are protected. The batch checks the saved key and original row content
+before each mutation. A conflict or failed change rolls back the entire
+batch while keeping earlier pending SQL changes.
 
 ## Checks
 

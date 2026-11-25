@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.HexFormat;
 import java.util.Objects;
 
 /** Values are parsed before scheduling a query and are never interpolated into SQL text. */
@@ -16,7 +17,8 @@ public final class SqlValue {
 
     public enum Type {
         TEXT("Text", Types.VARCHAR), INTEGER("Integer", Types.BIGINT), DECIMAL("Decimal", Types.DECIMAL),
-        BOOLEAN("Boolean", Types.BOOLEAN), DATE("Date", Types.DATE), TIME("Time", Types.TIME),
+        BINARY("Hexadecimal BLOB", Types.VARBINARY), BOOLEAN("Boolean", Types.BOOLEAN),
+        DATE("Date", Types.DATE), TIME("Time", Types.TIME),
         TIMESTAMP("Timestamp", Types.TIMESTAMP);
 
         private final String label;
@@ -44,6 +46,7 @@ public final class SqlValue {
                 case TEXT -> input;
                 case INTEGER -> Long.parseLong(value);
                 case DECIMAL -> decimal(value);
+                case BINARY -> HexFormat.of().parseHex(value);
                 case BOOLEAN -> booleanValue(value);
                 case DATE -> LocalDate.parse(value);
                 case TIME -> LocalTime.parse(value);
@@ -68,6 +71,8 @@ public final class SqlValue {
         throw new IllegalArgumentException("Use true, false, 1 or 0.");
     }
 
+    public Type type() { return type; }
+
     void bind(PreparedStatement statement, int index) throws SQLException {
         if (parsed == null) {
             statement.setNull(index, type.jdbcType);
@@ -77,6 +82,7 @@ public final class SqlValue {
             case TEXT -> statement.setString(index, (String) parsed);
             case INTEGER -> statement.setLong(index, (Long) parsed);
             case DECIMAL -> statement.setBigDecimal(index, (BigDecimal) parsed);
+            case BINARY -> statement.setBytes(index, (byte[]) parsed);
             case BOOLEAN -> statement.setBoolean(index, (Boolean) parsed);
             case DATE, TIME, TIMESTAMP -> statement.setObject(index, parsed, type.jdbcType);
         }

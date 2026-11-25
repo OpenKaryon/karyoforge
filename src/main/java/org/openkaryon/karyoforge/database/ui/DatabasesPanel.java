@@ -19,6 +19,7 @@ import org.openkaryon.karyoforge.database.core.SqlResult;
 import org.openkaryon.karyoforge.database.core.SqlText;
 import org.openkaryon.karyoforge.database.core.SqlValue;
 import org.openkaryon.karyoforge.database.core.TableDefinition;
+import org.openkaryon.karyoforge.database.core.TableSnapshot;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -27,7 +28,9 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -42,6 +45,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JBTextArea sql = new JBTextArea(5, 48);
     private final JBTable table = new JBTable();
     private final JBTable structure = new JBTable();
+    private final JBTable dataGrid = new JBTable();
+    private final JPanel tableDataTab = new JPanel(new BorderLayout());
     private final JBTextArea definition = new JBTextArea();
     private final JTabbedPane details = new JTabbedPane();
     private final JScrollPane resultsTab = new JBScrollPane(table);
@@ -54,6 +59,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JButton disconnect = button("Disconnect", this::disconnect);
     private final JButton show = button("Show Rows", this::showRows);
     private final JButton inspect = button("Inspect", this::inspect);
+    private final JButton openTable = button("Open Table", this::openTable);
+    private final JButton editRow = button("Edit Row", this::editRow);
+    private final JButton deleteRow = button("Delete Row", this::deleteRow);
+    private final JButton undoRow = button("Discard Row Draft", this::undoRow);
+    private final JButton applyRows = button("Review & Apply", this::applyRows);
     private final JButton refresh = button("Refresh Schema", this::refreshSchema);
     private final JButton commit = button("Commit", () -> finishTransaction(true));
     private final JButton rollback = button("Rollback", () -> finishTransaction(false));
@@ -71,6 +81,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private boolean disposed;
     private QueryRequest active;
     private QueryPage page;
+    private TableSnapshot editableTable;
+    private final TreeMap<Integer, RowDraft> drafts = new TreeMap<>();
 
     DatabasesPanel(Project project) {
         super(new BorderLayout(0, 4));
@@ -84,6 +96,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
         definition.getAccessibleContext().setAccessibleName("Database object definition");
         definition.setEditable(false);
         structure.setDefaultRenderer(Object.class, literalRenderer());
+        dataGrid.getAccessibleContext().setAccessibleName("SQLite table data");
+        dataGrid.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        dataGrid.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        dataGrid.setDefaultRenderer(Object.class, literalRenderer());
+        dataGrid.getTableHeader().setDefaultRenderer(literalRenderer());
         status.getAccessibleContext().setAccessibleName("Database status");
         status.putClientProperty("html.disable", true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -95,7 +112,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var sourceControls = controls(profiles, add, edit, remove, connect, disconnect);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
-        objectPanel.add(controls(show, inspect, refresh), BorderLayout.SOUTH);
+        objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
         queryPanel.add(controls(run, next, stop, commit, rollback), BorderLayout.SOUTH);
@@ -104,6 +121,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
         details.addTab("DDL", new JBScrollPane(definition));
         details.setEnabledAt(1, false);
         details.setEnabledAt(2, false);
+        tableDataTab.add(new JBScrollPane(dataGrid), BorderLayout.CENTER);
+        tableDataTab.add(controls(editRow, deleteRow, undoRow, applyRows), BorderLayout.SOUTH);
+        details.addTab("Table Data", tableDataTab);
+        details.setEnabledAt(3, false);
         var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, details);
         queryAndResult.setResizeWeight(0.25);
         var explorer = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, objectPanel, queryAndResult);
@@ -114,6 +135,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
         profiles.addActionListener(event -> updateControls());
         schema.addListSelectionListener(event -> updateControls());
+        dataGrid.getSelectionModel().addListSelectionListener(event -> updateControls());
         sql.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.CTRL_DOWN_MASK), "runSql");
         sql.getActionMap().put("runSql", new AbstractAction() {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) {
@@ -201,6 +223,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     }
 
     private void disconnect() {
+        if (!discardTableDraft()) return;
         submit("Disconnecting…", null, () -> {
             if (session != null) {
                 session.close();
@@ -244,10 +267,132 @@ final class DatabasesPanel extends JPanel implements Disposable {
             if (!dialog.showAndGet()) return;
             values = dialog.values();
         }
+        if (!discardTableDraft()) return;
         var request = new QueryRequest();
         var bindings = values;
         submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
     }
+
+    private void openTable() {
+        var object = schema.getSelectedValue();
+        if (object == null || !discardTableDraft()) return;
+        var request = new QueryRequest();
+        submit("Opening table data…", request, () -> session.openTable(object, request), this::showTable);
+    }
+
+    private void showTable(TableSnapshot snapshot) {
+        clearResult();
+        showDefinition(snapshot.definition());
+        editableTable = snapshot;
+        var result = snapshot.data();
+        dataGrid.setModel(new AbstractTableModel() {
+            @Override public int getRowCount() { return result.rows().size(); }
+            @Override public int getColumnCount() { return result.columns().size() + 1; }
+            @Override public String getColumnName(int column) {
+                return column == 0 ? "Draft" : result.columns().get(column - 1).label();
+            }
+            @Override public Object getValueAt(int row, int column) {
+                var draft = drafts.get(row);
+                if (column == 0) return draft == null ? "" : draft.delete() ? "Delete" : "Update";
+                var changed = draft == null ? null : draft.values().get(column - 1);
+                return changed == null ? result.rows().get(row).cells().get(column - 1).display() : changed.display();
+            }
+        });
+        details.setEnabledAt(3, true);
+        details.setSelectedComponent(tableDataTab);
+        report(snapshot.definition().object().name() + " · " + result.rows().size() + " rows"
+                + (result.notice().isEmpty() ? "" : " · " + result.notice())
+                + (snapshot.protection().isEmpty() ? "" : " · " + snapshot.protection()));
+    }
+
+    private void editRow() {
+        int row = dataGrid.getSelectedRow();
+        if (!canEditRow(row)) return;
+        var previous = drafts.get(row);
+        var editor = new TableRowDialog(project, editableTable, row, previous == null ? Map.of() : previous.values());
+        if (!editor.showAndGet()) return;
+        var values = editor.values();
+        if (values.isEmpty()) drafts.remove(row);
+        else drafts.put(row, new RowDraft(false, values));
+        refreshDraft(row);
+    }
+
+    private void deleteRow() {
+        int row = dataGrid.getSelectedRow();
+        if (!canEditRow(row)) return;
+        drafts.put(row, new RowDraft(true, Map.of()));
+        refreshDraft(row);
+    }
+
+    private void undoRow() {
+        int row = dataGrid.getSelectedRow();
+        drafts.remove(row);
+        refreshDraft(row);
+    }
+
+    private void refreshDraft(int row) {
+        ((AbstractTableModel) dataGrid.getModel()).fireTableRowsUpdated(row, row);
+        report(drafts.size() + " local row drafts.");
+    }
+
+    private void applyRows() {
+        if (editableTable == null || drafts.isEmpty()) return;
+        var snapshot = editableTable;
+        var changes = new ArrayList<TableSnapshot.Change>();
+        var preview = new StringBuilder();
+        for (var entry : drafts.entrySet()) {
+            int row = entry.getKey();
+            var draft = entry.getValue();
+            var original = snapshot.data().rows().get(row).cells();
+            var columns = snapshot.definition().columns();
+            preview.append(draft.delete() ? "Delete row " : "Update row ").append(row + 1).append('\n');
+            var values = new TreeMap<Integer, SqlValue>();
+            for (int index = 0; index < columns.size(); index++) {
+                var column = columns.get(index);
+                if (column.keyPosition() > 0) {
+                    preview.append("  Key ").append(column.name()).append(" = ").append(excerpt(original.get(index).display())).append('\n');
+                }
+                var changed = draft.values().get(index);
+                if (changed != null) {
+                    values.put(index, changed.value());
+                    preview.append("  ").append(column.name()).append(": ").append(excerpt(original.get(index).display()))
+                            .append(" → ").append(excerpt(changed.display())).append('\n');
+                }
+            }
+            changes.add(new TableSnapshot.Change(row, draft.delete(), values));
+        }
+        if (!new TableReviewDialog(project, preview.toString()).showAndGet()) return;
+        resetTableData();
+        var request = new QueryRequest();
+        submit("Applying the table batch…", request, () -> session.applyTableChanges(snapshot, changes, request),
+                affected -> report(affected + " rows staged in the transaction. Choose Commit or Rollback."));
+    }
+
+    private static String excerpt(String value) {
+        String rendered = value.replace("\r", "\\r").replace("\n", "\\n");
+        return rendered.length() > 120 ? rendered.substring(0, 119) + "…" : rendered;
+    }
+
+    private boolean canEditRow(int row) {
+        return row >= 0 && editableTable != null && editableTable.rowProtection(row).isEmpty();
+    }
+
+    private boolean discardTableDraft() {
+        if (!drafts.isEmpty() && Messages.showYesNoDialog(project, "Discard unapplied table drafts?",
+                "Discard Table Drafts", Messages.getQuestionIcon()) != Messages.YES) return false;
+        resetTableData();
+        return true;
+    }
+
+    private void resetTableData() {
+        editableTable = null;
+        drafts.clear();
+        if (details.getSelectedComponent() == tableDataTab) details.setSelectedComponent(resultsTab);
+        details.setEnabledAt(3, false);
+        dataGrid.setModel(new javax.swing.table.DefaultTableModel());
+    }
+
+    private record RowDraft(boolean delete, Map<Integer, TableRowDialog.DraftValue> values) {}
 
     private void inspect() {
         var object = schema.getSelectedValue();
@@ -295,6 +440,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     }
 
     private void finishTransaction(boolean commitChanges) {
+        if (!discardTableDraft()) return;
         submit(commitChanges ? "Committing…" : "Rolling back…", null, () -> {
             session.finishTransaction(commitChanges);
             return Boolean.TRUE;
@@ -411,6 +557,21 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
         show.setEnabled(canBrowse);
         inspect.setEnabled(canBrowse);
+        openTable.setEnabled(canBrowse);
+        int row = dataGrid.getSelectedRow();
+        boolean readyRow = !busy && canEditRow(row);
+        var draft = drafts.get(row);
+        editRow.setEnabled(readyRow && (draft == null || !draft.delete())
+                && java.util.stream.IntStream.range(0, editableTable.definition().columns().size())
+                        .anyMatch(index -> editableTable.columnType(index) != null));
+        deleteRow.setEnabled(readyRow && (draft == null || !draft.delete()));
+        undoRow.setEnabled(!busy && draft != null);
+        applyRows.setEnabled(!busy && !drafts.isEmpty());
+        if (row >= 0 && editableTable != null) {
+            String reason = editableTable.rowProtection(row);
+            editRow.setToolTipText(reason.isEmpty() ? null : reason);
+            deleteRow.setToolTipText(editRow.getToolTipText());
+        }
         next.setEnabled(!busy && connected && page != null && page.hasNext());
         stop.setEnabled(busy && active != null);
     }

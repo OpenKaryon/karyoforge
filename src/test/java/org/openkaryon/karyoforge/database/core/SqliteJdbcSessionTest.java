@@ -207,6 +207,78 @@ public final class SqliteJdbcSessionTest {
         }
     }
 
+    @Test public void appliesExactCompositeKeyEditsAndDeleteAsOnePendingBatch() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            run(session, """
+                    CREATE TABLE records (
+                        part_a INTEGER NOT NULL,
+                        part_b TEXT COLLATE NOCASE NOT NULL,
+                        payload TEXT CHECK (payload <> 'rejected'),
+                        bytes BLOB,
+                        generated TEXT GENERATED ALWAYS AS (part_b || payload) STORED,
+                        PRIMARY KEY (part_a, part_b)
+                    )
+                    """);
+            run(session, "INSERT INTO records VALUES (1, 'a', 'First', X'abcdef'), (1, 'b', 'Second', X'00')");
+            session.finishTransaction(true);
+            var object = new JdbcSession.SchemaObject("records", "table");
+            var table = session.openTable(object, new QueryRequest());
+            assertEquals("", table.protection());
+            assertEquals("", table.rowProtection(0));
+            assertNull(table.columnType(0));
+            assertNull(table.columnType(4));
+            assertEquals(SqlValue.Type.BINARY, table.columnType(3));
+            assertEquals("ABCDEF", table.data().rows().getFirst().cells().get(3).display());
+
+            var good = change(0, 2, "changed");
+            var bad = change(1, 2, "rejected");
+            assertThrows(DatabaseProblem.class, () -> session.applyTableChanges(table, List.of(good, bad), new QueryRequest()));
+            assertEquals("First", scalar(session, "SELECT payload FROM records WHERE part_b='a'"));
+            assertThrows(DatabaseProblem.class, () -> session.applyTableChanges(table, List.of(good), new QueryRequest()));
+
+            var fresh = session.openTable(object, new QueryRequest());
+            var deletion = new TableSnapshot.Change(1, true, java.util.Map.of());
+            assertEquals(2, session.applyTableChanges(fresh, List.of(good, deletion), new QueryRequest()));
+            assertEquals("1", scalar(session, "SELECT count(*) FROM records"));
+            try (var inspector = new JdbcSession(source)) {
+                inspector.connect();
+                assertEquals("2", scalar(inspector, "SELECT count(*) FROM records"));
+            }
+            session.finishTransaction(true);
+            assertEquals("changed", scalar(session, "SELECT payload FROM records WHERE part_b='a'"));
+            assertEquals("1", scalar(session, "SELECT count(*) FROM records"));
+        }
+    }
+
+    @Test public void protectsSnapshotsWithoutKeysAndRowsWithoutExactOriginalValues() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            run(session, "CREATE TABLE unkeyed (payload TEXT)");
+            run(session, "INSERT INTO unkeyed VALUES ('sample')");
+            var unkeyed = session.openTable(new JdbcSession.SchemaObject("unkeyed", "table"), new QueryRequest());
+            assertFalse(unkeyed.protection().isEmpty());
+
+            run(session, "CREATE TABLE protected (key TEXT PRIMARY KEY, payload TEXT, numeric_value REAL)");
+            run(session, "INSERT INTO protected VALUES (NULL, 'null key', NULL), ('long', hex(zeroblob(9000)), NULL), "
+                    + "('nul-text', 'A'||char(0)||'B', NULL), ('real', 'fraction', 1.25)");
+            var table = session.openTable(new JdbcSession.SchemaObject("protected", "table"), new QueryRequest());
+            assertEquals(4, table.data().rows().size());
+            for (int row = 0; row < 4; row++) assertFalse(table.rowProtection(row).isEmpty());
+            var deletion = new TableSnapshot.Change(0, true, java.util.Map.of());
+            assertThrows(IllegalArgumentException.class, () -> session.applyTableChanges(table, List.of(deletion), new QueryRequest()));
+            assertEquals("4", scalar(session, "SELECT count(*) FROM protected"));
+        }
+    }
+
+    private static TableSnapshot.Change change(int row, int column, String value) {
+        return new TableSnapshot.Change(row, false, java.util.Map.of(column, SqlValue.of(SqlValue.Type.TEXT, value, false)));
+    }
+
     @Test public void doesNotCreateMissingFilesForWritableProfiles() throws Exception {
         var source = fixture();
         Path absent = source.database().resolveSibling("absent.db");
