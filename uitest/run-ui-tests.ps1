@@ -145,7 +145,7 @@ public static class KaryoForgeUiPower {
         notebookPython=$notebookPython; ideMemoryMb=$ideMemory; runnerMemoryMb=512; physicalMemoryBytes=$system.TotalPhysicalMemory; logicalProcessors=$system.NumberOfLogicalProcessors} |
         ConvertTo-Json | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $results 'environment.json')
     $owned = @{}
-    $deadline = (Get-Date).AddMinutes($request.timeoutMinutes)
+    $timer = [Diagnostics.Stopwatch]::StartNew()
     do {
         if (-not [KaryoForgeUiPower]::HasUnlockedDesktop()) {
             throw 'The Windows test session locked or became inactive during GUI acceptance; unlock the desktop before restarting'
@@ -181,7 +181,7 @@ public static class KaryoForgeUiPower {
         @($owned.Values) | ConvertTo-Json -Depth 4 |
             Set-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'owned-descendants.json')
         if ($process.WaitForExit(1000)) { break }
-    } while ((Get-Date) -lt $deadline)
+    } while ($timer.Elapsed.TotalMinutes -lt $request.timeoutMinutes)
     if (-not $process.HasExited) { throw 'GUI suite exceeded the explicit timeout' }
     $process.WaitForExit()
     $code = $process.ExitCode
