@@ -2,6 +2,7 @@ package org.openkaryon.karyoforge.uitest
 
 import com.intellij.driver.client.Remote
 import com.intellij.driver.sdk.invokeAction
+import com.intellij.driver.sdk.ui.components.common.editor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.checkBox
@@ -59,6 +60,16 @@ class SqliteDatabasesUiTest {
                 x { contains(byVisibleText("Page 2 · 5 rows")) }
                     .shouldBe("The next page contains five rows", present, 1.minutes)
                 assertEquals("sample-201", table.getValueAt(0, 1))
+
+                button { byVisibleText("Open SQL Console") }.click()
+                val nativeSql = editor()
+                nativeSql.text = "SELECT 17 AS first;\nSELECT 42 AS second;"
+                nativeSql.click()
+                nativeSql.keyboard { hotKey(KeyEvent.VK_CONTROL, KeyEvent.VK_END) }
+                nativeSql.keyboard { hotKey(KeyEvent.VK_CONTROL, KeyEvent.VK_ENTER) }
+                x { contains(byVisibleText("Page 1 · 1 rows")) }
+                    .shouldBe("The native SQL action runs the statement at the caret", present, 1.minutes)
+                assertEquals("42", table.getValueAt(0, 0))
 
                 val sql = x { byAccessibleName("SQL statement") }
                 sql.click()

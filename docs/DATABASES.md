@@ -36,6 +36,16 @@ The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
 statement. **Stop** cancels the active query or page request. **Disconnect**
 releases the cursor, connection and driver lease.
 
+## SQL editor
+
+**Open SQL Console** opens a native editor tab bound to its data source.
+Use **Run SQL Selection / Current Statement** in that editor or in a
+project's `.sql` file, or press Ctrl+Enter. A console uses its bound source.
+A regular SQL file uses the connected source selected in the Databases
+tool window. Run, Stop, bindings and result pages share that window's
+connection. The editor highlights SQL tokens and completes keywords
+without opening any connection.
+
 ## Result views and export
 
 Use **Result Options** to add typed filters and sort keys across all

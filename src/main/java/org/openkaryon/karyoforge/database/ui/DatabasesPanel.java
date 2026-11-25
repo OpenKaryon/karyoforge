@@ -2,6 +2,7 @@ package org.openkaryon.karyoforge.database.ui;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
@@ -48,6 +49,7 @@ import java.util.function.Supplier;
 /** Native project view. The JDBC command lane and EDT never share a vendor object. */
 final class DatabasesPanel extends JPanel implements Disposable {
     private final Project project;
+    private final DatabaseEditorBridge editorBridge;
     private final DatabaseSources sources = ApplicationManager.getApplication().getService(DatabaseSources.class);
     private final ComboBox<DatabaseSources.Profile> profiles = new ComboBox<>();
     private final JBList<JdbcSession.SchemaObject> schema = new JBList<>();
@@ -82,6 +84,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JButton commit = button("Commit", () -> finishTransaction(true));
     private final JButton rollback = button("Rollback", () -> finishTransaction(false));
     private final JButton run = button("Run SQL", this::runSql);
+    private final JButton openConsole = button("Open SQL Console", this::openConsole);
     private final JButton next = button("Next Result Page", this::next);
     private final JButton stop = button("Stop", this::stop);
     private final JButton resultOptions = button("Result Options", this::showResultOptions);
@@ -107,6 +110,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     DatabasesPanel(Project project) {
         super(new BorderLayout(0, 4));
         this.project = project;
+        editorBridge = project.getService(DatabaseEditorBridge.class);
+        editorBridge.attach(this);
         profiles.getAccessibleContext().setAccessibleName("Database data sources");
         schema.getAccessibleContext().setAccessibleName("Database schema objects");
         schema.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -135,7 +140,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
-        queryPanel.add(controls(run, next, stop, resultOptions, export), BorderLayout.SOUTH);
+        queryPanel.add(controls(run, openConsole, next, stop, resultOptions, export), BorderLayout.SOUTH);
         var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, new JBScrollPane(table));
         queryAndResult.setResizeWeight(0.25);
         resultsTab.add(queryAndResult, BorderLayout.CENTER);
@@ -330,12 +335,40 @@ final class DatabasesPanel extends JPanel implements Disposable {
         }
     }
 
+    private void openConsole() {
+        var profile = selectedSource();
+        if (!connected || busy || profile == null) return;
+        var console = editorBridge.console(profile.id(), profile.source().name(), sql.getText());
+        FileEditorManager.getInstance(project).openFile(console, true);
+    }
+
+    void runFromEditor(String sourceId, String text, int start, int end) {
+        var profile = selectedSource();
+        if (!connected || profile == null) {
+            report("Connect a data source before running SQL from the editor.");
+            return;
+        }
+        if (sourceId != null && !sourceId.equals(profile.id())) {
+            report("Select and connect this console's data source before running SQL.");
+            return;
+        }
+        if (busy) {
+            report("Wait for the current database operation to finish or choose Stop.");
+            return;
+        }
+        runSql(text, start, end);
+    }
+
     private void runSql() {
+        runSql(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd());
+    }
+
+    private void runSql(String text, int start, int end) {
         if (!connected || busy) return;
         SqlText.Command command;
         try {
             var dialect = activeSource.dialect();
-            command = SqlText.compile(SqlText.activeStatement(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd(), dialect), dialect);
+            command = SqlText.compile(SqlText.activeStatement(text, start, end, dialect), dialect);
         } catch (IllegalArgumentException malformed) {
             report(malformed.getMessage());
             return;
@@ -725,6 +758,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         commit.setEnabled(!busy && connected && writable);
         rollback.setEnabled(!busy && connected && writable);
         run.setEnabled(!busy && connected);
+        openConsole.setEnabled(!busy && connected);
         boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
         show.setEnabled(canBrowse);
         inspect.setEnabled(canBrowse);
@@ -758,6 +792,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     @Override public void dispose() {
         disposed = true;
+        editorBridge.detach(this);
         if (active != null) cancels.execute(active::stop);
         commands.execute(() -> {
             if (session != null) session.close();

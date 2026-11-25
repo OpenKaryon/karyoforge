@@ -18,6 +18,14 @@
     <depends>org.jetbrains.plugins.terminal</depends>
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="KaryoForge Databases" anchor="bottom" factoryClass="org.openkaryon.karyoforge.database.ui.DatabasesToolWindowFactory"/>
+        <fileType name="KaryoForge SQL" language="KaryoForgeSQL" extensions="sql"
+                  implementationClass="org.openkaryon.karyoforge.database.sql.DatabaseSqlFileType" fieldName="INSTANCE"/>
+        <lang.parserDefinition language="KaryoForgeSQL"
+                               implementationClass="org.openkaryon.karyoforge.database.sql.DatabaseSqlParser"/>
+        <lang.syntaxHighlighterFactory language="KaryoForgeSQL"
+                                       implementationClass="org.openkaryon.karyoforge.database.sql.DatabaseSqlHighlighter"/>
+        <completion.contributor language="KaryoForgeSQL"
+                                implementationClass="org.openkaryon.karyoforge.database.sql.DatabaseSqlCompletion"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.biology.preview.BiologyPreviewProvider$TextType"/>
         <fileEditorProvider implementation="org.openkaryon.karyoforge.biology.preview.BiologyPreviewProvider"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.data.preview.DelimitedPreviewProvider$TextType"/>
@@ -34,6 +42,12 @@
                                   implementationClass="org.openkaryon.karyoforge.languages.python.MissingPythonInterpreterSuppressor"/>
     </extensions>
     <actions>
+        <action id="org.openkaryon.karyoforge.database.runSql" text="Run SQL Selection / Current Statement"
+                description="Run the selected SQL or statement at the caret on the database connection"
+                class="org.openkaryon.karyoforge.database.sql.RunDatabaseSqlAction">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut first-keystroke="control ENTER" keymap="$default"/>
+        </action>
         <group id="org.openkaryon.karyoforge.tools" text="KaryoForge" popup="true">
             <action id="org.openkaryon.karyoforge.notebook.new" text="New Jupyter Notebook..."
                     description="Create a local notebook without starting a Python runtime"
