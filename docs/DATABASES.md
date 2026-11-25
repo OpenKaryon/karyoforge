@@ -69,7 +69,11 @@ project's `.sql` file, or press Ctrl+Enter. A console selects and uses its bound
 source even when a different source was selected in the tool window.
 A regular SQL file uses the connected source selected in the Databases
 tool window. Run, Stop, bindings and result pages share that window's
-connection. The editor highlights SQL tokens and completes keywords.
+connection. Each editor keeps its fetched results. Selecting that editor
+restores its results in the Databases window. Only the editor that owns the
+current cursor can fetch another page. Running another statement closes the
+previous cursor and keeps the previous editor's fetched rows available.
+The editor highlights SQL tokens and completes keywords.
 After opening or refreshing a connection's catalog, SQL completion can
 suggest its tables and views. **Inspect** or **Open Table** loads column
 names that the editor can complete for a simple SELECT, including a

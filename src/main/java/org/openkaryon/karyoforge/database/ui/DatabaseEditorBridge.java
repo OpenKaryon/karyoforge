@@ -21,6 +21,7 @@ public final class DatabaseEditorBridge {
     private final Project project;
     private final ConcurrentHashMap<String, LoadedDatabaseCatalog> catalogs = new ConcurrentHashMap<>();
     private volatile String selectedCatalog;
+    private VirtualFile selectedEditor;
     private static final Key<String> CONSOLE_SOURCE = Key.create("org.openkaryon.karyoforge.database.consoleSource");
     private DatabasesPanel panel;
 
@@ -60,11 +61,26 @@ public final class DatabaseEditorBridge {
         return editor;
     }
 
+    VirtualFile selectedEditor() { return selectedEditor; }
+
+    void editorSelected(VirtualFile file) {
+        selectedEditor = file;
+        if (panel != null) panel.editorSelected(file);
+    }
+
+    void editorClosed(VirtualFile file) {
+        if (selectedEditor == file) editorSelected(null);
+        if (panel != null) panel.editorClosed(file);
+    }
+
     public void run(VirtualFile editor, String text, int start, int end, boolean explain) {
         var window = ToolWindowManager.getInstance(project).getToolWindow(DatabasesToolWindowFactory.ID);
         if (window == null) return;
         window.show(() -> {
-            if (panel != null) panel.runFromEditor(editor.getUserData(CONSOLE_SOURCE), text, start, end, explain);
+            if (panel != null) {
+                editorSelected(editor);
+                panel.runFromEditor(editor.getUserData(CONSOLE_SOURCE), editor, text, start, end, explain);
+            }
         });
     }
 }

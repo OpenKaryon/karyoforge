@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import org.openkaryon.karyoforge.database.core.ClickHouseSource;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
@@ -97,6 +98,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
             selected = workspaces.computeIfAbsent(profile.id(),
                     id -> new DatabaseSessionPanel(project, profile, editorBridge, this::updateControls));
             selected.updateProfile(profile);
+            selected.selectEditorResult(editorBridge.selectedEditor());
             toolbar.add(selected.actionButtons());
             viewer.add(selected, BorderLayout.CENTER);
         }
@@ -108,7 +110,15 @@ final class DatabasesPanel extends JPanel implements Disposable {
         updateControls();
     }
 
-    void runFromEditor(String sourceId, String text, int start, int end, boolean explain) {
+    void editorSelected(VirtualFile file) {
+        if (selected != null) selected.selectEditorResult(file);
+    }
+
+    void editorClosed(VirtualFile file) {
+        for (var workspace : workspaces.values()) workspace.closeEditorResult(file);
+    }
+
+    void runFromEditor(String sourceId, VirtualFile editor, String text, int start, int end, boolean explain) {
         if (sourceId != null) {
             var target = sources.profiles().stream().filter(profile -> profile.id().equals(sourceId)).findFirst().orElse(null);
             if (target == null) {
@@ -118,7 +128,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
             if (selectedSource() == null || !sourceId.equals(selectedSource().id())) refreshProfiles(sourceId);
         }
         if (selected == null) report("Connect a data source before running SQL from the editor.");
-        else selected.runFromEditor(text, start, end, explain);
+        else selected.runFromEditor(editor, text, start, end, explain);
     }
 
     private void updateControls() {

@@ -6,6 +6,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBScrollPane;
@@ -38,6 +39,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.Map;
@@ -102,10 +104,10 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private boolean busy;
     private boolean disposed;
     private QueryRequest active;
-    private QueryPage page;
-    private FetchedResults fetched;
-    private List<FetchedResults.Filter> filters = List.of();
-    private List<FetchedResults.Sort> ordering = List.of();
+    private final QueryResults inlineResults = new QueryResults();
+    private final Map<VirtualFile, QueryResults> editorResults = new IdentityHashMap<>();
+    private QueryResults shownResults = inlineResults;
+    private QueryResults cursorOwner;
     private TableSnapshot editableTable;
     private JdbcSession.SchemaObject tableObject;
     private QueryPage tablePage;
@@ -335,7 +337,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             activeSource = null;
             editorBridge.forgetCatalog(profile.id());
             showSchema(List.of());
-            clearResult();
+            clearAllResults();
             details.setSelectedComponent(resultsTab);
             details.setEnabledAt(1, false);
             details.setEnabledAt(2, false);
@@ -359,7 +361,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         FileEditorManager.getInstance(project).openFile(console, true);
     }
 
-    void runFromEditor(String text, int start, int end, boolean plan) {
+    void runFromEditor(VirtualFile editor, String text, int start, int end, boolean plan) {
         if (!connected) {
             report("Connect a data source before running SQL from the editor.");
             return;
@@ -368,16 +370,16 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             report("Wait for the current database operation to finish or choose Stop.");
             return;
         }
-        runSql(text, start, end, plan);
+        runSql(text, start, end, plan, editor);
     }
 
     private void runSql() { runInline(false); }
 
     private void runInline(boolean plan) {
-        runSql(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd(), plan);
+        runSql(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd(), plan, null);
     }
 
-    private void runSql(String text, int start, int end, boolean plan) {
+    private void runSql(String text, int start, int end, boolean plan, VirtualFile editor) {
         if (!connected || busy) return;
         SqlText.Command command;
         try {
@@ -397,7 +399,12 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         if (!discardTableDraft()) return;
         var request = new QueryRequest();
         var bindings = values;
-        submit(plan ? "Planning SQL…" : "Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
+        endPaging();
+        QueryResults target = editor == null ? inlineResults : editorResults.computeIfAbsent(editor, ignored -> new QueryResults());
+        selectResults(target);
+        cursorOwner = target;
+        submit(plan ? "Planning SQL…" : "Running SQL…", request,
+                () -> session.execute(command, bindings, request), result -> showResult(target, result));
     }
 
     private void openTable() {
@@ -425,12 +432,12 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void loadTable(TableQuery query) {
+        endPaging();
         var request = new QueryRequest();
         submit("Opening table data…", request, () -> session.openTable(query, request), this::showTable);
     }
 
     private void showTable(TableSnapshot snapshot) {
-        clearResult();
         showDefinition(snapshot.definition());
         editableTable = snapshot;
         tableObject = snapshot.definition().object();
@@ -627,34 +634,60 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             session.finishTransaction(commitChanges);
             return Boolean.TRUE;
         }, ignored -> {
-            clearResult();
+            endPaging();
             report(commitChanges ? "Transaction committed." : "Transaction rolled back.");
         });
     }
 
-    private void clearResult() {
-        page = null;
-        fetched = null;
-        filters = List.of();
-        ordering = List.of();
-        table.setModel(new javax.swing.table.DefaultTableModel());
+    private void clearAllResults() {
+        cursorOwner = null;
+        editorResults.clear();
+        inlineResults.clear();
+        shownResults = inlineResults;
+        renderResults();
     }
 
-    private void showResult(SqlResult result) {
+    void selectEditorResult(VirtualFile editor) {
+        selectResults(editorResults.getOrDefault(editor, inlineResults));
+    }
+
+    void closeEditorResult(VirtualFile editor) {
+        var removed = editorResults.remove(editor);
+        if (removed == null) return;
+        if (shownResults == removed) selectResults(inlineResults);
+        if (cursorOwner == removed) {
+            if (busy && active != null) stop();
+            else if (!busy) stopRetained();
+        }
+    }
+
+    private void selectResults(QueryResults target) {
+        if (target == shownResults) return;
+        shownResults = target;
+        renderResults();
+        updateControls();
+    }
+
+    private void showResult(QueryResults target, SqlResult result) {
         if (result instanceof QueryPage query) {
-            showPage(query);
+            showPage(target, query);
         } else if (result instanceof SqlResult.UpdateCount count) {
-            clearResult();
-            details.setSelectedComponent(resultsTab);
+            target.clear();
+            cursorOwner = null;
+            if (target == shownResults) {
+                renderResults();
+                details.setSelectedComponent(resultsTab);
+            }
             report(count.rows() < 0 ? "Statement completed. Changes are pending."
                     : count.rows() + " affected rows. Changes are pending.");
         }
     }
 
     private void next() {
-        if (page == null || !page.hasNext()) return;
+        var target = shownResults;
+        if (cursorOwner != target || !hasNext(target.page)) return;
         var request = new QueryRequest();
-        submit("Reading the next result page…", request, () -> session.next(request), this::showPage);
+        submit("Reading the next result page…", request, () -> session.next(request), result -> showPage(target, result));
     }
 
     private <T> void submit(String pending, QueryRequest request, Supplier<T> operation, Consumer<T> complete) {
@@ -695,11 +728,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private void stop() {
         QueryRequest request = active;
         if (request == null) {
-            if (!busy && (hasNext(page) || hasNext(tablePage))) {
-                endPaging();
-                submit("Closing the retained result…", null, () -> session.stopPaging(),
-                        closed -> report(closed ? "Stopped paging. Fetched rows are still available." : "This result has no next page."));
-            }
+            if (!busy) stopRetained();
             return;
         }
         stop.setEnabled(false);
@@ -708,8 +737,16 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         cancels.execute(request::stop);
     }
 
+    private void stopRetained() {
+        if ((cursorOwner == null || !hasNext(cursorOwner.page)) && !hasNext(tablePage)) return;
+        endPaging();
+        submit("Closing the retained result…", null, () -> session.stopPaging(),
+                closed -> report(closed ? "Stopped paging. Fetched rows are still available." : "This result has no next page."));
+    }
+
     private void endPaging() {
-        page = withoutNextPage(page);
+        if (cursorOwner != null) cursorOwner.page = withoutNextPage(cursorOwner.page);
+        cursorOwner = null;
         tablePage = withoutNextPage(tablePage);
     }
 
@@ -719,21 +756,36 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private static boolean hasNext(QueryPage page) { return page != null && page.hasNext(); }
 
-    private void showPage(QueryPage result) {
-        page = result;
+    private void showPage(QueryResults target, QueryPage result) {
+        target.page = result;
         if (result.page() == 1) {
-            fetched = FetchedResults.first(result);
-            filters = List.of();
-            ordering = List.of();
+            target.fetched = FetchedResults.first(result);
+            target.filters = List.of();
+            target.ordering = List.of();
         } else {
-            fetched = fetched.append(result);
+            target.fetched = target.fetched.append(result);
+        }
+        cursorOwner = result.hasNext() ? target : null;
+        if (target != shownResults) {
+            report("Fetched " + result.rows().size() + " rows in another editor.");
+            if (target != inlineResults && !editorResults.containsValue(target)) stopRetained();
+            return;
         }
         details.setSelectedComponent(resultsTab);
-        if (filters.isEmpty() && ordering.isEmpty()) {
+        renderResults();
+    }
+
+    private void renderResults() {
+        var state = shownResults;
+        if (state.page == null) {
+            table.setModel(new javax.swing.table.DefaultTableModel());
+            return;
+        }
+        if (state.filters.isEmpty() && state.ordering.isEmpty()) {
             showCurrentPage();
         } else {
             try {
-                showFetchedView(fetched.view(filters, ordering));
+                showFetchedView(state.fetched.view(state.filters, state.ordering));
             } catch (IllegalArgumentException incomparable) {
                 clearTransforms();
                 report(incomparable.getMessage() + " Fetched rows are retained.");
@@ -742,9 +794,24 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void showCurrentPage() {
+        var page = shownResults.page;
         displayResult(page.columns(), page.rows());
         report("Page " + page.page() + " · " + page.rows().size() + " rows"
                 + (page.notice().isEmpty() ? "" : " · " + page.notice()));
+    }
+
+    private static final class QueryResults {
+        private QueryPage page;
+        private FetchedResults fetched;
+        private List<FetchedResults.Filter> filters = List.of();
+        private List<FetchedResults.Sort> ordering = List.of();
+
+        void clear() {
+            page = null;
+            fetched = null;
+            filters = List.of();
+            ordering = List.of();
+        }
     }
 
     private void displayResult(List<QueryPage.Column> columns, List<QueryPage.Row> rows) {
@@ -768,43 +835,45 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         sort.addActionListener(event -> addTransform(false));
         menu.add(sort);
         var clear = new JMenuItem("Clear filters and sort");
-        clear.setEnabled(!filters.isEmpty() || !ordering.isEmpty());
+        clear.setEnabled(!shownResults.filters.isEmpty() || !shownResults.ordering.isEmpty());
         clear.addActionListener(event -> clearTransforms());
         menu.add(clear);
         menu.show(resultOptions, 0, resultOptions.getHeight());
     }
 
     private void addTransform(boolean filtering) {
-        var results = fetched;
+        var target = shownResults;
+        var results = target.fetched;
         if (results == null) return;
         var dialog = new ResultOptionsDialog(project, results.columns(), filtering);
         if (!dialog.showAndGet()) return;
-        var requestedFilters = new ArrayList<>(filters);
-        var requestedOrder = new ArrayList<>(ordering);
+        var requestedFilters = new ArrayList<>(target.filters);
+        var requestedOrder = new ArrayList<>(target.ordering);
         if (filtering) requestedFilters.add(dialog.filter());
         else requestedOrder.add(dialog.sort());
         submit("Updating the local result view…", null, () -> results.view(requestedFilters, requestedOrder), view -> {
-            filters = List.copyOf(requestedFilters);
-            ordering = List.copyOf(requestedOrder);
-            showFetchedView(view);
+            target.filters = List.copyOf(requestedFilters);
+            target.ordering = List.copyOf(requestedOrder);
+            if (target == shownResults) showFetchedView(view);
         });
     }
 
     private void showFetchedView(FetchedResults.View view) {
         displayResult(view.columns(), view.rows());
         report("Local view · " + view.rows().size() + " visible of " + view.fetchedCount() + " fetched rows"
-                + " · " + page.page() + " pages");
+                + " · " + shownResults.page.page() + " pages");
     }
 
     private void clearTransforms() {
-        filters = List.of();
-        ordering = List.of();
+        shownResults.filters = List.of();
+        shownResults.ordering = List.of();
         showCurrentPage();
     }
 
     private void exportResults() {
-        if (fetched == null) return;
-        FetchedResults.View view = fetched.view(filters, ordering);
+        var state = shownResults;
+        if (state.fetched == null) return;
+        FetchedResults.View view = state.fetched.view(state.filters, state.ordering);
         var dialog = new ResultExportDialog(project, view);
         if (!dialog.showAndGet()) return;
         var path = dialog.destination();
@@ -865,11 +934,12 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             editRow.setToolTipText(reason.isEmpty() ? null : reason);
             deleteRow.setToolTipText(editRow.getToolTipText());
         }
-        boolean hasResults = !busy && connected && fetched != null && !fetched.columns().isEmpty();
+        boolean hasResults = !busy && connected && shownResults.fetched != null && !shownResults.fetched.columns().isEmpty();
         resultOptions.setEnabled(hasResults);
         export.setEnabled(hasResults);
-        next.setEnabled(!busy && connected && page != null && page.hasNext());
-        stop.setEnabled(busy ? active != null : connected && hasNext(page));
+        boolean canPage = connected && cursorOwner == shownResults && hasNext(shownResults.page);
+        next.setEnabled(!busy && canPage);
+        stop.setEnabled(busy ? active != null : canPage);
         stopTable.setEnabled(busy ? active != null : connected && hasNext(tablePage));
         onStateChanged.run();
     }

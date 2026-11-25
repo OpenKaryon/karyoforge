@@ -126,7 +126,10 @@ tasks.test {
         nativeDirectory.mkdirs()
     }
     val sqliteDriver = providers.gradleProperty("sqliteDriver").orElse("").get()
-    if (sqliteDriver.isBlank()) exclude("**/SqliteJdbcSessionTest.class")
+    if (sqliteDriver.isBlank()) {
+        exclude("**/SqliteJdbcSessionTest.class")
+        exclude("**/DatabaseEditorResultsTest.class")
+    }
     systemProperty("karyoforge.database.sqlite.driver", sqliteDriver)
     val postgresDriver = providers.gradleProperty("postgresDriver").orElse("").get()
     if (postgresDriver.isBlank()) exclude("**/PostgresqlJdbcSessionTest.class")

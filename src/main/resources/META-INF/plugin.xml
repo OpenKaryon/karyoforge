@@ -43,6 +43,10 @@
         <lang.inspectionSuppressor language="Python"
                                   implementationClass="org.openkaryon.karyoforge.languages.python.MissingPythonInterpreterSuppressor"/>
     </extensions>
+    <projectListeners>
+        <listener class="org.openkaryon.karyoforge.database.ui.DatabaseEditorSelectionListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
     <actions>
         <action id="org.openkaryon.karyoforge.database.runSql" text="Run SQL Selection / Current Statement"
                 description="Run the selected SQL or statement at the caret on the database connection"
