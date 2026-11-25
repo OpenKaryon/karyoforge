@@ -125,7 +125,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean ready = selected != null && !selected.busy();
         edit.setEnabled(ready);
         limits.setEnabled(ready);
-        remove.setEnabled(ready && !selected.connected());
+        remove.setEnabled(ready && !selected.connected() && !selected.cleanupPending());
     }
 
     private void report(String status) {
@@ -201,7 +201,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     private void removeSource() {
         var profile = selectedSource();
-        if (profile == null || selected == null || selected.busy() || selected.connected()) return;
+        if (profile == null || selected == null || selected.busy() || selected.connected() || selected.cleanupPending()) return;
         int result = Messages.showYesNoDialog(project, "Remove the saved data source from the IDE?",
                 "Remove Data Source", Messages.getQuestionIcon());
         if (result != Messages.YES) return;

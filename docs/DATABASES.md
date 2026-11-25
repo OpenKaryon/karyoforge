@@ -56,7 +56,10 @@ default. Network connection and OpenSSH handshake timeouts default to 15 seconds
 ClickHouse also verifies the server budget against the configured query timeout.
 The owning session retains its resources while a driver is still cancelling.
 Between pages, **Stop** closes the retained cursor while keeping fetched rows
-and the current transaction. **Disconnect** releases the cursor, connection and driver lease.
+and the current transaction. **Disconnect** releases the cursor, connection
+and driver lease. If cleanup is still pending, the project retains the
+session owner and offers **Retry Driver Cleanup** for that source. The retry
+works on retired connections and temporary connection tests.
 
 ## SQL editor
 

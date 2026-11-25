@@ -49,6 +49,7 @@ import java.util.function.Supplier;
 final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final Project project;
     private final DatabaseEditorBridge editorBridge;
+    private final DatabaseDriverCleanup cleanup = ApplicationManager.getApplication().getService(DatabaseDriverCleanup.class);
     private final Runnable onStateChanged;
     private DatabaseSources.Profile profile;
     private final DatabaseSchemaTree schema = new DatabaseSchemaTree(this::loadTreeColumns);
@@ -68,6 +69,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final JButton connect = button("Connect", this::connect);
     private final JButton testConnection = button("Test Connection", this::testConnection);
     private final JButton disconnect = button("Disconnect", this::disconnect);
+    private final JButton retryCleanup = button("Retry Driver Cleanup", this::retryDriverCleanup);
     private final JButton show = button("Show Rows", this::showRows);
     private final JButton inspect = button("Inspect", this::inspect);
     private final JButton openTable = button("Open Table", this::openTable);
@@ -88,7 +90,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final JButton stop = button("Stop", this::stop);
     private final JButton resultOptions = button("Result Options", this::showResultOptions);
     private final JButton export = button("Export Results", this::exportResults);
-    private final JPanel actionButtons = controls(connect, testConnection, disconnect, commit, rollback);
+    private final JPanel actionButtons = controls(connect, testConnection, disconnect, retryCleanup, commit, rollback);
     private final java.util.concurrent.ExecutorService commands =
             Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("KaryoForge database command").factory());
     private final java.util.concurrent.ExecutorService cancels =
@@ -209,6 +211,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     JPanel actionButtons() { return actionButtons; }
     boolean busy() { return busy; }
     boolean connected() { return connected; }
+    boolean cleanupPending() { return cleanup.pending(profile.id()); }
 
     void queueCredentialCleanup(Runnable cleanup) { commands.execute(cleanup); }
 
@@ -242,12 +245,15 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         }
         submit("Testing " + requested.source().engine() + " connection…", null, () -> {
             char[] password = input.password();
-            try (var probe = new JdbcSession(requested.source(), requested.limits(), requested.timeouts())) {
+            JdbcSession probe = null;
+            try {
+                probe = new JdbcSession(requested.source(), requested.limits(), requested.timeouts());
                 password = resolvePassword(requested, password);
                 probe.connect(password);
                 return true;
             } finally {
                 Arrays.fill(password, '\0');
+                if (probe != null) cleanup.release(requested.id(), probe::close);
             }
         }, ignored -> report("Connection test passed. The temporary session was closed."));
     }
@@ -264,7 +270,10 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         submit("Connecting to " + requested.source().engine() + "…", null, () -> {
             char[] password = input.password();
             try {
-                if (session != null) session.close();
+                releaseSession(requested.id());
+                if (cleanup.pending(requested.id())) {
+                    throw new DatabaseProblem("Retry Driver Cleanup before connecting this source.");
+                }
                 password = resolvePassword(requested, password);
                 session = new JdbcSession(requested.source(), requested.limits(), requested.timeouts());
                 session.connect(password);
@@ -278,9 +287,8 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
                     }
                 }
                 return new Connected(objects, saved);
-            } catch (DatabaseProblem unavailable) {
-                if (session != null) session.close();
-                session = null;
+            } catch (RuntimeException | LinkageError unavailable) {
+                releaseSession(requested.id());
                 throw unavailable;
             } finally {
                 Arrays.fill(password, '\0');
@@ -298,15 +306,30 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private record Connected(List<JdbcSession.SchemaObject> objects, boolean passwordSaved) {}
 
+    private void releaseSession(String sourceId) {
+        JdbcSession owner = session;
+        session = null;
+        if (owner != null) cleanup.release(sourceId, owner::close);
+    }
+
+    private void retryDriverCleanup() {
+        String sourceId = profile.id();
+        submit("Retrying driver cleanup…", null, () -> cleanup.retry(sourceId),
+                released -> report(released ? "Database driver cleanup completed."
+                        : "Database driver cleanup is still pending."));
+    }
+
     private void disconnect() {
         if (!discardTableDraft()) return;
+        String sourceId = profile.id();
         submit("Disconnecting…", null, () -> {
-            if (session != null) {
-                session.close();
-                session = null;
+            try {
+                releaseSession(sourceId);
+                return true;
+            } catch (DatabaseProblem pending) {
+                return false;
             }
-            return Boolean.TRUE;
-        }, ignored -> {
+        }, released -> {
             connected = false;
             writable = false;
             activeSource = null;
@@ -318,7 +341,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             details.setEnabledAt(2, false);
             definition.setText("");
             structure.setModel(new javax.swing.table.DefaultTableModel());
-            report("Disconnected.");
+            report(released ? "Disconnected." : "Source closed for new queries. Driver cleanup is pending.");
         });
     }
 
@@ -806,8 +829,11 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void updateControls() {
-        connect.setEnabled(!busy && !connected);
-        testConnection.setEnabled(!busy);
+        boolean cleanupPending = cleanupPending();
+        connect.setEnabled(!busy && !connected && !cleanupPending);
+        testConnection.setEnabled(!busy && !cleanupPending);
+        retryCleanup.setVisible(cleanupPending);
+        retryCleanup.setEnabled(cleanupPending && !busy);
         disconnect.setEnabled(!busy && connected);
         refresh.setEnabled(!busy && connected);
         commit.setVisible(writable);
@@ -857,8 +883,13 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     @Override public void dispose() {
         disposed = true;
         if (active != null) cancels.execute(active::stop);
+        String sourceId = profile.id();
         commands.execute(() -> {
-            if (session != null) session.close();
+            try {
+                releaseSession(sourceId);
+            } catch (DatabaseProblem pending) {
+                // The application still owns the retired session through DatabaseDriverCleanup.
+            }
         });
         commands.shutdown();
         cancels.shutdown();

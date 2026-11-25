@@ -24,6 +24,7 @@ final class ClickHouseConnection implements AutoCloseable {
     private Connection exposed;
     private boolean opening = true;
     private volatile boolean quarantined;
+    private volatile ClickHouseGateway.Permit unconfirmed;
 
     ClickHouseConnection(ClickHouseSource source, DatabaseTimeouts timeouts) {
         this.source = source;
@@ -176,6 +177,7 @@ final class ClickHouseConnection implements AutoCloseable {
             // Require independent confirmation before the session can be reused.
         }
         quarantined = true;
+        unconfirmed = permit;
         throw new SQLException("ClickHouse request cancellation could not be confirmed.", "HY000");
     }
 
@@ -189,6 +191,11 @@ final class ClickHouseConnection implements AutoCloseable {
     }
 
     @Override public void close() throws SQLException {
+        var request = unconfirmed;
+        if (request != null) {
+            cancel(request);
+            unconfirmed = null;
+        }
         if (client != null) {
             client.close();
             client = null;
