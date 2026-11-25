@@ -22,6 +22,8 @@ final class PostgresqlSourceDialog extends DialogWrapper {
     private final JBTextField database = new JBTextField("postgres", 30);
     private final JBTextField user = new JBTextField(30);
     private final TextFieldWithBrowseButton driver = new TextFieldWithBrowseButton();
+    private final TextFieldWithBrowseButton ca = new TextFieldWithBrowseButton();
+    private final JBCheckBox tls = new JBCheckBox("Verify server TLS certificate and host name");
     private final JBCheckBox writable = new JBCheckBox("Allow writes (manual Commit and Rollback)");
 
     PostgresqlSourceDialog(Project project, PostgresqlSource existing) {
@@ -30,6 +32,9 @@ final class PostgresqlSourceDialog extends DialogWrapper {
         setOKButtonText("Save");
         driver.addBrowseFolderListener(project, FileChooserDescriptorFactory.singleFile()
                 .withTitle("Choose a Trusted PostgreSQL JDBC JAR").withFileFilter(file -> "jar".equalsIgnoreCase(file.getExtension())));
+        ca.addBrowseFolderListener(project, FileChooserDescriptorFactory.singleFile()
+                .withTitle("Choose the PostgreSQL CA Certificate"));
+        tls.addActionListener(event -> ca.setEnabled(tls.isSelected()));
         if (existing != null) {
             name.setText(existing.name());
             host.setText(existing.host());
@@ -38,7 +43,10 @@ final class PostgresqlSourceDialog extends DialogWrapper {
             user.setText(existing.user());
             driver.setText(existing.driver().toString());
             writable.setSelected(existing.writable());
+            tls.setSelected(existing.verifiedTls());
+            if (existing.verifiedTls()) ca.setText(existing.caFile().toString());
         }
+        ca.setEnabled(tls.isSelected());
         init();
     }
 
@@ -50,7 +58,7 @@ final class PostgresqlSourceDialog extends DialogWrapper {
             throw new IllegalArgumentException("Enter an integer port.");
         }
         return new PostgresqlSource(name.getText(), host.getText(), number, database.getText(), user.getText(),
-                Path.of(driver.getText().strip()), writable.isSelected());
+                Path.of(driver.getText().strip()), writable.isSelected(), tls.isSelected() ? Path.of(ca.getText().strip()) : null);
     }
 
     @Override protected @Nullable ValidationInfo doValidate() {
@@ -58,7 +66,7 @@ final class PostgresqlSourceDialog extends DialogWrapper {
             source();
             return null;
         } catch (java.nio.file.InvalidPathException invalid) {
-            return new ValidationInfo("Choose a valid JDBC JAR path.", driver);
+            return new ValidationInfo("Choose valid local paths for the JDBC JAR and the CA certificate.");
         } catch (IllegalArgumentException invalid) {
             return new ValidationInfo(invalid.getMessage());
         }
@@ -72,8 +80,10 @@ final class PostgresqlSourceDialog extends DialogWrapper {
                 .addLabeledComponent("Database", database)
                 .addLabeledComponent("User", user)
                 .addLabeledComponent("Trusted JDBC JAR", driver)
+                .addComponent(tls)
+                .addLabeledComponent("CA certificate", ca)
                 .addComponent(writable)
-                .addComponent(new JBLabel("A direct connection uses a loopback address. Saving the source does not connect."))
+                .addComponent(new JBLabel("Connections without TLS use loopback. Saving the source does not connect."))
                 .getPanel();
     }
 

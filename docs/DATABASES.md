@@ -67,10 +67,13 @@ batch while keeping earlier pending SQL changes.
 
 ## PostgreSQL
 
-Choose **Add PostgreSQL Source** to connect via a direct loopback endpoint and
-an explicitly selected pgJDBC JAR. The profile stores the endpoint, database
-and user name. **Connect** asks for the password for that session. The
-default access mode is an engine-enforced read-only transaction.
+Choose **Add PostgreSQL Source** and an explicitly selected pgJDBC JAR.
+Connections without TLS are limited to loopback. For verified TLS, enable
+**Verify server TLS certificate and host name** and select the server's CA
+certificate. The connection requires that CA and that the certificate match
+the configured host name or IP. The profile stores the endpoint, database,
+user name and CA path. **Connect** asks for the password for that session.
+The default access mode is an engine-enforced read-only transaction.
 A PostgreSQL profile configured for writes uses manual **Commit** and
 **Rollback**. A failed or stopped statement rolls back to its own
 savepoint, preserving earlier pending work.

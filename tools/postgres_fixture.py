@@ -10,6 +10,7 @@ import re
 import secrets
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 import time
 
 from tasks import ROOT, gradle_command
@@ -21,6 +22,35 @@ DATABASE = "karyoforge_acceptance"
 def docker(*args: str, env: dict[str, str] | None = None) -> str:
     return subprocess.run(["docker", *args], env=env, check=True, stdout=subprocess.PIPE,
                           text=True, encoding="utf-8", timeout=240).stdout.strip()
+
+
+
+def provision_tls(container: str, directory: Path) -> dict[str, str]:
+    setup = r"""
+set -eu
+material="$(mktemp -d /tmp/karyoforge-pg-tls-XXXXXX)"
+cd "$material"
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 -subj '/CN=KaryoForge Fixture CA' \
+    -addext 'basicConstraints=critical,CA:TRUE' -keyout ca.key -out ca.pem >/dev/null 2>&1
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 -subj '/CN=Unrelated fixture CA' \
+    -addext 'basicConstraints=critical,CA:TRUE' -keyout other.key -out other.pem >/dev/null 2>&1
+openssl req -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' \
+    -keyout "$PGDATA/server.key" -out certificate.req >/dev/null 2>&1
+printf '%s\n' 'subjectAltName=DNS:localhost' 'extendedKeyUsage=serverAuth' > extensions
+openssl x509 -req -in certificate.req -CA ca.pem -CAkey ca.key -CAcreateserial \
+    -days 2 -sha256 -extfile extensions -out "$PGDATA/server.crt" >/dev/null 2>&1
+chmod 600 "$PGDATA/server.key"
+psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER SYSTEM SET ssl = 'on'" >/dev/null
+pg_ctl reload -D "$PGDATA" >/dev/null
+printf '%s\n' "$material"
+"""
+    location = docker("exec", "-u", "postgres", container, "/bin/sh", "-c", setup)
+    if not re.fullmatch(r"/tmp/karyoforge-pg-tls-[A-Za-z0-9]+", location):
+        raise ValueError("PostgreSQL fixture did not report its certificate directory")
+    for name in ("ca.pem", "other.pem"):
+        docker("cp", f"{container}:{location}/{name}", str(directory / name))
+    return {"KARYOFORGE_TEST_PG_CA": str(directory / "ca.pem"),
+            "KARYOFORGE_TEST_PG_OTHER_CA": str(directory / "other.pem")}
 
 
 def main() -> int:
@@ -61,8 +91,10 @@ def main() -> int:
         if args.offline_gradle:
             selection.insert(0, "--offline")
         tests = {**os.environ, "KARYOFORGE_TEST_PG_PORT": binding.group(1), "KARYOFORGE_TEST_PG_PASSWORD": password}
-        print("Running JDBC acceptance on the owned PostgreSQL 17.11 container.", flush=True)
-        return subprocess.run(gradle_command(ROOT, selection), cwd=ROOT, env=tests, check=False).returncode
+        with TemporaryDirectory(prefix="karyoforge-pg-certs-") as directory:
+            tests.update(provision_tls(container, Path(directory)))
+            print("Running JDBC acceptance on the owned PostgreSQL 17.11 container.", flush=True)
+            return subprocess.run(gradle_command(ROOT, selection), cwd=ROOT, env=tests, check=False).returncode
     finally:
         docker("stop", "--time", "3", container)
 

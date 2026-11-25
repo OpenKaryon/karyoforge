@@ -1,5 +1,6 @@
 package org.openkaryon.karyoforge.database.core;
 
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.PreparedStatement;
@@ -22,10 +23,18 @@ final class PostgresqlBackend implements JdbcBackend {
     @Override public String driverClass() { return "org.postgresql.Driver"; }
 
     @Override public Connection connect(Driver driver, char[] password) throws SQLException {
+        if (source.verifiedTls() && !Files.isRegularFile(source.caFile())) {
+            throw new DatabaseProblem("Choose an existing PostgreSQL CA certificate file.");
+        }
         var properties = new Properties();
         properties.setProperty("user", source.user());
         properties.setProperty("password", password == null ? "" : new String(password));
-        properties.setProperty("sslmode", "disable");
+        if (source.verifiedTls()) {
+            properties.setProperty("sslmode", "verify-full");
+            properties.setProperty("sslrootcert", source.caFile().toString());
+        } else {
+            properties.setProperty("sslmode", "disable");
+        }
         properties.setProperty("gssEncMode", "disable");
         properties.setProperty("sslcert", "");
         properties.setProperty("sslkey", "");

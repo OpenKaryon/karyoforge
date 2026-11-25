@@ -47,6 +47,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     row.port = postgres.port();
                     row.database = postgres.database();
                     row.user = postgres.user();
+                    if (postgres.verifiedTls()) row.caFile = postgres.caFile().toString();
                 }
             }
             state.entries.add(row);
@@ -64,7 +65,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                 DatabaseSource source = switch (entry.kind == null ? "sqlite" : entry.kind) {
                     case "sqlite" -> new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
-                            Path.of(entry.driver), entry.writable);
+                            Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile));
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
                 profiles.putIfAbsent(id, new Profile(id, source));
@@ -89,6 +90,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         public String host;
         public int port;
         public String user;
+        public String caFile;
         public String database;
         public String driver;
         public boolean writable;

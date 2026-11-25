@@ -103,10 +103,24 @@ public final class PostgresqlJdbcSessionTest {
         }
     }
 
-    private static JdbcSession open(boolean writable) {
-        var source = new PostgresqlSource("Owned PostgreSQL", "127.0.0.1",
+
+    @Test public void verifiesTheExplicitTlsCaAndServerNameWithoutPlaintextFallback() {
+        Path trusted = Path.of(System.getenv("KARYOFORGE_TEST_PG_CA"));
+        Path unrelated = Path.of(System.getenv("KARYOFORGE_TEST_PG_OTHER_CA"));
+        try (var tls = open(false, "localhost", trusted)) {
+            assertEquals("t", scalar(tls, "SELECT ssl FROM pg_catalog.pg_stat_ssl WHERE pid=pg_catalog.pg_backend_pid()"));
+            assertEquals("on", scalar(tls, "SHOW transaction_read_only"));
+        }
+        assertThrows(DatabaseProblem.class, () -> open(false, "127.0.0.1", trusted));
+        assertThrows(DatabaseProblem.class, () -> open(false, "localhost", unrelated));
+    }
+
+    private static JdbcSession open(boolean writable) { return open(writable, "127.0.0.1", null); }
+
+    private static JdbcSession open(boolean writable, String host, Path ca) {
+        var source = new PostgresqlSource("Owned PostgreSQL", host,
                 Integer.parseInt(System.getenv("KARYOFORGE_TEST_PG_PORT")), "karyoforge_acceptance", "postgres",
-                Path.of(System.getProperty("karyoforge.database.postgresql.driver")), writable);
+                Path.of(System.getProperty("karyoforge.database.postgresql.driver")), writable, ca);
         var session = new JdbcSession(source);
         var password = passwordForTest();
         try {

@@ -54,7 +54,7 @@ public final class JdbcSession implements AutoCloseable {
             throw policy;
         } catch (SQLException | RuntimeException failure) {
             close();
-            throw DatabaseProblem.connection(source.engine(), source.writable(), failure);
+            throw DatabaseProblem.connection(source, failure);
         }
     }
 
