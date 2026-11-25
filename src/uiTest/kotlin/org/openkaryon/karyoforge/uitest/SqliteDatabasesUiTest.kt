@@ -141,8 +141,12 @@ class SqliteDatabasesUiTest {
                 button { byVisibleText("Connect") }.click()
                 x { contains(byVisibleText("Connected in read-write mode.")) }
                     .shouldBe("The writable profile connects", present, 1.minutes)
-                accessibleTree { byAccessibleName("Database schema objects") }.clickPath("main", "Tables", "samples (table)")
-                button { byVisibleText("Open Table") }.click()
+                accessibleTree { byAccessibleName("Database schema objects") }.doubleClickPath("main", "Tables", "samples (table)")
+                val editorRows = x { byAccessibleName("Table editor rows") }
+                editorRows.shouldBe("The table opens in a native editor", present, 1.minutes)
+                val editInDatabases = button { byVisibleText("Edit in Databases") }
+                editInDatabases.shouldBe("The table editor uses the session's reviewed editing path", { isEnabled() }, 1.minutes)
+                editInDatabases.click()
                 x { contains(byVisibleText("samples · 200 rows")) }
                     .shouldBe("The first table page opens", present, 1.minutes)
                 val where = textField { byAccessibleName("Table WHERE expression") }

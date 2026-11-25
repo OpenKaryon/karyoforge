@@ -99,14 +99,24 @@ public final class JdbcSession implements AutoCloseable {
 
     public TableSnapshot openTable(TableQuery query, QueryRequest request) {
         if (query.filtered() == null) return openTable(query.object(), request);
+        return browseTable(query.object(), query.filtered(), request,
+                "Filtered rows are read-only. Clear WHERE and ORDER BY to edit an eligible table.");
+    }
+
+    public TableSnapshot browseTable(TableQuery query, QueryRequest request) {
+        var command = query.filtered();
+        if (command == null) command = SqlText.compile(query.object().selectSql(), query.object().dialect());
+        return browseTable(query.object(), command, request, "Table editor results are read-only.");
+    }
+
+    private TableSnapshot browseTable(SchemaObject object, SqlText.Command command, QueryRequest request, String protection) {
         checkReady();
         request.check();
-        TableDefinition definition = describe(query.object());
-        if (!(execute(query.filtered(), Map.of(), request) instanceof QueryPage page)) {
-            throw new DatabaseProblem("The table filter did not return a result.");
+        TableDefinition definition = describe(object);
+        if (!(execute(command, Map.of(), request) instanceof QueryPage page)) {
+            throw new DatabaseProblem("Reading the table did not return a result.");
         }
-        return new TableSnapshot(definition, page, "Filtered rows are read-only. Clear WHERE and ORDER BY to edit an eligible table.",
-                0, List.of(), column -> null);
+        return new TableSnapshot(definition, page, protection, 0, List.of(), column -> null);
     }
 
     public TableSnapshot openTable(SchemaObject object, QueryRequest request) {

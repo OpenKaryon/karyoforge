@@ -11,6 +11,7 @@ import com.intellij.ui.components.JBLabel;
 import org.openkaryon.karyoforge.database.core.ClickHouseSource;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
 import org.openkaryon.karyoforge.database.core.DuckDbSource;
+import org.openkaryon.karyoforge.database.core.JdbcSession.SchemaObject;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
@@ -119,16 +120,22 @@ final class DatabasesPanel extends JPanel implements Disposable {
     }
 
     void runFromEditor(String sourceId, VirtualFile editor, String text, int start, int end, boolean explain) {
-        if (sourceId != null) {
-            var target = sources.profiles().stream().filter(profile -> profile.id().equals(sourceId)).findFirst().orElse(null);
-            if (target == null) {
-                report("This console's data source was removed.");
-                return;
-            }
-            if (selectedSource() == null || !sourceId.equals(selectedSource().id())) refreshProfiles(sourceId);
-        }
+        if (sourceId != null && !selectBoundSource(sourceId)) return;
         if (selected == null) report("Connect a data source before running SQL from the editor.");
         else selected.runFromEditor(editor, text, start, end, explain);
+    }
+
+    void editTable(String sourceId, SchemaObject object) {
+        if (selectBoundSource(sourceId)) selected.openInlineTable(object);
+    }
+
+    private boolean selectBoundSource(String sourceId) {
+        if (sources.profiles().stream().noneMatch(profile -> profile.id().equals(sourceId))) {
+            report("This editor's data source was removed.");
+            return false;
+        }
+        if (selectedSource() == null || !sourceId.equals(selectedSource().id())) refreshProfiles(sourceId);
+        return selected != null;
     }
 
     private void updateControls() {

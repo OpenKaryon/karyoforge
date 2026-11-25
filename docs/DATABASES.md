@@ -103,6 +103,17 @@ complete signed numbers. A clipped value requires explicit preview export.
 Export never fetches another page. Publishing a new file requires a
 destination with hard-link support.
 
+## Table editors
+
+Double-click a table or view in the catalog, or choose **Open Table in Editor**
+from its context menu. The editor tab shows **Data**, **Structure** and **DDL**,
+with server-side WHERE and ORDER BY fields, paging, Stop and an SQL console
+shortcut. Open editor tabs retain their fetched rows. Each source holds one
+live cursor, and another operation on that source ends the current paging.
+
+Use **Edit in Databases** on an eligible writable source to open a reviewed
+editable snapshot in the Databases tool window.
+
 ## Table editing
 
 On a writable source, **Open Table** loads a bounded first page. In **Table

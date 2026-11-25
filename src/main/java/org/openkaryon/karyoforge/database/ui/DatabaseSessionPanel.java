@@ -40,6 +40,9 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.Map;
@@ -108,6 +111,9 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final Map<VirtualFile, QueryResults> editorResults = new IdentityHashMap<>();
     private QueryResults shownResults = inlineResults;
     private QueryResults cursorOwner;
+    private final Map<String, DatabaseTableFile> tableFiles = new LinkedHashMap<>();
+    private final Set<DatabaseTableEditor> tableEditors = new LinkedHashSet<>();
+    private DatabaseTableEditor tableEditorOwner;
     private TableSnapshot editableTable;
     private JdbcSession.SchemaObject tableObject;
     private QueryPage tablePage;
@@ -178,9 +184,12 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
                 var path = schema.getPathForLocation(event.getX(), event.getY());
                 if (event.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(event)
                         && path != null && path.equals(schema.getSelectionPath()) && openTable.isEnabled()) {
-                    openTable();
+                    openTableInEditor();
                 }
             }
+
+            @Override public void mousePressed(MouseEvent event) { showTableMenu(event); }
+            @Override public void mouseReleased(MouseEvent event) { showTableMenu(event); }
         });
         dataGrid.getSelectionModel().addListSelectionListener(event -> updateControls());
         sql.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.CTRL_DOWN_MASK), "runSql");
@@ -198,7 +207,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         return renderer;
     }
 
-    private static DefaultTableCellRenderer literalRenderer() {
+    static DefaultTableCellRenderer literalRenderer() {
         var renderer = new DefaultTableCellRenderer();
         renderer.putClientProperty("html.disable", true);
         return renderer;
@@ -335,6 +344,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             connected = false;
             writable = false;
             activeSource = null;
+            endPaging();
             editorBridge.forgetCatalog(profile.id());
             showSchema(List.of());
             clearAllResults();
@@ -357,8 +367,16 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private void openConsole() {
         if (!connected || busy) return;
-        var console = editorBridge.console(profile.id(), activeSource.name(), sql.getText());
+        openConsole(sql.getText());
+    }
+
+    private void openConsole(String content) {
+        var console = editorBridge.console(profile.id(), activeSource.name(), content);
         FileEditorManager.getInstance(project).openFile(console, true);
+    }
+
+    void openTableSql(JdbcSession.SchemaObject object) {
+        if (canBrowseTable()) openConsole(object.selectSql());
     }
 
     void runFromEditor(VirtualFile editor, String text, int start, int end, boolean plan) {
@@ -407,9 +425,96 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
                 () -> session.execute(command, bindings, request), result -> showResult(target, result));
     }
 
-    private void openTable() {
+    private void showTableMenu(MouseEvent event) {
+        if (!event.isPopupTrigger()) return;
+        var path = schema.getPathForLocation(event.getX(), event.getY());
+        if (path == null) return;
+        schema.setSelectionPath(path);
+        if (!canBrowseTable() || schema.selectedObject() == null) return;
+        var menu = new JPopupMenu();
+        var open = new JMenuItem("Open Table in Editor");
+        open.addActionListener(action -> openTableInEditor());
+        menu.add(open);
+        menu.show(schema, event.getX(), event.getY());
+    }
+
+    private void openTableInEditor() {
         var object = schema.selectedObject();
-        if (object == null || !discardTableDraft()) return;
+        if (object == null || !canBrowseTable()) return;
+        var file = tableFiles.computeIfAbsent(object.qualified(), ignored -> new DatabaseTableFile(this, object));
+        FileEditorManager.getInstance(project).openFile(file, true);
+    }
+
+    void registerTableEditor(DatabaseTableEditor editor) { tableEditors.add(editor); }
+
+    void closeTableEditor(DatabaseTableEditor editor) {
+        tableEditors.remove(editor);
+        if (tableEditors.stream().noneMatch(other -> other.getFile() == editor.getFile())) {
+            tableFiles.remove(editor.getFile().object().qualified(), editor.getFile());
+        }
+        if (tableEditorOwner == editor && !disposed && !project.isDisposed()) {
+            if (busy && active != null) stop();
+            else if (!busy) stopRetained();
+        }
+    }
+
+    boolean canBrowseTable() { return !disposed && !busy && connected; }
+
+    boolean canEditTable(JdbcSession.SchemaObject object) {
+        return canBrowseTable() && writable && object.type().equals("table")
+                && (activeSource.dialect() == SqlText.Dialect.SQLITE || activeSource.dialect() == SqlText.Dialect.POSTGRESQL);
+    }
+
+    boolean ownsTableEditor(DatabaseTableEditor editor) { return tableEditorOwner == editor; }
+
+    boolean canStopTableEditor(DatabaseTableEditor editor) {
+        return ownsTableEditor(editor) && (busy ? active != null : editor.hasNext());
+    }
+
+    boolean loadTableEditor(DatabaseTableEditor editor, TableQuery query) {
+        if (!canBrowseTable() || !discardTableDraft()) return false;
+        endPaging();
+        tableEditorOwner = editor;
+        var request = new QueryRequest();
+        editor.report("Reading table rows…");
+        submit("Reading table rows…", request, () -> session.browseTable(query, request), snapshot -> {
+            if (!tableEditors.contains(editor)) {
+                editor.endPaging();
+                submit("Closing the table cursor…", null, () -> session.stopPaging(), ignored -> endPaging());
+                return;
+            }
+            learnDefinition(snapshot.definition());
+            editor.load(snapshot);
+            report("Table data loaded in the editor.");
+        });
+        return true;
+    }
+
+    void nextTableEditorPage(DatabaseTableEditor editor) {
+        if (!canBrowseTable() || !ownsTableEditor(editor) || !editor.hasNext()) return;
+        var request = new QueryRequest();
+        editor.report("Reading the next table page…");
+        submit("Reading the next table page…", request, () -> session.next(request), rows -> {
+            if (tableEditors.contains(editor)) editor.showPage(rows);
+            else submit("Closing the table cursor…", null, () -> session.stopPaging(), ignored -> endPaging());
+        });
+    }
+
+    void stopTableEditor(DatabaseTableEditor editor) {
+        if (canStopTableEditor(editor)) {
+            stop();
+            editor.report("Stopping the table request…");
+        }
+    }
+
+    void editTableInDatabases(JdbcSession.SchemaObject object) {
+        if (canEditTable(object)) editorBridge.editTable(profile.id(), object);
+    }
+
+    private void openTable() { openInlineTable(schema.selectedObject()); }
+
+    void openInlineTable(JdbcSession.SchemaObject object) {
+        if (object == null || !canBrowseTable() || !discardTableDraft()) return;
         where.setText("");
         orderBy.setText("");
         loadTable(new TableQuery(object, "", ""));
@@ -591,6 +696,16 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private void showDefinition(TableDefinition object) {
         learnDefinition(object);
+        fillStructure(structure, object);
+        definition.setText(object.ddl());
+        definition.setCaretPosition(0);
+        details.setEnabledAt(1, true);
+        details.setEnabledAt(2, true);
+        details.setSelectedComponent(structureTab);
+        report("Definition of " + object.object().name() + (object.clipped() ? " · DDL preview clipped." : "."));
+    }
+
+    static void fillStructure(JTable structure, TableDefinition object) {
         structure.setModel(new AbstractTableModel() {
             private final List<String> headers = List.of("Column", "Declared type", "Declared NOT NULL", "Primary key position", "Storage");
             @Override public int getRowCount() { return object.columns().size(); }
@@ -608,12 +723,6 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
                 };
             }
         });
-        definition.setText(object.ddl());
-        definition.setCaretPosition(0);
-        details.setEnabledAt(1, true);
-        details.setEnabledAt(2, true);
-        details.setSelectedComponent(structureTab);
-        report("Definition of " + object.object().name() + (object.clipped() ? " · DDL preview clipped." : "."));
     }
 
     private void refreshSchema() {
@@ -721,7 +830,10 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private void showFailure(String message, boolean cursorMayHaveClosed) {
         // A failed or stopped read may have closed its retained cursor. Keep its detached page.
-        if (cursorMayHaveClosed) endPaging();
+        if (cursorMayHaveClosed) {
+            if (tableEditorOwner != null) tableEditorOwner.report(message);
+            endPaging();
+        }
         report(message);
     }
 
@@ -738,16 +850,23 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void stopRetained() {
-        if ((cursorOwner == null || !hasNext(cursorOwner.page)) && !hasNext(tablePage)) return;
+        if ((cursorOwner == null || !hasNext(cursorOwner.page)) && !hasNext(tablePage)
+                && (tableEditorOwner == null || !tableEditorOwner.hasNext())) return;
+        var editor = tableEditorOwner;
         endPaging();
-        submit("Closing the retained result…", null, () -> session.stopPaging(),
-                closed -> report(closed ? "Stopped paging. Fetched rows are still available." : "This result has no next page."));
+        submit("Closing the retained result…", null, () -> session.stopPaging(), closed -> {
+            String message = closed ? "Stopped paging. Fetched rows are still available." : "This result has no next page.";
+            if (editor != null) editor.report(message);
+            report(message);
+        });
     }
 
     private void endPaging() {
         if (cursorOwner != null) cursorOwner.page = withoutNextPage(cursorOwner.page);
         cursorOwner = null;
         tablePage = withoutNextPage(tablePage);
+        if (tableEditorOwner != null) tableEditorOwner.endPaging();
+        tableEditorOwner = null;
     }
 
     private static QueryPage withoutNextPage(QueryPage page) {
@@ -941,6 +1060,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         next.setEnabled(!busy && canPage);
         stop.setEnabled(busy ? active != null : canPage);
         stopTable.setEnabled(busy ? active != null : connected && hasNext(tablePage));
+        for (var editor : tableEditors) editor.updateControls();
         onStateChanged.run();
     }
 

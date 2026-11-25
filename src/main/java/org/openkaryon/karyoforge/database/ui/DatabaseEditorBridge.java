@@ -73,6 +73,13 @@ public final class DatabaseEditorBridge {
         if (panel != null) panel.editorClosed(file);
     }
 
+    void editTable(String sourceId, SchemaObject object) {
+        var window = ToolWindowManager.getInstance(project).getToolWindow(DatabasesToolWindowFactory.ID);
+        if (window != null) window.show(() -> {
+            if (panel != null) panel.editTable(sourceId, object);
+        });
+    }
+
     public void run(VirtualFile editor, String text, int start, int end, boolean explain) {
         var window = ToolWindowManager.getInstance(project).getToolWindow(DatabasesToolWindowFactory.ID);
         if (window == null) return;

@@ -30,6 +30,7 @@
         <editorFactoryListener implementation="org.openkaryon.karyoforge.database.sql.DatabaseSqlEditorShortcuts"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.biology.preview.BiologyPreviewProvider$TextType"/>
         <fileEditorProvider implementation="org.openkaryon.karyoforge.biology.preview.BiologyPreviewProvider"/>
+        <fileEditorProvider implementation="org.openkaryon.karyoforge.database.ui.DatabaseTableEditorProvider"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.data.preview.DelimitedPreviewProvider$TextType"/>
         <fileEditorProvider implementation="org.openkaryon.karyoforge.data.preview.DelimitedPreviewProvider"/>
         <fileTypeOverrider implementation="org.openkaryon.karyoforge.notebook.editor.NotebookJsonType" order="first"/>

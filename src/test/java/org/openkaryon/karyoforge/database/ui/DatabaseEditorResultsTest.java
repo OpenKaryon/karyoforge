@@ -3,6 +3,7 @@ package org.openkaryon.karyoforge.database.ui;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.util.ui.UIUtil;
 import org.openkaryon.karyoforge.database.core.DatabaseTimeouts;
+import org.openkaryon.karyoforge.database.core.JdbcSession.SchemaObject;
 import org.openkaryon.karyoforge.database.core.ResultLimits;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 import org.openkaryon.karyoforge.database.driver.DriverLease;
@@ -11,6 +12,7 @@ import javax.swing.JButton;
 import javax.swing.JTable;
 import java.awt.Component;
 import java.awt.Container;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +21,7 @@ import java.util.function.Predicate;
 
 public final class DatabaseEditorResultsTest extends BasePlatformTestCase {
     public void testEditorsKeepDetachedResultsAndOnlyTheOriginalEditorCanPage() throws Exception {
-        var database = Path.of(getProject().getBasePath()).resolve("owned.sqlite");
+        var database = Files.createTempFile("karyoforge-editor-results-", ".sqlite");
         var driver = Path.of(System.getProperty("karyoforge.database.sqlite.driver"));
         try (var lease = DriverLease.open(driver, "org.sqlite.JDBC");
              var connection = lease.driver().connect("jdbc:sqlite:" + database, new Properties());
@@ -63,11 +65,30 @@ public final class DatabaseEditorResultsTest extends BasePlatformTestCase {
             workspace.selectEditorResult(second);
             assertTrue(next.isEnabled());
 
+            var provider = new DatabaseTableEditorProvider();
+            var tableFile = new DatabaseTableFile(workspace, new SchemaObject("samples", "table"));
+            assertTrue(provider.accept(getProject(), tableFile));
+            var browser = (DatabaseTableEditor) provider.createEditor(getProject(), tableFile);
+            try {
+                browser.selectNotify();
+                await(() -> !workspace.busy() && browser.hasNext());
+                var grid = find(browser.getComponent(), JTable.class,
+                        item -> "Table editor rows".equals(item.getAccessibleContext().getAccessibleName()));
+                assertEquals("10", grid.getValueAt(0, 0));
+                assertFalse(next.isEnabled());
+                find(browser.getComponent(), JButton.class, button -> button.getText().equals("Next Page")).doClick();
+                await(() -> !workspace.busy() && grid.getRowCount() == 1);
+                assertEquals("30", grid.getValueAt(0, 0));
+            } finally {
+                browser.dispose();
+            }
+
             find(workspace.actionButtons(), JButton.class, button -> button.getText().equals("Disconnect")).doClick();
             await(() -> !workspace.connected());
         } finally {
             workspace.dispose();
             bridge.forgetCatalog(id);
+            Files.deleteIfExists(database);
         }
     }
 
