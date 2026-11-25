@@ -7,7 +7,11 @@ opens the file and loads the driver only when you choose **Connect**. A JDBC
 driver runs executable code in the IDE process. Use an artifact whose origin
 and checksum you trust. The IDE neither ships nor downloads JDBC drivers.
 Use **Test Connection** to open and close a temporary session for the selected
-profile. It leaves the project's active connection and catalog in place.
+profile. It leaves the project's active connections and catalogs in place.
+Select another profile to connect while existing sessions stay open. Each
+connected source keeps its own results, cursor, row drafts, transaction and
+Stop control. A query running on one source leaves the other sources available.
+The project remembers the last selected profile.
 
 Server profiles can save their password with **Remember password in PasswordSafe**
 when connecting. This choice starts unchecked. Leave the field blank to reuse
@@ -49,7 +53,8 @@ releases the cursor, connection and driver lease.
 
 **Open SQL Console** opens a native editor tab bound to its data source.
 Use **Run SQL Selection / Current Statement** in that editor or in a
-project's `.sql` file, or press Ctrl+Enter. A console uses its bound source.
+project's `.sql` file, or press Ctrl+Enter. A console selects and uses its bound
+source even when a different source was selected in the tool window.
 A regular SQL file uses the connected source selected in the Databases
 tool window. Run, Stop, bindings and result pages share that window's
 connection. The editor highlights SQL tokens and completes keywords.

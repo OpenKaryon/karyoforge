@@ -6,6 +6,7 @@ import com.intellij.driver.sdk.ui.components.common.editor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.checkBox
+import com.intellij.driver.sdk.ui.components.elements.comboBox
 import com.intellij.driver.sdk.ui.components.elements.dialog
 import com.intellij.driver.sdk.ui.components.elements.textField
 import com.intellij.driver.sdk.ui.present
@@ -73,18 +74,45 @@ class SqliteDatabasesUiTest {
                 x { contains(byVisibleText("Page 1 · 1 rows")) }
                     .shouldBe("The native SQL action runs the statement at the caret", present, 1.minutes)
                 assertEquals("42", table.getValueAt(0, 0))
-
+                button { byVisibleText("Add SQLite Source") }.click()
+            }
+            ui.dialog({ byTitle("Add SQLite Data Source") }) {
+                textField { byAccessibleName("Data source name") }.text = "Parallel SQLite"
+                textField { byAccessibleName("SQLite database file") }.text = database.toString()
+                textField { byAccessibleName("SQLite JDBC JAR") }.text = driverJar.toString()
+                pressButton("Save")
+            }
+            ideFrame {
+                button { byVisibleText("Connect") }.click()
+                x { contains(byVisibleText("Connected in read-only mode.")) }
+                    .shouldBe("The second connection opens without closing the first", present, 1.minutes)
+                val picker = comboBox { byAccessibleName("Database data sources") }
+                picker.selectItemContains("Owned SQLite")
                 val sql = x { byAccessibleName("SQL statement") }
                 sql.click()
                 sql.keyboard { hotKey(KeyEvent.VK_CONTROL, KeyEvent.VK_A) }
                 ui.pasteText("WITH RECURSIVE x(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM x WHERE i<1000000000) SELECT sum(i) FROM x")
                 button { byVisibleText("Run SQL") }.click()
                 button { byVisibleText("Stop") }.shouldBe("A running query can be stopped", { isEnabled() }, 1.minutes)
+                picker.selectItemContains("Parallel SQLite")
+                val parallelSql = x { byAccessibleName("SQL statement") }
+                parallelSql.click()
+                ui.pasteText("SELECT 99 AS independent_session")
+                button { byVisibleText("Run SQL") }.click()
+                x { contains(byVisibleText("Page 1 · 1 rows")) }
+                    .shouldBe("The second source finishes while the first is busy", present, 1.minutes)
+                val parallelTable = driver.cast(x { byAccessibleName("Database query results") }.component, QueryGrid::class)
+                assertEquals("99", parallelTable.getValueAt(0, 0))
+                picker.selectItemContains("Owned SQLite")
                 button { byVisibleText("Stop") }.click()
                 x { contains(byVisibleText("Database request stopped.")) }
                     .shouldBe("The owned request stops", present, 1.minutes)
                 button { byVisibleText("Disconnect") }.click()
                 x { byVisibleText("Disconnected.") }.shouldBe("The data source releases its connection", present, 1.minutes)
+                picker.selectItemContains("Parallel SQLite")
+                assertEquals("99", parallelTable.getValueAt(0, 0))
+                button { byVisibleText("Disconnect") }.click()
+                x { byVisibleText("Disconnected.") }.shouldBe("The second source releases its own connection", present, 1.minutes)
             }
         }
         assertArrayEquals(original, Files.readAllBytes(database))
