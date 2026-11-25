@@ -18,6 +18,7 @@ import org.openkaryon.karyoforge.database.core.QueryRequest;
 import org.openkaryon.karyoforge.database.core.SqlResult;
 import org.openkaryon.karyoforge.database.core.SqlText;
 import org.openkaryon.karyoforge.database.core.SqlValue;
+import org.openkaryon.karyoforge.database.core.TableDefinition;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -40,6 +41,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JBList<JdbcSession.SchemaObject> schema = new JBList<>();
     private final JBTextArea sql = new JBTextArea(5, 48);
     private final JBTable table = new JBTable();
+    private final JBTable structure = new JBTable();
+    private final JBTextArea definition = new JBTextArea();
+    private final JTabbedPane details = new JTabbedPane();
+    private final JScrollPane resultsTab = new JBScrollPane(table);
+    private final JScrollPane structureTab = new JBScrollPane(structure);
     private final JBLabel status = new JBLabel("Choose or add a SQLite data source.");
     private final JButton add = button("Add SQLite Source", () -> editSource(null));
     private final JButton edit = button("Edit Source", () -> editSource(selectedSource()));
@@ -47,6 +53,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JButton connect = button("Connect", this::connect);
     private final JButton disconnect = button("Disconnect", this::disconnect);
     private final JButton show = button("Show Rows", this::showRows);
+    private final JButton inspect = button("Inspect", this::inspect);
     private final JButton refresh = button("Refresh Schema", this::refreshSchema);
     private final JButton commit = button("Commit", () -> finishTransaction(true));
     private final JButton rollback = button("Rollback", () -> finishTransaction(false));
@@ -73,6 +80,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         sql.getAccessibleContext().setAccessibleName("SQL statement");
         table.getAccessibleContext().setAccessibleName("Database query results");
+        structure.getAccessibleContext().setAccessibleName("Database object columns");
+        definition.getAccessibleContext().setAccessibleName("Database object definition");
+        definition.setEditable(false);
+        structure.setDefaultRenderer(Object.class, literalRenderer());
         status.getAccessibleContext().setAccessibleName("Database status");
         status.putClientProperty("html.disable", true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -84,11 +95,16 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var sourceControls = controls(profiles, add, edit, remove, connect, disconnect);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
-        objectPanel.add(controls(show, refresh), BorderLayout.SOUTH);
+        objectPanel.add(controls(show, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
         queryPanel.add(controls(run, next, stop, commit, rollback), BorderLayout.SOUTH);
-        var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, new JBScrollPane(table));
+        details.addTab("Results", resultsTab);
+        details.addTab("Structure", structureTab);
+        details.addTab("DDL", new JBScrollPane(definition));
+        details.setEnabledAt(1, false);
+        details.setEnabledAt(2, false);
+        var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, details);
         queryAndResult.setResizeWeight(0.25);
         var explorer = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, objectPanel, queryAndResult);
         explorer.setResizeWeight(0.25);
@@ -196,6 +212,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
             writable = false;
             showSchema(List.of());
             clearResult();
+            details.setSelectedComponent(resultsTab);
+            details.setEnabledAt(1, false);
+            details.setEnabledAt(2, false);
+            definition.setText("");
+            structure.setModel(new javax.swing.table.DefaultTableModel());
             report("Disconnected.");
         });
     }
@@ -226,6 +247,38 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var request = new QueryRequest();
         var bindings = values;
         submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
+    }
+
+    private void inspect() {
+        var object = schema.getSelectedValue();
+        if (object == null) return;
+        submit("Reading object definition…", null, () -> session.describe(object), this::showDefinition);
+    }
+
+    private void showDefinition(TableDefinition object) {
+        structure.setModel(new AbstractTableModel() {
+            private final List<String> headers = List.of("Column", "Declared type", "Declared NOT NULL", "Primary key position", "Storage");
+            @Override public int getRowCount() { return object.columns().size(); }
+            @Override public int getColumnCount() { return headers.size(); }
+            @Override public String getColumnName(int column) { return headers.get(column); }
+            @Override public Object getValueAt(int row, int index) {
+                var column = object.columns().get(row);
+                return switch (index) {
+                    case 0 -> column.name();
+                    case 1 -> column.type();
+                    case 2 -> column.notNull() ? "Yes" : "";
+                    case 3 -> column.keyPosition() == 0 ? "" : Integer.toString(column.keyPosition());
+                    case 4 -> column.storage();
+                    default -> throw new IndexOutOfBoundsException(index);
+                };
+            }
+        });
+        definition.setText(object.ddl());
+        definition.setCaretPosition(0);
+        details.setEnabledAt(1, true);
+        details.setEnabledAt(2, true);
+        details.setSelectedComponent(structureTab);
+        report("Definition of " + object.object().name() + (object.clipped() ? " · DDL preview clipped." : "."));
     }
 
     private void refreshSchema() {
@@ -261,6 +314,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
             showPage(query);
         } else if (result instanceof SqlResult.UpdateCount count) {
             clearResult();
+            details.setSelectedComponent(resultsTab);
             report(count.rows() < 0 ? "Statement completed. Changes are pending."
                     : count.rows() + " affected rows. Changes are pending.");
         }
@@ -319,6 +373,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     private void showPage(QueryPage result) {
         page = result;
+        details.setSelectedComponent(resultsTab);
         table.setModel(new AbstractTableModel() {
             @Override public int getRowCount() { return result.rows().size(); }
             @Override public int getColumnCount() { return result.columns().size(); }
@@ -353,7 +408,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
         commit.setEnabled(!busy && connected && writable);
         rollback.setEnabled(!busy && connected && writable);
         run.setEnabled(!busy && connected);
-        show.setEnabled(!busy && connected && schema.getSelectedValue() != null);
+        boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
+        show.setEnabled(canBrowse);
+        inspect.setEnabled(canBrowse);
         next.setEnabled(!busy && connected && page != null && page.hasNext());
         stop.setEnabled(busy && active != null);
     }

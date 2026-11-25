@@ -176,6 +176,37 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test public void describesActualSchemaColumnsAndStoredDdl() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            run(session, """
+                    CREATE TABLE "keyed ""table" (
+                      part_b INTEGER NOT NULL,
+                      part_a TEXT NOT NULL,
+                      payload TEXT,
+                      label TEXT GENERATED ALWAYS AS (part_a || payload) STORED,
+                      PRIMARY KEY (part_a, part_b)
+                    )
+                    """);
+            var table = session.schema().stream().filter(item -> item.name().equals("keyed \"table")).findFirst().orElseThrow();
+            var definition = session.describe(table);
+            assertTrue(definition.ddl().contains("PRIMARY KEY (part_a, part_b)"));
+            assertFalse(definition.clipped());
+            assertEquals(List.of(
+                    new TableDefinition.Column("part_b", "INTEGER", true, 2, 0),
+                    new TableDefinition.Column("part_a", "TEXT", true, 1, 0),
+                    new TableDefinition.Column("payload", "TEXT", false, 0, 0),
+                    new TableDefinition.Column("label", "TEXT", false, 0, 3)), definition.columns());
+            var view = session.describe(new JdbcSession.SchemaObject("sample_view", "view"));
+            assertTrue(view.ddl().startsWith("CREATE VIEW sample_view"));
+            assertEquals("id", view.columns().getFirst().name());
+            run(session, "DROP TABLE \"keyed \"\"table\"");
+            assertThrows(DatabaseProblem.class, () -> session.describe(table));
+        }
+    }
+
     @Test public void doesNotCreateMissingFilesForWritableProfiles() throws Exception {
         var source = fixture();
         Path absent = source.database().resolveSibling("absent.db");

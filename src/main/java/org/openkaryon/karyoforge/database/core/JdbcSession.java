@@ -90,6 +90,44 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
+    public TableDefinition describe(SchemaObject object) {
+        checkReady();
+        try {
+            String ddl;
+            try (var statement = connection.prepareStatement("""
+                    SELECT substr(sql, 1, 65537) FROM main.sqlite_schema
+                    WHERE name = ? AND type = ?
+                    """)) {
+                statement.setString(1, object.name());
+                statement.setString(2, object.type());
+                try (var rows = statement.executeQuery()) {
+                    if (!rows.next()) throw new DatabaseProblem("The selected table or view no longer exists.");
+                    ddl = rows.getString(1);
+                }
+            }
+            var columns = new ArrayList<TableDefinition.Column>();
+            try (var statement = connection.prepareStatement("""
+                    SELECT name, type, "notnull", pk, hidden FROM pragma_table_xinfo(?, 'main') ORDER BY cid
+                    """)) {
+                statement.setString(1, object.name());
+                try (var rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        if (columns.size() == MAX_COLUMNS) throw new DatabaseProblem("The object exceeds 256 columns.");
+                        String name = rows.getString(1);
+                        String type = rows.getString(2);
+                        if (name.length() > 1024 || type.length() > 1024) {
+                            throw new DatabaseProblem("A column name or declaration exceeds 1024 characters.");
+                        }
+                        columns.add(new TableDefinition.Column(name, type, rows.getInt(3) != 0, rows.getInt(4), rows.getInt(5)));
+                    }
+                }
+            }
+            return TableDefinition.snapshot(object, columns, ddl);
+        } catch (SQLException failure) {
+            throw DatabaseProblem.query("Reading the object definition", failure);
+        }
+    }
+
     public SqlResult execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
         checkReady();
         if (!allowedCommands().contains(command.keyword())) {
