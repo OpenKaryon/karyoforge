@@ -20,6 +20,8 @@ import org.openkaryon.karyoforge.database.core.SqlText;
 import org.openkaryon.karyoforge.database.core.SqlValue;
 import org.openkaryon.karyoforge.database.core.TableDefinition;
 import org.openkaryon.karyoforge.database.core.TableSnapshot;
+import org.openkaryon.karyoforge.database.results.FetchedResults;
+import org.openkaryon.karyoforge.database.results.ResultExport;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -70,6 +72,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JButton run = button("Run SQL", this::runSql);
     private final JButton next = button("Next Result Page", this::next);
     private final JButton stop = button("Stop", this::stop);
+    private final JButton resultOptions = button("Result Options", this::showResultOptions);
+    private final JButton export = button("Export Results", this::exportResults);
     private final java.util.concurrent.ExecutorService commands =
             Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("KaryoForge database command").factory());
     private final java.util.concurrent.ExecutorService cancels =
@@ -81,6 +85,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private boolean disposed;
     private QueryRequest active;
     private QueryPage page;
+    private FetchedResults fetched;
+    private List<FetchedResults.Filter> filters = List.of();
+    private List<FetchedResults.Sort> ordering = List.of();
     private TableSnapshot editableTable;
     private final TreeMap<Integer, RowDraft> drafts = new TreeMap<>();
 
@@ -115,7 +122,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
-        queryPanel.add(controls(run, next, stop, commit, rollback), BorderLayout.SOUTH);
+        queryPanel.add(controls(run, next, stop, resultOptions, export, commit, rollback), BorderLayout.SOUTH);
         details.addTab("Results", resultsTab);
         details.addTab("Structure", structureTab);
         details.addTab("DDL", new JBScrollPane(definition));
@@ -452,6 +459,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     private void clearResult() {
         page = null;
+        fetched = null;
+        filters = List.of();
+        ordering = List.of();
         table.setModel(new javax.swing.table.DefaultTableModel());
     }
 
@@ -482,11 +492,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
                 T result = operation.get();
                 onUi(() -> complete.accept(result));
             } catch (DatabaseProblem | IllegalArgumentException failure) {
-                onUi(() -> showFailure(failure.getMessage()));
+                onUi(() -> showFailure(failure.getMessage(), request != null));
             } catch (ProcessCanceledException failure) {
-                onUi(() -> showFailure("Database request stopped."));
+                onUi(() -> showFailure("Database request stopped.", request != null));
             } catch (RuntimeException | LinkageError failure) {
-                onUi(() -> showFailure("The database operation failed."));
+                onUi(() -> showFailure("The database operation failed.", request != null));
             }
         });
     }
@@ -501,9 +511,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
         });
     }
 
-    private void showFailure(String message) {
+    private void showFailure(String message, boolean cursorMayHaveClosed) {
         // A failed or stopped read may have closed its retained cursor. Keep its detached page.
-        if (page != null && page.hasNext()) {
+        if (cursorMayHaveClosed && page != null && page.hasNext()) {
             page = new QueryPage(page.columns(), page.rows(), page.page(), page.totalRows(), false, page.notice());
         }
         report(message);
@@ -519,18 +529,105 @@ final class DatabasesPanel extends JPanel implements Disposable {
 
     private void showPage(QueryPage result) {
         page = result;
+        if (result.page() == 1) {
+            fetched = FetchedResults.first(result);
+            filters = List.of();
+            ordering = List.of();
+        } else {
+            fetched = fetched.append(result);
+        }
         details.setSelectedComponent(resultsTab);
+        if (filters.isEmpty() && ordering.isEmpty()) {
+            showCurrentPage();
+        } else {
+            try {
+                showFetchedView(fetched.view(filters, ordering));
+            } catch (IllegalArgumentException incomparable) {
+                clearTransforms();
+                report(incomparable.getMessage() + " Fetched rows are retained.");
+            }
+        }
+    }
+
+    private void showCurrentPage() {
+        displayResult(page.columns(), page.rows());
+        report("Page " + page.page() + " · " + page.rows().size() + " rows"
+                + (page.notice().isEmpty() ? "" : " · " + page.notice()));
+    }
+
+    private void displayResult(List<QueryPage.Column> columns, List<QueryPage.Row> rows) {
         table.setModel(new AbstractTableModel() {
-            @Override public int getRowCount() { return result.rows().size(); }
-            @Override public int getColumnCount() { return result.columns().size(); }
-            @Override public String getColumnName(int column) { return result.columns().get(column).label(); }
-            @Override public Object getValueAt(int row, int column) { return result.rows().get(row).cells().get(column).display(); }
+            @Override public int getRowCount() { return rows.size(); }
+            @Override public int getColumnCount() { return columns.size(); }
+            @Override public String getColumnName(int column) { return columns.get(column).label(); }
+            @Override public Object getValueAt(int row, int column) { return rows.get(row).cells().get(column).display(); }
         });
         for (int index = 0; index < table.getColumnCount(); index++) {
             table.getColumnModel().getColumn(index).setPreferredWidth(145);
         }
-        report("Page " + result.page() + " · " + result.rows().size() + " rows"
-                + (result.notice().isEmpty() ? "" : " · " + result.notice()));
+    }
+
+    private void showResultOptions() {
+        var menu = new JPopupMenu();
+        var filter = new JMenuItem("Add filter…");
+        filter.addActionListener(event -> addTransform(true));
+        menu.add(filter);
+        var sort = new JMenuItem("Add sort key…");
+        sort.addActionListener(event -> addTransform(false));
+        menu.add(sort);
+        var clear = new JMenuItem("Clear filters and sort");
+        clear.setEnabled(!filters.isEmpty() || !ordering.isEmpty());
+        clear.addActionListener(event -> clearTransforms());
+        menu.add(clear);
+        menu.show(resultOptions, 0, resultOptions.getHeight());
+    }
+
+    private void addTransform(boolean filtering) {
+        var results = fetched;
+        if (results == null) return;
+        var dialog = new ResultOptionsDialog(project, results.columns(), filtering);
+        if (!dialog.showAndGet()) return;
+        var requestedFilters = new ArrayList<>(filters);
+        var requestedOrder = new ArrayList<>(ordering);
+        if (filtering) requestedFilters.add(dialog.filter());
+        else requestedOrder.add(dialog.sort());
+        submit("Updating the local result view…", null, () -> results.view(requestedFilters, requestedOrder), view -> {
+            filters = List.copyOf(requestedFilters);
+            ordering = List.copyOf(requestedOrder);
+            showFetchedView(view);
+        });
+    }
+
+    private void showFetchedView(FetchedResults.View view) {
+        displayResult(view.columns(), view.rows());
+        report("Local view · " + view.rows().size() + " visible of " + view.fetchedCount() + " fetched rows"
+                + " · " + page.page() + " pages");
+    }
+
+    private void clearTransforms() {
+        filters = List.of();
+        ordering = List.of();
+        showCurrentPage();
+    }
+
+    private void exportResults() {
+        if (fetched == null) return;
+        FetchedResults.View view = fetched.view(filters, ordering);
+        var dialog = new ResultExportDialog(project, view);
+        if (!dialog.showAndGet()) return;
+        var path = dialog.destination();
+        var options = dialog.options();
+        submit("Exporting fetched rows…", null, () -> {
+            try {
+                return ResultExport.write(path, view, options);
+            } catch (java.nio.file.FileAlreadyExistsException exists) {
+                throw new DatabaseProblem("The output file already exists. Choose a new path.");
+            } catch (java.nio.charset.CharacterCodingException encoding) {
+                throw new DatabaseProblem("The selected encoding cannot represent every exported value.");
+            } catch (java.io.IOException | UnsupportedOperationException unavailable) {
+                throw new DatabaseProblem("Could not create the export. Choose a writable folder with hard-link support.");
+            }
+        }, count -> report("Exported " + count + " fetched rows."));
     }
 
     private void report(String message) {
@@ -572,6 +669,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
             editRow.setToolTipText(reason.isEmpty() ? null : reason);
             deleteRow.setToolTipText(editRow.getToolTipText());
         }
+        boolean hasResults = !busy && connected && fetched != null && !fetched.columns().isEmpty();
+        resultOptions.setEnabled(hasResults);
+        export.setEnabled(hasResults);
         next.setEnabled(!busy && connected && page != null && page.hasNext());
         stop.setEnabled(busy && active != null);
     }

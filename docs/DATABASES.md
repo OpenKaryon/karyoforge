@@ -36,6 +36,21 @@ The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
 statement. **Stop** cancels the active query or page request. **Disconnect**
 releases the cursor, connection and driver lease.
 
+## Result views and export
+
+Use **Result Options** to add typed filters and sort keys across all
+fetched pages. Filters combine with AND. Sorting keeps exact numeric
+values and supports explicit NULL placement. These controls use the
+local result and issue no SQL. **Clear filters and sort** restores the
+current result page.
+
+**Export Results** writes the visible fetched rows as CSV or quoted TSV,
+with a selected encoding, an unquoted NULL token and an optional header.
+The default spreadsheet policy prefixes formula-like text while retaining
+complete signed numbers. A clipped value requires explicit preview export.
+Export never fetches another page. Publishing a new file requires a
+destination with hard-link support.
+
 ## Table editing
 
 On a writable source, **Open Table** loads a bounded first page. Select a row
