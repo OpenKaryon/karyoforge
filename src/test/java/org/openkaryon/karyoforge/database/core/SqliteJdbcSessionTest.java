@@ -176,6 +176,25 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test public void stopsBetweenPagesWhileKeepingDetachedRowsAndPendingChanges() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            var table = session.schema().getFirst();
+            run(session, "INSERT INTO " + table.qualified() + " VALUES (206, 'pending', NULL)");
+            var page = query(session, table.selectSql() + " ORDER BY id", new QueryRequest());
+            assertTrue(page.hasNext());
+            assertTrue(session.stopPaging());
+            assertFalse(session.stopPaging());
+            assertEquals("1", page.rows().getFirst().cells().getFirst().value());
+            assertThrows(DatabaseProblem.class, () -> session.next(new QueryRequest()));
+            assertEquals("206", scalar(session, "SELECT count(*) FROM " + table.qualified()));
+            session.finishTransaction(false);
+            assertEquals("205", scalar(session, "SELECT count(*) FROM " + table.qualified()));
+        }
+    }
+
     @Test public void requestsAnEnginePlanOnAReadOnlyConnectionWithBoundValues() throws Exception {
         try (var session = new JdbcSession(fixture())) {
             session.connect();

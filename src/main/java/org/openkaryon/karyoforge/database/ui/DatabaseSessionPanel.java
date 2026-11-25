@@ -665,23 +665,36 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private void showFailure(String message, boolean cursorMayHaveClosed) {
         // A failed or stopped read may have closed its retained cursor. Keep its detached page.
-        if (cursorMayHaveClosed && page != null && page.hasNext()) {
-            page = new QueryPage(page.columns(), page.rows(), page.page(), page.totalRows(), false, page.notice());
-        }
-        if (cursorMayHaveClosed && tablePage != null && tablePage.hasNext()) {
-            tablePage = new QueryPage(tablePage.columns(), tablePage.rows(), tablePage.page(), tablePage.totalRows(), false, tablePage.notice());
-        }
+        if (cursorMayHaveClosed) endPaging();
         report(message);
     }
 
     private void stop() {
         QueryRequest request = active;
-        if (request == null) return;
+        if (request == null) {
+            if (!busy && (hasNext(page) || hasNext(tablePage))) {
+                endPaging();
+                submit("Closing the retained result…", null, () -> session.stopPaging(),
+                        closed -> report(closed ? "Stopped paging. Fetched rows are still available." : "This result has no next page."));
+            }
+            return;
+        }
         stop.setEnabled(false);
         stopTable.setEnabled(false);
         status.setText("Stopping the current database request…");
         cancels.execute(request::stop);
     }
+
+    private void endPaging() {
+        page = withoutNextPage(page);
+        tablePage = withoutNextPage(tablePage);
+    }
+
+    private static QueryPage withoutNextPage(QueryPage page) {
+        return hasNext(page) ? new QueryPage(page.columns(), page.rows(), page.page(), page.totalRows(), false, page.notice()) : page;
+    }
+
+    private static boolean hasNext(QueryPage page) { return page != null && page.hasNext(); }
 
     private void showPage(QueryPage result) {
         page = result;
@@ -830,8 +843,8 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         resultOptions.setEnabled(hasResults);
         export.setEnabled(hasResults);
         next.setEnabled(!busy && connected && page != null && page.hasNext());
-        stop.setEnabled(busy && active != null);
-        stopTable.setEnabled(stop.isEnabled());
+        stop.setEnabled(busy ? active != null : connected && hasNext(page));
+        stopTable.setEnabled(busy ? active != null : connected && hasNext(tablePage));
         onStateChanged.run();
     }
 

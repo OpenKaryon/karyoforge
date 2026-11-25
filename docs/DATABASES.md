@@ -49,8 +49,9 @@ null constraints, primary-key order and hidden/generated columns in **Structure*
 PostgreSQL, MySQL, MariaDB and ClickHouse show row estimates when their catalogs
 already have them. Browsing uses those statistics without counting table rows.
 The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
-statement. **Stop** cancels the active query or page request. **Disconnect**
-releases the cursor, connection and driver lease.
+statement. **Stop** cancels an active query or page request. Between pages it
+closes the retained cursor while keeping the fetched rows and the current
+transaction. **Disconnect** releases the cursor, connection and driver lease.
 
 ## SQL editor
 

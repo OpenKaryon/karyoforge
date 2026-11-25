@@ -158,6 +158,13 @@ public final class JdbcSession implements AutoCloseable {
         });
     }
 
+    public boolean stopPaging() {
+        checkReady();
+        if (cursor == null) return false;
+        closeCursor();
+        return true;
+    }
+
     private <T> T requestResult(String operation, QueryRequest request, ReadResult<T> work) {
         T result = null;
         try {
