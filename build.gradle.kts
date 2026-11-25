@@ -125,6 +125,9 @@ tasks.test {
     doFirst {
         nativeDirectory.mkdirs()
     }
+    val sqliteDriver = providers.gradleProperty("sqliteDriver").orElse("").get()
+    if (sqliteDriver.isBlank()) exclude("**/SqliteJdbcSessionTest.class")
+    systemProperty("karyoforge.database.sqlite.driver", sqliteDriver)
     maxHeapSize = if (providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) "2g" else "1g"
 }
 
@@ -269,5 +272,9 @@ tasks.register<Sync>("uiTestBundle") {
     from(sdkDirectory.map { it.resolve("plugins/performanceTesting") }) { into("test-plugins/performanceTesting") }
     from("uitest") { include("*.ps1") }
     from(layout.buildDirectory.dir("ui-test-fixtures")) { into("fixtures") }
+    val sqliteDriver = providers.gradleProperty("sqliteDriver").orNull
+    if (!sqliteDriver.isNullOrBlank()) {
+        from(file(sqliteDriver)) { into("fixtures/sqlite"); rename { "driver.jar" } }
+    }
     from(layout.buildDirectory.dir("notebook-test-fixtures")) { into("notebook-fixtures") }
 }

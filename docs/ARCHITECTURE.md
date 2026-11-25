@@ -54,6 +54,7 @@ after Apply, and its inspection overlay does not rewrite inspection profiles.
 | `settings` | Shared settings, explicit import/default behavior and reversible UI preferences |
 | `setup` | Role/module selection and explicit technology/runtime configuration |
 | `data` | Generic tables, text/log previews, paging and bounded shared input infrastructure |
+| `database` | JDBC driver leases, project session ownership and native database tools |
 | `notebook` | Notebook document model, editor, saved outputs and explicit kernel execution |
 | `biology` | Sequence/variant formats, indexed genomic views and biological study workflows |
 | `languages` | Language ownership, grammars, SDK integration and explicitly selected language servers |

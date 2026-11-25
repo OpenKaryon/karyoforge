@@ -1,0 +1,74 @@
+package org.openkaryon.karyoforge.database.ui;
+
+import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
+import org.jetbrains.annotations.NotNull;
+import org.openkaryon.karyoforge.database.core.SqliteSource;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.UUID;
+
+/** Stores user-selected paths only. Loading or editing a profile does not open a driver or a database. */
+@Service(Service.Level.APP)
+@State(name = "org.openkaryon.karyoforge.database.sources", storages = @Storage("karyoforge-databases.xml"))
+public final class DatabaseSources implements PersistentStateComponent<DatabaseSources.Snapshot> {
+    private final LinkedHashMap<String, Profile> profiles = new LinkedHashMap<>();
+
+    synchronized List<Profile> profiles() { return List.copyOf(profiles.values()); }
+
+    synchronized String save(String id, SqliteSource source) {
+        String key = id == null ? UUID.randomUUID().toString() : id;
+        profiles.put(key, new Profile(key, source));
+        return key;
+    }
+
+    synchronized void remove(String id) { profiles.remove(id); }
+
+    @Override public synchronized @NotNull Snapshot getState() {
+        var state = new Snapshot();
+        for (var profile : profiles.values()) {
+            var row = new Entry();
+            row.id = profile.id();
+            row.name = profile.source().name();
+            row.database = profile.source().database().toString();
+            row.driver = profile.source().driver().toString();
+            state.entries.add(row);
+        }
+        return state;
+    }
+
+    @Override public synchronized void loadState(@NotNull Snapshot state) {
+        profiles.clear();
+        if (state.entries == null) return;
+        for (var entry : state.entries) {
+            if (entry == null || entry.id == null) continue;
+            try {
+                String id = UUID.fromString(entry.id).toString();
+                var source = new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver));
+                profiles.putIfAbsent(id, new Profile(id, source));
+            } catch (IllegalArgumentException | NullPointerException invalid) {
+                // A malformed saved profile must not prevent valid profiles from loading.
+            }
+        }
+    }
+
+    record Profile(String id, SqliteSource source) {
+        @Override public String toString() { return source.name(); }
+    }
+
+    public static final class Snapshot {
+        public List<Entry> entries = new ArrayList<>();
+    }
+
+    public static final class Entry {
+        public String id;
+        public String name;
+        public String database;
+        public String driver;
+    }
+}

@@ -4,8 +4,9 @@ PYTHON ?= python
 REFERENCE_DIR ?=
 AUDIT_OUTPUT ?= docs/audit/reference-inventory.json
 PYTHON_EXECUTABLE ?=
+SQLITE_DRIVER ?=
 
-.PHONY: notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
+.PHONY: test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
 
 help:
 	"$(PYTHON)" tools/tasks.py help
@@ -63,8 +64,11 @@ package-windows: check
 package-linux:
 	"$(PYTHON)" tools/tasks.py package-linux
 
+test-database:
+	"$(PYTHON)" tools/tasks.py test-database --sqlite-driver "$(SQLITE_DRIVER)"
+
 gui-bundle:
-	"$(PYTHON)" tools/tasks.py gui-bundle
+	"$(PYTHON)" tools/tasks.py gui-bundle --sqlite-driver "$(SQLITE_DRIVER)"
 
 test-gui:
 	"$(PYTHON)" tools/tasks.py test-gui

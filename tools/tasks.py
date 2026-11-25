@@ -34,6 +34,8 @@ HELP = """KaryoForge local commands:
   make gui-bundle               Compile and bundle the VM-only GUI suite; no local GUI launch
   make test-gui                 Run on explicit KARYOFORGE_UI_HOST/USER/KEY VM settings
   make test-ide                 Gradle IDE integration tests
+  make test-database SQLITE_DRIVER="/path/to/sqlite-jdbc.jar"
+                                Real SQLite tests with an explicit local JAR
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
   make notebook-fixtures        Prepare SHA-256-locked offline Windows notebook wheels
@@ -158,7 +160,8 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
         "--no-daemon", "--console=plain", *tasks]
 
 
-def execute(task: str, root: Path, reference: str = "", output: str = "", python_executable: str = "") -> int:
+def execute(task: str, root: Path, reference: str = "", output: str = "",
+            python_executable: str = "", sqlite_driver: str = "") -> int:
     if task == "help":
         print(HELP)
         return 0
@@ -179,8 +182,17 @@ def execute(task: str, root: Path, reference: str = "", output: str = "", python
             command.append("--check")
     elif task == "test-gui":
         command = [sys.executable, "tools/ui_vm.py"]
-    elif task == "gui-bundle":
-        command = gradle_command(root, ["uiTestBundle"])
+    elif task in {"gui-bundle", "test-database"}:
+        arguments = ["uiTestBundle"] if task == "gui-bundle" else [
+            "test", "--tests", "org.openkaryon.karyoforge.database.*"]
+        if sqlite_driver.strip():
+            selected = (root / Path(sqlite_driver).expanduser()).resolve()
+            if selected.suffix.lower() != ".jar" or not selected.is_file():
+                raise ValueError("SQLITE_DRIVER must name an existing JDBC JAR")
+            arguments.append(f"-PsqliteDriver={selected}")
+        elif task == "test-database":
+            raise ValueError("SQLITE_DRIVER is required; supply a verified SQLite JDBC JAR")
+        command = gradle_command(root, arguments)
     elif task == "notebook-fixtures":
         command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
     elif task in {"notebook-runtime", "test-notebook"}:
@@ -236,9 +248,10 @@ def main() -> int:
     parser.add_argument("--reference", default="")
     parser.add_argument("--output", default="")
     parser.add_argument("--python-executable", default="")
+    parser.add_argument("--sqlite-driver", default="")
     args = parser.parse_args()
     try:
-        return execute(args.task, ROOT, args.reference, args.output, args.python_executable)
+        return execute(args.task, ROOT, args.reference, args.output, args.python_executable, args.sqlite_driver)
     except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2

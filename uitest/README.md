@@ -5,15 +5,19 @@ Driver pinned to IC-252.28539.97. Kotlin is restricted to `src/uiTest`; its test
 runtime is separate from the Java product plugin. The bundle includes the
 pinned SDK's Performance Testing plugin as test-only data. Each owned profile
 installs that plugin to provide Driver's server bridge; the public IDE archives
-do not include it. No GUI task runs an IDE on
-the development desktop. Database, indexed genomic tracks and private setup dialogs are outside this
-suite because the public distribution does not provide them. Notebook scenarios cover the public
-local Python implementation.
+do not include it. No GUI task runs an IDE on the development desktop.
+Notebook scenarios cover the public local Python implementation. The SQLite
+scenario uses a driver supplied with the test bundle.
 
 ## Build and run
 
 `make gui-bundle` compiles and bundles the tests without opening any windows.
 JDK 21, Python and the verified Gradle wrapper are required on the controller.
+To include the SQLite scenario, build with
+`make gui-bundle SQLITE_DRIVER="/path/to/sqlite-jdbc-3.53.2.0.jar"`, then run
+`python tools/ui_vm.py --skip-build --select org.openkaryon.karyoforge.uitest.SqliteDatabasesUiTest`
+with your VM connection options. An unfiltered run only includes SQLite when
+the driver is present in the bundle.
 `make test-gui` requires explicit VM connection settings:
 
 ```powershell

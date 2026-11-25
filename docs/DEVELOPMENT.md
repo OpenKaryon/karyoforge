@@ -38,6 +38,7 @@ outputs and profile locations. Linux packaging is not implemented.
 | `audit-reference-check` | Check the same inputs for drift without rewriting the inventory |
 | `build` | Delegate to Gradle `buildPlugin verifyPluginStructure`; fail if build prerequisites are absent |
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
+| `test-database` | Run SQLite fixture integration tests with an explicit local `SQLITE_DRIVER` |
 | `test-ide` | Delegate to Gradle `test`; fail if build prerequisites are absent |
 | `test-python` | Run native Python script/module, selected unittest/pytest and debugger checks with explicit `PYTHON_EXECUTABLE` |
 | `notebook-fixtures` | Prepare and verify the locked offline Windows notebook wheelhouse |

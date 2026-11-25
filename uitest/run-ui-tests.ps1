@@ -123,7 +123,12 @@ public static class KaryoForgeUiPower {
             $selectionFlag = if ($test.Contains('#')) { '--select-method' } else { '--select-class' }
             $arguments += @($selectionFlag, $test)
         }
-    } else { $arguments += @('--scan-classpath', (Join-Path $request.payload 'classes')) }
+    } else {
+        $arguments += @('--scan-classpath', (Join-Path $request.payload 'classes'))
+        if (-not (Test-Path -LiteralPath (Join-Path $request.payload 'fixtures/sqlite/driver.jar') -PathType Leaf)) {
+            $arguments += @('--exclude-classname', '^org\.openkaryon\.karyoforge\.uitest\.SqliteDatabasesUiTest$')
+        }
+    }
     # java.exe argument files preserve spaces without shell interpolation or Start-Process string joining.
     $escaped = $arguments | ForEach-Object { '"' + $_.Replace('\','\\').Replace('"','\"') + '"' }
     $argumentFile = Join-Path $root 'java.args'
