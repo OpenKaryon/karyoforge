@@ -10,7 +10,7 @@ import java.util.Properties;
 import java.util.Set;
 
 final class SqliteBackend implements JdbcBackend {
-    private static final Set<String> READ_COMMANDS = Set.of("SELECT", "WITH");
+    private static final Set<String> READ_COMMANDS = Set.of("SELECT", "WITH", "EXPLAIN");
     private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "INSERT", "UPDATE",
             "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "EXPLAIN", "ANALYZE", "REINDEX");
     private final SqliteSource source;
@@ -104,7 +104,7 @@ final class SqliteBackend implements JdbcBackend {
         if (!allowed.contains(command.keyword())) {
             throw new IllegalArgumentException(source.writable()
                     ? "This SQLite command is unavailable. Use Commit and Rollback to control the transaction."
-                    : "Enter one SELECT or WITH query.");
+                    : "Enter one SELECT, WITH, or plan-only EXPLAIN query.");
         }
     }
 }

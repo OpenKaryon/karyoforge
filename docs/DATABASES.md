@@ -65,7 +65,12 @@ qualified relation or alias. **Go to Declaration** opens a read-only
 description of an unambiguous loaded object. Completion and navigation
 use that detached catalog and issue no queries. Complex scopes
 such as CTEs, subqueries and UNIONs use keyword completion only.
-Refresh Schema clears cached column definitions.
+Refresh Schema clears cached column definitions. **Explain SQL** and the
+editor's **Explain SQL Selection / Current Statement** request a plan for one
+SELECT or read-only WITH. They accept typed bindings and display engine plan
+rows. Planning can evaluate expressions in the engine. ClickHouse profiles
+have no Explain action. SQLite uses EXPLAIN QUERY PLAN, and the other supported
+engines use plain EXPLAIN. The console accepts plan-only EXPLAIN forms.
 
 ## Result views and export
 

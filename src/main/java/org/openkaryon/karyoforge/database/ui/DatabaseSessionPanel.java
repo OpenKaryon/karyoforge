@@ -78,6 +78,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final JButton commit = button("Commit", () -> finishTransaction(true));
     private final JButton rollback = button("Rollback", () -> finishTransaction(false));
     private final JButton run = button("Run SQL", this::runSql);
+    private final JButton explain = button("Explain SQL", () -> runInline(true));
     private final JButton openConsole = button("Open SQL Console", this::openConsole);
     private final JButton next = button("Next Result Page", this::next);
     private final JButton stop = button("Stop", this::stop);
@@ -136,7 +137,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
-        queryPanel.add(controls(run, openConsole, next, stop, resultOptions, export), BorderLayout.SOUTH);
+        queryPanel.add(controls(run, explain, openConsole, next, stop, resultOptions, export), BorderLayout.SOUTH);
         var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, new JBScrollPane(table));
         queryAndResult.setResizeWeight(0.25);
         resultsTab.add(queryAndResult, BorderLayout.CENTER);
@@ -319,7 +320,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         FileEditorManager.getInstance(project).openFile(console, true);
     }
 
-    void runFromEditor(String text, int start, int end) {
+    void runFromEditor(String text, int start, int end, boolean plan) {
         if (!connected) {
             report("Connect a data source before running SQL from the editor.");
             return;
@@ -328,19 +329,22 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             report("Wait for the current database operation to finish or choose Stop.");
             return;
         }
-        runSql(text, start, end);
+        runSql(text, start, end, plan);
     }
 
-    private void runSql() {
-        runSql(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd());
+    private void runSql() { runInline(false); }
+
+    private void runInline(boolean plan) {
+        runSql(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd(), plan);
     }
 
-    private void runSql(String text, int start, int end) {
+    private void runSql(String text, int start, int end, boolean plan) {
         if (!connected || busy) return;
         SqlText.Command command;
         try {
             var dialect = activeSource.dialect();
-            command = SqlText.compile(SqlText.activeStatement(text, start, end, dialect), dialect);
+            String statement = SqlText.activeStatement(text, start, end, dialect);
+            command = plan ? SqlText.explain(statement, dialect) : SqlText.compile(statement, dialect);
         } catch (IllegalArgumentException malformed) {
             report(malformed.getMessage());
             return;
@@ -354,7 +358,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         if (!discardTableDraft()) return;
         var request = new QueryRequest();
         var bindings = values;
-        submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
+        submit(plan ? "Planning SQL…" : "Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
     }
 
     private void openTable() {
@@ -770,6 +774,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         commit.setEnabled(!busy && connected && writable);
         rollback.setEnabled(!busy && connected && writable);
         run.setEnabled(!busy && connected);
+        explain.setEnabled(run.isEnabled() && activeSource.dialect() != SqlText.Dialect.CLICKHOUSE);
         openConsole.setEnabled(!busy && connected);
         boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
         show.setEnabled(canBrowse);

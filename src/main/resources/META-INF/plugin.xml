@@ -49,6 +49,11 @@
                 class="org.openkaryon.karyoforge.database.sql.RunDatabaseSqlAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+        <action id="org.openkaryon.karyoforge.database.explainSql" text="Explain SQL Selection / Current Statement"
+                description="Show the plan for a read-only SQL query"
+                class="org.openkaryon.karyoforge.database.sql.RunDatabaseSqlAction$Explain">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
         <group id="org.openkaryon.karyoforge.tools" text="KaryoForge" popup="true">
             <action id="org.openkaryon.karyoforge.notebook.new" text="New Jupyter Notebook..."
                     description="Create a local notebook without starting a Python runtime"

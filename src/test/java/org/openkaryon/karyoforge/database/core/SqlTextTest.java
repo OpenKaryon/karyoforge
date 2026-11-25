@@ -48,4 +48,18 @@ public final class SqlTextTest {
             assertThrows(input, IllegalArgumentException.class, () -> SqlText.compile(input));
         }
     }
+
+    @Test public void buildsOnlyReadQueryPlansAndKeepsNamedBindings() {
+        var dialect = SqlText.Dialect.POSTGRESQL;
+        var query = SqlText.explain("WITH v AS (SELECT :delete AS n) SELECT n, 'DELETE' FROM v", dialect);
+        assertEquals("EXPLAIN", query.keyword());
+        assertTrue(query.sql().startsWith("EXPLAIN WITH v AS (SELECT ?"));
+        assertEquals(List.of("delete"), query.parameters());
+        for (String rejected : List.of("EXPLAIN ANALYZE SELECT 1", "EXPLAIN (ANALYZE TRUE) SELECT 1",
+                "EXPLAIN SELECT 1 INTO scratch", "EXPLAIN WITH v AS (DELETE FROM samples RETURNING id) SELECT id FROM v")) {
+            assertThrows(rejected, IllegalArgumentException.class, () -> SqlText.compile(rejected, dialect));
+        }
+        assertEquals("EXPLAIN QUERY PLAN SELECT 1", SqlText.explain("SELECT 1", SqlText.Dialect.SQLITE).sql());
+        assertThrows(IllegalArgumentException.class, () -> SqlText.explain("SELECT 1", SqlText.Dialect.CLICKHOUSE));
+    }
 }

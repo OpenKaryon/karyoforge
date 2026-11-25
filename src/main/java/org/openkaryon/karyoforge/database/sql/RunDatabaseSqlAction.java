@@ -10,7 +10,17 @@ import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.openkaryon.karyoforge.database.ui.DatabaseEditorBridge;
 
-public final class RunDatabaseSqlAction extends AnAction implements DumbAware {
+public class RunDatabaseSqlAction extends AnAction implements DumbAware {
+    private final boolean explain;
+
+    public RunDatabaseSqlAction() { this(false); }
+
+    private RunDatabaseSqlAction(boolean explain) { this.explain = explain; }
+
+    public static final class Explain extends RunDatabaseSqlAction {
+        public Explain() { super(true); }
+    }
+
     @Override public @NotNull ActionUpdateThread getActionUpdateThread() { return ActionUpdateThread.BGT; }
 
     @Override public void update(@NotNull AnActionEvent event) {
@@ -27,7 +37,7 @@ public final class RunDatabaseSqlAction extends AnAction implements DumbAware {
         if (!accepts(file)) return;
         var caret = editor.getCaretModel().getPrimaryCaret();
         project.getService(DatabaseEditorBridge.class).run(file, editor.getDocument().getText(),
-                caret.getSelectionStart(), caret.getSelectionEnd());
+                caret.getSelectionStart(), caret.getSelectionEnd(), explain);
     }
 
     static boolean accepts(VirtualFile file) {

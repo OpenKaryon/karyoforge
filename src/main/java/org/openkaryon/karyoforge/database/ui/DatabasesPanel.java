@@ -107,7 +107,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         updateControls();
     }
 
-    void runFromEditor(String sourceId, String text, int start, int end) {
+    void runFromEditor(String sourceId, String text, int start, int end, boolean explain) {
         if (sourceId != null) {
             var target = sources.profiles().stream().filter(profile -> profile.id().equals(sourceId)).findFirst().orElse(null);
             if (target == null) {
@@ -117,7 +117,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
             if (selectedSource() == null || !sourceId.equals(selectedSource().id())) refreshProfiles(sourceId);
         }
         if (selected == null) report("Connect a data source before running SQL from the editor.");
-        else selected.runFromEditor(text, start, end);
+        else selected.runFromEditor(text, start, end, explain);
     }
 
     private void updateControls() {

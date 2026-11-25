@@ -60,11 +60,11 @@ public final class DatabaseEditorBridge {
         return editor;
     }
 
-    public void run(VirtualFile editor, String text, int start, int end) {
+    public void run(VirtualFile editor, String text, int start, int end, boolean explain) {
         var window = ToolWindowManager.getInstance(project).getToolWindow(DatabasesToolWindowFactory.ID);
         if (window == null) return;
         window.show(() -> {
-            if (panel != null) panel.runFromEditor(editor.getUserData(CONSOLE_SOURCE), text, start, end);
+            if (panel != null) panel.runFromEditor(editor.getUserData(CONSOLE_SOURCE), text, start, end, explain);
         });
     }
 }

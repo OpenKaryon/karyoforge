@@ -50,6 +50,7 @@ public final class SqlText {
         var initial = scan(text, dialect, false);
         var segment = requireSingle(initial);
         text = initial.text().substring(segment.start(), segment.end());
+        if (segment.keyword().equals("EXPLAIN")) requirePlanOnly(text, dialect);
         var compiled = new StringBuilder(text.length());
         var names = new LinkedHashSet<String>();
         var order = new ArrayList<String>();
@@ -146,21 +147,78 @@ public final class SqlText {
         return text;
     }
 
+    private static final Set<String> PLAN_SIDE_EFFECTS = Set.of("ALTER", "ANALYZE", "CALL", "COPY", "CREATE",
+            "DELETE", "DROP", "EXPLAIN", "INSERT", "INTO", "MERGE", "REPLACE", "SHARE", "TRUNCATE", "UPDATE");
+
+    public static Command explain(String sql, Dialect dialect) {
+        String query = single(scan(sql, dialect, false));
+        return compile((dialect == Dialect.SQLITE ? "EXPLAIN QUERY PLAN " : "EXPLAIN ") + query, dialect);
+    }
+
+    private static void requirePlanOnly(String sql, Dialect dialect) {
+        if (dialect == Dialect.CLICKHOUSE) throw new IllegalArgumentException("Explain is unavailable for ClickHouse.");
+        String error = "Explain requires one SELECT or read-only WITH query and uses no ANALYZE options.";
+        int start = skipTrivia(sql, "EXPLAIN".length(), dialect);
+        int end = wordEnd(sql, start);
+        if (dialect == Dialect.SQLITE && sql.substring(start, end).equalsIgnoreCase("QUERY")) {
+            int plan = skipTrivia(sql, end, dialect);
+            int planEnd = wordEnd(sql, plan);
+            if (!sql.substring(plan, planEnd).equalsIgnoreCase("PLAN")) throw new IllegalArgumentException(error);
+            start = skipTrivia(sql, planEnd, dialect);
+        }
+        String query = sql.substring(start);
+        var scanned = scan(query, dialect, false);
+        var statement = requireSingle(scanned);
+        if (!statement.keyword().equals("SELECT") && !statement.keyword().equals("WITH")) throw new IllegalArgumentException(error);
+        var spans = scanned.spans();
+        boolean selected = false;
+        int spanIndex = 0;
+        int depth = 0;
+        for (int index = 0; index < query.length();) {
+            if (spanIndex < spans.size() && spans.get(spanIndex).start() == index) {
+                index = spans.get(spanIndex++).end();
+                continue;
+            }
+            char c = query.charAt(index);
+            if (c == '(') depth++;
+            if (c == ')' && --depth < 0) throw new IllegalArgumentException(error);
+            if (c == ':' && (index == 0 || query.charAt(index - 1) != ':') && identifierStart(query, index + 1)) {
+                index = wordEnd(query, index + 1);
+                continue;
+            }
+            if (identifierStart(query, index)) {
+                int wordEnd = wordEnd(query, index);
+                String word = query.substring(index, wordEnd).toUpperCase(Locale.ROOT);
+                if (PLAN_SIDE_EFFECTS.contains(word)) throw new IllegalArgumentException(error);
+                if (depth == 0 && word.equals("SELECT")) selected = true;
+                index = wordEnd;
+            } else index++;
+        }
+        if (!selected || depth != 0) throw new IllegalArgumentException(error);
+    }
+
     static String followingKeyword(Command command) {
-        int start = command.keyword().length();
-        String sql = command.sql();
+        int start = skipTrivia(command.sql(), command.keyword().length(), command.dialect());
+        return command.sql().substring(start, wordEnd(command.sql(), start)).toUpperCase(Locale.ROOT);
+    }
+
+    private static int skipTrivia(String sql, int start, Dialect dialect) {
         while (start < sql.length()) {
             if (whitespace(sql.charAt(start))) {
                 start++;
                 continue;
             }
-            int comment = commentEnd(sql, start, command.dialect());
+            int comment = commentEnd(sql, start, dialect);
             if (comment <= start) break;
             start = comment;
         }
+        return start;
+    }
+
+    private static int wordEnd(String sql, int start) {
         int end = start;
         while (end < sql.length() && identifierPart(sql.charAt(end))) end++;
-        return sql.substring(start, end).toUpperCase(Locale.ROOT);
+        return end;
     }
 
     private static String single(Scan scan) {

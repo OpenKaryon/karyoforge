@@ -176,6 +176,18 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test public void requestsAnEnginePlanOnAReadOnlyConnectionWithBoundValues() throws Exception {
+        try (var session = new JdbcSession(fixture())) {
+            session.connect();
+            var object = session.schema().getFirst();
+            var plan = SqlText.explain(object.selectSql() + " WHERE id=:id", SqlText.Dialect.SQLITE);
+            var bindings = java.util.Map.of("id", SqlValue.of(SqlValue.Type.INTEGER, "3", false));
+            var result = (QueryPage) session.execute(plan, bindings, new QueryRequest());
+            assertTrue(result.columns().stream().anyMatch(column -> column.label().equalsIgnoreCase("detail")));
+            assertFalse(result.rows().isEmpty());
+        }
+    }
+
     @Test public void filtersAndPagesATableWithoutIssuingAnEditableSnapshot() throws Exception {
         var source = fixture();
         var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
