@@ -27,7 +27,7 @@ public final class SqliteJdbcSessionTest {
             var schema = session.schema();
             assertEquals(List.of("measure \"sample", "sample_view"), schema.stream().map(JdbcSession.SchemaObject::name).toList());
             assertEquals("SELECT * FROM main.\"measure \"\"sample\"", schema.getFirst().selectSql());
-            var first = session.execute(schema.getFirst().selectSql() + " ORDER BY id", new QueryRequest());
+            var first = query(session, schema.getFirst().selectSql() + " ORDER BY id", new QueryRequest());
             assertEquals(200, first.rows().size());
             assertEquals(1, first.page());
             assertTrue(first.hasNext());
@@ -54,12 +54,12 @@ public final class SqliteJdbcSessionTest {
         var source = fixture();
         try (var session = new JdbcSession(source)) {
             session.connect();
-            assertThrows(IllegalArgumentException.class, () -> session.execute("SELECT 1; SELECT 2", new QueryRequest()));
-            assertThrows(IllegalArgumentException.class, () -> session.execute("PRAGMA query_only = OFF", new QueryRequest()));
-            assertThrows(DatabaseProblem.class, () -> session.execute(
+            assertThrows(IllegalArgumentException.class, () -> query(session, "SELECT 1; SELECT 2", new QueryRequest()));
+            assertThrows(IllegalArgumentException.class, () -> query(session, "PRAGMA query_only = OFF", new QueryRequest()));
+            assertThrows(DatabaseProblem.class, () -> query(session,
                     "WITH chosen AS (SELECT 1) DELETE FROM \"measure \"\"sample\" WHERE id IN (SELECT * FROM chosen) RETURNING id",
                     new QueryRequest()));
-            var result = session.execute("-- leading comment\n SELECT 'x;''y' AS value; /* trailing comment */", new QueryRequest());
+            var result = query(session, "-- leading comment\n SELECT 'x;''y' AS value; /* trailing comment */", new QueryRequest());
             assertEquals("x;'y", result.rows().getFirst().cells().getFirst().value());
         }
         var absent = source.database().resolveSibling("not-created.db");
@@ -72,7 +72,7 @@ public final class SqliteJdbcSessionTest {
     @Test public void boundsDetachedTextAndBlobWithoutChangingExactScalars() throws Exception {
         try (var session = new JdbcSession(fixture())) {
             session.connect();
-            var page = session.execute("SELECT hex(zeroblob(9000)) AS text_value, zeroblob(9000) AS blob_value, " +
+            var page = query(session, "SELECT hex(zeroblob(9000)) AS text_value, zeroblob(9000) AS blob_value, " +
                     "9223372036854775807 AS exact_value", new QueryRequest());
             var cells = page.rows().getFirst().cells();
             assertEquals(QueryPage.Cell.Kind.TEXT, cells.get(0).kind());
@@ -90,7 +90,7 @@ public final class SqliteJdbcSessionTest {
         try (var session = new JdbcSession(fixture())) {
             session.connect();
             var request = new QueryRequest();
-            var work = new FutureTask<>(() -> assertThrows(DatabaseProblem.class, () -> session.execute("""
+            var work = new FutureTask<>(() -> assertThrows(DatabaseProblem.class, () -> query(session, """
                     WITH RECURSIVE countup(n) AS (
                       SELECT 1 UNION ALL SELECT n+1 FROM countup WHERE n < 1000000000
                     )
@@ -108,7 +108,7 @@ public final class SqliteJdbcSessionTest {
             assertFalse("The owned statement must settle after Stop", query.isAlive());
             assertEquals("Database request stopped.", work.get(2, TimeUnit.SECONDS).getMessage());
             request.stop();
-            assertEquals("42", session.execute("SELECT 42", new QueryRequest()).rows().getFirst().cells().getFirst().value());
+            assertEquals("42", query(session, "SELECT 42", new QueryRequest()).rows().getFirst().cells().getFirst().value());
         }
     }
 
@@ -126,7 +126,7 @@ public final class SqliteJdbcSessionTest {
             bound.put("day", SqlValue.of(SqlValue.Type.DATE, "2026-11-25", false));
             bound.put("time", SqlValue.of(SqlValue.Type.TIME, "09:30:02", false));
             bound.put("stamp", SqlValue.of(SqlValue.Type.TIMESTAMP, "2026-11-25 09:30:02", false));
-            var row = session.execute(query, bound, new QueryRequest()).rows().getFirst().cells();
+            var row = ((QueryPage) session.execute(query, bound, new QueryRequest())).rows().getFirst().cells();
             assertEquals("9223372036854775807", row.get(0).value());
             assertEquals(text, row.get(1).value());
             assertEquals(row.get(0), row.get(2));
@@ -139,10 +139,70 @@ public final class SqliteJdbcSessionTest {
 
             var position = SqlText.compile("SELECT ? AS bound");
             var empty = SqlValue.of(SqlValue.Type.TEXT, "", false);
-            assertEquals("", session.execute(position, java.util.Map.of("1", empty), new QueryRequest())
+            assertEquals("", ((QueryPage) session.execute(position, java.util.Map.of("1", empty), new QueryRequest()))
                     .rows().getFirst().cells().getFirst().value());
             assertThrows(IllegalArgumentException.class, () -> session.execute(position, java.util.Map.of(), new QueryRequest()));
         }
+    }
+
+    @Test public void commitsAndRollsBackChangesOnTheOwnedFile() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        try (var session = new JdbcSession(writable)) {
+            session.connect();
+            assertEquals(new SqlResult.UpdateCount(1), run(session, "INSERT INTO \"measure \"\"sample\" VALUES (206, 'pending', '')"));
+            assertEquals("206", scalar(session, "SELECT count(*) FROM \"measure \"\"sample\""));
+            assertEquals("205", committedRows(source));
+
+            assertThrows(DatabaseProblem.class, () -> run(session, "INSERT INTO \"measure \"\"sample\" VALUES (1, NULL, NULL)"));
+            assertEquals("206", scalar(session, "SELECT count(*) FROM \"measure \"\"sample\""));
+            for (String managed : List.of("COMMIT", "ROLLBACK", "ATTACH DATABASE ':memory:' AS other", "PRAGMA query_only=ON")) {
+                assertThrows(managed, IllegalArgumentException.class, () -> run(session, managed));
+            }
+
+            session.finishTransaction(false);
+            assertEquals("205", scalar(session, "SELECT count(*) FROM \"measure \"\"sample\""));
+            assertEquals(new SqlResult.UpdateCount(1), run(session, "INSERT INTO \"measure \"\"sample\" VALUES (206, 'kept', '')"));
+            session.finishTransaction(true);
+            assertEquals("206", committedRows(source));
+
+            var retained = (QueryPage) run(session, "SELECT * FROM \"measure \"\"sample\"");
+            assertTrue(retained.hasNext());
+            session.finishTransaction(false);
+            assertThrows(DatabaseProblem.class, () -> session.next(new QueryRequest()));
+            run(session, "DELETE FROM \"measure \"\"sample\" WHERE id <= 2");
+            assertEquals("204", scalar(session, "SELECT count(*) FROM \"measure \"\"sample\""));
+        }
+        assertEquals("206", committedRows(source));
+    }
+
+    @Test public void doesNotCreateMissingFilesForWritableProfiles() throws Exception {
+        var source = fixture();
+        Path absent = source.database().resolveSibling("absent.db");
+        try (var session = new JdbcSession(new SqliteSource("Owned", absent, source.driver(), true))) {
+            assertThrows(DatabaseProblem.class, session::connect);
+        }
+        assertFalse(Files.exists(absent));
+    }
+
+    private static String committedRows(SqliteSource source) {
+        try (var inspector = new JdbcSession(source)) {
+            inspector.connect();
+            assertThrows(DatabaseProblem.class, () -> inspector.finishTransaction(true));
+            return scalar(inspector, "SELECT count(*) FROM \"measure \"\"sample\"");
+        }
+    }
+
+    private static String scalar(JdbcSession session, String statement) {
+        return ((QueryPage) run(session, statement)).rows().getFirst().cells().getFirst().value();
+    }
+
+    private static SqlResult run(JdbcSession session, String statement) {
+        return session.execute(SqlText.compile(statement), java.util.Map.of(), new QueryRequest());
+    }
+
+    private static QueryPage query(JdbcSession session, String statement, QueryRequest request) {
+        return (QueryPage) session.execute(SqlText.compile(statement), java.util.Map.of(), request);
     }
 
     private static boolean inDriver(Thread thread) {

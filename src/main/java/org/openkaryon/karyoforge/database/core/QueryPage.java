@@ -3,7 +3,7 @@ package org.openkaryon.karyoforge.database.core;
 import java.util.List;
 import java.util.Objects;
 
-public record QueryPage(List<Column> columns, List<Row> rows, int page, int totalRows, boolean hasNext, String notice) {
+public record QueryPage(List<Column> columns, List<Row> rows, int page, int totalRows, boolean hasNext, String notice) implements SqlResult {
     public QueryPage {
         columns = List.copyOf(columns);
         rows = List.copyOf(rows);

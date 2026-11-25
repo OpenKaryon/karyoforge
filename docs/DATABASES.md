@@ -7,11 +7,17 @@ opens the file and loads the driver only when you choose **Connect**. A JDBC
 driver runs executable code in the IDE process. Use an artifact whose origin
 and checksum you trust. The IDE neither ships nor downloads JDBC drivers.
 
-SQLite opens the file in read-only mode and verifies the connection's
-query-only setting. Select a table or view and choose **Show Rows**, or enter
-a SELECT or WITH query. **Run SQL** and Ctrl+Enter run one statement, using
-the selection or the statement at the caret. The connection also enforces
-read-only access for WITH statements.
+SQLite opens an existing file read-only by default and verifies the
+connection's query-only setting. Select a table or view and choose **Show
+Rows**, or enter a SELECT or WITH query. **Run SQL** and Ctrl+Enter run one
+statement, using the selection or the statement at the caret. The connection
+also enforces read-only access for WITH statements.
+
+To write to an existing SQLite file, enable **Allow writes** in its source
+settings before connecting. Run SQL changes and finish with **Commit** or
+**Rollback**. Disconnect rolls back pending writes. The console controls
+transaction boundaries and connection settings, so use the buttons for
+transaction control and **Refresh Schema** after schema changes.
 
 Use named `:name` or positional `?` parameters in one statement. The SQL
 Parameters dialog binds text, integers, decimals, booleans, ISO dates, times,

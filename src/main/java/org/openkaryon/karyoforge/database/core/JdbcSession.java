@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /** Owns the connection and retained cursor. Except for QueryRequest.stop, use one command lane. */
 public final class JdbcSession implements AutoCloseable {
@@ -22,6 +23,9 @@ public final class JdbcSession implements AutoCloseable {
     private static final int MAX_BYTES = 8 * 1024 * 1024;
     private static final int MAX_CELL_CHARS = 16_384;
     private static final int MAX_SCHEMA_OBJECTS = 2000;
+    private static final Set<String> READ_COMMANDS = Set.of("SELECT", "WITH");
+    private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "INSERT", "UPDATE",
+            "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "EXPLAIN", "ANALYZE", "REINDEX");
     private final SqliteSource source;
     private DriverLease lease;
     private Connection connection;
@@ -46,16 +50,21 @@ public final class JdbcSession implements AutoCloseable {
             connection = lease.driver().connect(source.jdbcUrl(), settings);
             if (connection == null) throw new SQLException("The driver rejected the data source.");
             try (var statement = connection.createStatement()) {
-                statement.execute("PRAGMA query_only = ON");
+                int expectedQueryOnly = source.writable() ? 0 : 1;
+                statement.execute("PRAGMA query_only = " + expectedQueryOnly);
                 try (var rows = statement.executeQuery("PRAGMA query_only")) {
-                    if (!rows.next() || rows.getInt(1) != 1) throw new SQLException("Read-only mode was not established.");
+                    if (!rows.next() || rows.getInt(1) != expectedQueryOnly) {
+                        throw new SQLException("Could not establish the selected SQLite access mode.");
+                    }
                 }
             }
+            if (source.writable()) connection.setAutoCommit(false);
             quarantined = false;
             ready = true;
         } catch (SQLException | RuntimeException failure) {
             close();
-            throw new DatabaseProblem("Could not open the selected SQLite database in read-only mode.");
+            throw new DatabaseProblem("Could not open the selected SQLite database in "
+                    + (source.writable() ? "read-write" : "read-only") + " mode.");
         } finally {
             settings.clear();
         }
@@ -81,14 +90,12 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
-    public QueryPage execute(String sql, QueryRequest request) {
-        return execute(SqlText.compile(sql), Map.of(), request);
-    }
-
-    public QueryPage execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
+    public SqlResult execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
         checkReady();
-        if (!command.keyword().equals("SELECT") && !command.keyword().equals("WITH")) {
-            throw new IllegalArgumentException("Enter one SELECT or WITH query.");
+        if (!allowedCommands().contains(command.keyword())) {
+            throw new IllegalArgumentException(source.writable()
+                    ? "This SQLite command is unavailable. Use Commit and Rollback to control the transaction."
+                    : "Enter one SELECT or WITH query.");
         }
         var bindings = Map.copyOf(values);
         if (!bindings.keySet().containsAll(command.parameters()) || bindings.size() != command.parameters().size()) {
@@ -96,7 +103,7 @@ public final class JdbcSession implements AutoCloseable {
         }
         request.check();
         closeCursor();
-        return requestPage(request, () -> {
+        return this.<SqlResult>requestResult(request, () -> {
             var statement = connection.prepareStatement(command.sql());
             cursor = new Cursor(statement);
             request.attach(statement);
@@ -108,25 +115,28 @@ public final class JdbcSession implements AutoCloseable {
                 request.check();
                 bindings.get(name).bind(statement, index++);
             }
-            cursor.rows = statement.executeQuery();
+            if (!statement.execute()) return new SqlResult.UpdateCount(statement.getUpdateCount());
+            cursor.rows = statement.getResultSet();
             cursor.columns = columns(cursor.rows.getMetaData());
             return readPage(cursor, request);
         });
     }
 
+    private Set<String> allowedCommands() { return source.writable() ? WRITE_COMMANDS : READ_COMMANDS; }
+
     public QueryPage next(QueryRequest request) {
         checkReady();
         if (cursor == null) throw new DatabaseProblem("This query has no next page.");
-        return requestPage(request, () -> {
+        return requestResult(request, () -> {
             request.attach(cursor.statement);
             return readPage(cursor, request);
         });
     }
 
-    private QueryPage requestPage(QueryRequest request, ReadPage work) {
-        QueryPage page = null;
+    private <T extends SqlResult> T requestResult(QueryRequest request, ReadResult<T> work) {
+        T result = null;
         try {
-            page = work.run();
+            result = work.run();
         } catch (SQLException failure) {
             request.check();
             throw DatabaseProblem.query("Reading query results", failure);
@@ -135,11 +145,23 @@ public final class JdbcSession implements AutoCloseable {
             throw new DatabaseProblem("Could not read a detached query value.");
         } finally {
             if (request.finish()) quarantined = true;
-            if (page == null || request.stopped() || !page.hasNext()) closeCursor();
+            if (request.stopped() || !(result instanceof QueryPage page) || !page.hasNext()) closeCursor();
         }
         if (quarantined) throw new DatabaseProblem("Stop could not be confirmed. Disconnect this data source.");
         request.check();
-        return page;
+        return result;
+    }
+
+    public void finishTransaction(boolean commit) {
+        checkReady();
+        if (!source.writable()) throw new DatabaseProblem("This SQLite source is read-only.");
+        closeCursor();
+        try {
+            if (commit) connection.commit();
+            else connection.rollback();
+        } catch (SQLException failure) {
+            throw DatabaseProblem.query(commit ? "Committing the transaction" : "Rolling back the transaction", failure);
+        }
     }
 
     private static List<QueryPage.Column> columns(ResultSetMetaData metadata) throws SQLException {
@@ -213,6 +235,7 @@ public final class JdbcSession implements AutoCloseable {
         closeCursor();
         try {
             if (connection != null) {
+                if (!connection.getAutoCommit()) connection.rollback();
                 connection.close();
                 connection = null;
             }
@@ -231,7 +254,7 @@ public final class JdbcSession implements AutoCloseable {
     }
 
     @FunctionalInterface
-    private interface ReadPage { QueryPage run() throws SQLException, IOException; }
+    private interface ReadResult<T extends SqlResult> { T run() throws SQLException, IOException; }
 
     private static final class Cursor {
         private final Statement statement;

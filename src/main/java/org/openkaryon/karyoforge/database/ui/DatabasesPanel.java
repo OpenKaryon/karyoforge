@@ -15,6 +15,7 @@ import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.JdbcSession;
 import org.openkaryon.karyoforge.database.core.QueryPage;
 import org.openkaryon.karyoforge.database.core.QueryRequest;
+import org.openkaryon.karyoforge.database.core.SqlResult;
 import org.openkaryon.karyoforge.database.core.SqlText;
 import org.openkaryon.karyoforge.database.core.SqlValue;
 
@@ -46,6 +47,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JButton connect = button("Connect", this::connect);
     private final JButton disconnect = button("Disconnect", this::disconnect);
     private final JButton show = button("Show Rows", this::showRows);
+    private final JButton refresh = button("Refresh Schema", this::refreshSchema);
+    private final JButton commit = button("Commit", () -> finishTransaction(true));
+    private final JButton rollback = button("Rollback", () -> finishTransaction(false));
     private final JButton run = button("Run SQL", this::runSql);
     private final JButton next = button("Next Result Page", this::next);
     private final JButton stop = button("Stop", this::stop);
@@ -55,6 +59,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
             Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("KaryoForge database Stop").factory());
     private JdbcSession session; // Accessed only by the command executor.
     private boolean connected;
+    private boolean writable;
     private boolean busy;
     private boolean disposed;
     private QueryRequest active;
@@ -79,10 +84,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var sourceControls = controls(profiles, add, edit, remove, connect, disconnect);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
-        objectPanel.add(controls(show), BorderLayout.SOUTH);
+        objectPanel.add(controls(show, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
-        queryPanel.add(controls(run, next, stop), BorderLayout.SOUTH);
+        queryPanel.add(controls(run, next, stop, commit, rollback), BorderLayout.SOUTH);
         var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, new JBScrollPane(table));
         queryAndResult.setResizeWeight(0.25);
         var explorer = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, objectPanel, queryAndResult);
@@ -172,8 +177,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
             }
         }, objects -> {
             connected = true;
-            schema.setListData(objects.toArray(JdbcSession.SchemaObject[]::new));
-            report("Connected in read-only mode. " + objects.size() + " schema objects.");
+            writable = profile.source().writable();
+            showSchema(objects);
+            report(writable ? "Connected in read-write mode. Use Commit or Rollback to finish changes."
+                    : "Connected in read-only mode. " + objects.size() + " schema objects.");
         });
     }
 
@@ -186,9 +193,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
             return Boolean.TRUE;
         }, ignored -> {
             connected = false;
-            schema.setListData(new JdbcSession.SchemaObject[0]);
-            page = null;
-            table.setModel(new javax.swing.table.DefaultTableModel());
+            writable = false;
+            showSchema(List.of());
+            clearResult();
             report("Disconnected.");
         });
     }
@@ -218,7 +225,45 @@ final class DatabasesPanel extends JPanel implements Disposable {
         }
         var request = new QueryRequest();
         var bindings = values;
-        submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showPage);
+        submit("Running SQL…", request, () -> session.execute(command, bindings, request), this::showResult);
+    }
+
+    private void refreshSchema() {
+        submit("Refreshing the schema…", null, () -> session.schema(), objects -> {
+            showSchema(objects);
+            report("Schema refreshed. " + objects.size() + " objects.");
+        });
+    }
+
+    private void showSchema(List<JdbcSession.SchemaObject> objects) {
+        var selected = schema.getSelectedValue();
+        schema.setListData(objects.toArray(JdbcSession.SchemaObject[]::new));
+        if (selected != null) schema.setSelectedValue(selected, false);
+    }
+
+    private void finishTransaction(boolean commitChanges) {
+        submit(commitChanges ? "Committing…" : "Rolling back…", null, () -> {
+            session.finishTransaction(commitChanges);
+            return Boolean.TRUE;
+        }, ignored -> {
+            clearResult();
+            report(commitChanges ? "Transaction committed." : "Transaction rolled back.");
+        });
+    }
+
+    private void clearResult() {
+        page = null;
+        table.setModel(new javax.swing.table.DefaultTableModel());
+    }
+
+    private void showResult(SqlResult result) {
+        if (result instanceof QueryPage query) {
+            showPage(query);
+        } else if (result instanceof SqlResult.UpdateCount count) {
+            clearResult();
+            report(count.rows() < 0 ? "Statement completed. Changes are pending."
+                    : count.rows() + " affected rows. Changes are pending.");
+        }
     }
 
     private void next() {
@@ -302,6 +347,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
         remove.setEnabled(canManage && selected);
         connect.setEnabled(canManage && selected);
         disconnect.setEnabled(!busy && connected);
+        refresh.setEnabled(!busy && connected);
+        commit.setVisible(writable);
+        rollback.setVisible(writable);
+        commit.setEnabled(!busy && connected && writable);
+        rollback.setEnabled(!busy && connected && writable);
         run.setEnabled(!busy && connected);
         show.setEnabled(!busy && connected && schema.getSelectedValue() != null);
         next.setEnabled(!busy && connected && page != null && page.hasNext());

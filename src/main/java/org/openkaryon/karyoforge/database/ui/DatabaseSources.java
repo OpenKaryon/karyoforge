@@ -37,6 +37,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             row.name = profile.source().name();
             row.database = profile.source().database().toString();
             row.driver = profile.source().driver().toString();
+            row.writable = profile.source().writable();
             state.entries.add(row);
         }
         return state;
@@ -49,7 +50,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             if (entry == null || entry.id == null) continue;
             try {
                 String id = UUID.fromString(entry.id).toString();
-                var source = new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver));
+                var source = new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
                 profiles.putIfAbsent(id, new Profile(id, source));
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 // A malformed saved profile must not prevent valid profiles from loading.
@@ -70,5 +71,6 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         public String name;
         public String database;
         public String driver;
+        public boolean writable;
     }
 }

@@ -14,6 +14,8 @@ public final class DatabaseSourcesTest {
         Path root = Path.of("").toAbsolutePath();
         var source = new SqliteSource("Passive", root.resolve("missing.db"), root.resolve("missing.jar"));
         String id = original.save(null, source);
+        var writable = new SqliteSource("Writable", root.resolve("other.db"), source.driver(), true);
+        String writableId = original.save(null, writable);
         var snapshot = original.getState();
         var malformed = new DatabaseSources.Entry();
         malformed.id = "invalid";
@@ -21,8 +23,9 @@ public final class DatabaseSourcesTest {
         var restored = new DatabaseSources();
         restored.loadState(snapshot);
 
-        assertEquals(List.of(new DatabaseSources.Profile(id, source)), restored.profiles());
+        assertEquals(List.of(new DatabaseSources.Profile(id, source), new DatabaseSources.Profile(writableId, writable)), restored.profiles());
         restored.remove(id);
+        restored.remove(writableId);
         assertEquals(List.of(), restored.getState().entries);
     }
 }

@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
@@ -18,6 +19,7 @@ final class SqliteSourceDialog extends DialogWrapper {
     private final JBTextField name = new JBTextField(35);
     private final TextFieldWithBrowseButton database = new TextFieldWithBrowseButton();
     private final TextFieldWithBrowseButton driver = new TextFieldWithBrowseButton();
+    private final JBCheckBox writable = new JBCheckBox("Allow writes (manual Commit and Rollback)");
 
     SqliteSourceDialog(Project project, SqliteSource existing) {
         super(project);
@@ -34,12 +36,14 @@ final class SqliteSourceDialog extends DialogWrapper {
             name.setText(existing.name());
             database.setText(existing.database().toString());
             driver.setText(existing.driver().toString());
+            writable.setSelected(existing.writable());
         }
         init();
     }
 
     SqliteSource source() {
-        return new SqliteSource(name.getText(), Path.of(database.getText().strip()), Path.of(driver.getText().strip()));
+        return new SqliteSource(name.getText(), Path.of(database.getText().strip()), Path.of(driver.getText().strip()),
+                writable.isSelected());
     }
 
     @Override protected @Nullable ValidationInfo doValidate() {
@@ -57,7 +61,8 @@ final class SqliteSourceDialog extends DialogWrapper {
                 .addLabeledComponent("Name", name)
                 .addLabeledComponent("Existing database file", database)
                 .addLabeledComponent("Trusted JDBC JAR", driver)
-                .addComponent(new JBLabel("This connection is read-only. Saving a source does not connect."))
+                .addComponent(writable)
+                .addComponent(new JBLabel("Saving a source does not connect."))
                 .getPanel();
     }
 
