@@ -15,12 +15,8 @@ import java.util.Map;
 
 /** Owns the connection and retained cursor. Except for QueryRequest.stop, use one command lane. */
 public final class JdbcSession implements AutoCloseable {
-    public static final int PAGE_SIZE = 200;
-    private static final int MAX_ROWS = 10_000;
-    private static final int MAX_COLUMNS = 256;
-    private static final int MAX_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_CELL_CHARS = 16_384;
     private final DatabaseSource source;
+    private final ResultLimits limits;
     private final JdbcBackend backend;
     private DriverLease lease;
     private Connection connection;
@@ -29,9 +25,12 @@ public final class JdbcSession implements AutoCloseable {
     private boolean ready;
     private boolean quarantined;
 
-    public JdbcSession(DatabaseSource source) {
+    public JdbcSession(DatabaseSource source) { this(source, ResultLimits.DEFAULT); }
+
+    public JdbcSession(DatabaseSource source, ResultLimits limits) {
         this.source = source;
-        backend = JdbcBackend.forSource(source);
+        this.limits = limits;
+        backend = JdbcBackend.forSource(source, limits);
     }
 
     public void connect() { connect(null); }
@@ -199,9 +198,9 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
-    private static List<QueryPage.Column> columns(ResultSetMetaData metadata) throws SQLException {
+    private List<QueryPage.Column> columns(ResultSetMetaData metadata) throws SQLException {
         int count = metadata.getColumnCount();
-        if (count > MAX_COLUMNS) throw new DatabaseProblem("The result exceeds 256 columns.");
+        limits.checkColumns(count);
         var columns = new ArrayList<QueryPage.Column>();
         for (int index = 1; index <= count; index++) {
             String label = metadata.getColumnLabel(index);
@@ -211,10 +210,10 @@ public final class JdbcSession implements AutoCloseable {
         return List.copyOf(columns);
     }
 
-    private static QueryPage readPage(Cursor owner, QueryRequest request) throws SQLException, IOException {
+    private QueryPage readPage(Cursor owner, QueryRequest request) throws SQLException, IOException {
         var page = new ArrayList<QueryPage.Row>();
         boolean limited = false;
-        while (page.size() < PAGE_SIZE && owner.totalRows < MAX_ROWS) {
+        while (page.size() < limits.pageSize() && owner.totalRows < limits.maxRows()) {
             request.check();
             boolean available = owner.positioned || owner.rows.next();
             owner.positioned = false;
@@ -223,11 +222,11 @@ public final class JdbcSession implements AutoCloseable {
             int rowBytes = 0;
             for (int index = 1; index <= owner.columns.size(); index++) {
                 request.check();
-                int remaining = MAX_BYTES - owner.totalBytes - rowBytes;
+                int remaining = limits.maxBytes() - owner.totalBytes - rowBytes;
                 if (remaining < 4) { limited = true; break; }
-                var cell = JdbcValues.read(owner.rows, index, Math.min(MAX_CELL_CHARS, remaining / 4));
+                var cell = JdbcValues.read(owner.rows, index, Math.min(limits.maxCellChars(), remaining / 4));
                 rowBytes += JdbcValues.bytes(cell);
-                if (rowBytes > MAX_BYTES - owner.totalBytes) { limited = true; break; }
+                if (rowBytes > limits.maxBytes() - owner.totalBytes) { limited = true; break; }
                 cells.add(cell);
             }
             if (limited) break;
@@ -236,13 +235,14 @@ public final class JdbcSession implements AutoCloseable {
             owner.totalBytes += rowBytes;
         }
         request.check();
-        boolean more = !limited && page.size() == PAGE_SIZE && owner.rows.next();
-        owner.positioned = more;
-        String notice = limited ? "The 8 MiB result limit was reached." : "";
-        if (more && owner.totalRows >= MAX_ROWS) {
+        boolean atRowLimit = owner.totalRows == limits.maxRows();
+        boolean more = !limited && (page.size() == limits.pageSize() || atRowLimit) && owner.rows.next();
+        String notice = limited ? "The result reached its byte limit (" + limits.maxBytes() + " bytes)." : "";
+        if (more && atRowLimit) {
             more = false;
-            notice = "The 10,000-row result limit was reached.";
+            notice = "The result reached its row limit (" + limits.maxRows() + " rows).";
         }
+        owner.positioned = more;
         return new QueryPage(owner.columns, page, ++owner.page, owner.totalRows, more, notice);
     }
 

@@ -7,17 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class ReadOnlyTable {
-    private static final int MAX_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_CELL = 16_384;
 
-    static TableSnapshot open(Connection connection, TableDefinition definition, QueryRequest request)
+    static TableSnapshot open(Connection connection, TableDefinition definition, ResultLimits limits, QueryRequest request)
             throws SQLException, IOException {
         var columns = definition.columns().stream().map(column -> new QueryPage.Column(column.name(), column.type())).toList();
         var grid = new ArrayList<QueryPage.Row>();
         var object = definition.object();
         var names = columns.stream().map(column -> object.identifier(column.label())).toList();
         String sql = "SELECT " + String.join(", ", names) + " FROM " + object.qualified()
-                + " LIMIT " + (JdbcSession.PAGE_SIZE + 1);
+                + " LIMIT " + (limits.pageSize() + 1);
         int bytes = 0;
         boolean more = false;
         try (var command = connection.prepareStatement(sql)) {
@@ -29,18 +27,19 @@ final class ReadOnlyTable {
                 }
                 while (rows.next()) {
                     request.check();
-                    if (grid.size() == JdbcSession.PAGE_SIZE) {
+                    if (grid.size() == limits.pageSize()) {
                         more = true;
                         break;
                     }
                     var row = new ArrayList<QueryPage.Cell>();
                     for (int column = 0; column < columns.size(); column++) {
                         request.check();
-                        var cell = JdbcValues.read(rows, column + 1, MAX_CELL);
+                        var cell = JdbcValues.read(rows, column + 1, limits.maxCellChars());
                         bytes += JdbcValues.bytes(cell);
+                        if (bytes > limits.maxBytes()) break;
                         row.add(cell);
                     }
-                    if (bytes > MAX_BYTES) {
+                    if (bytes > limits.maxBytes()) {
                         more = true;
                         break;
                     }

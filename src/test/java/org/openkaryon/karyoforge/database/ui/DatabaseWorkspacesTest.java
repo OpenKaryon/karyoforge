@@ -2,6 +2,7 @@ package org.openkaryon.karyoforge.database.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import org.openkaryon.karyoforge.database.core.ResultLimits;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 
 import javax.accessibility.Accessible;
@@ -46,6 +47,22 @@ public final class DatabaseWorkspacesTest extends BasePlatformTestCase {
         } finally {
             sources.loadState(baseline);
         }
+    }
+
+    public void testReloadsSavedLimitsAndDefaultsForEarlierProfiles() {
+        var sources = new DatabaseSources();
+        var home = Path.of(getProject().getBasePath());
+        var source = new SqliteSource("Owned source", home.resolve("fixture.sqlite"), home.resolve("driver.jar"));
+        String current = sources.save(null, source);
+        String previous = sources.save(null, source);
+        var limits = new ResultLimits(75, 350, 2048, 32, 32, 40);
+        sources.saveLimits(current, limits);
+        sources.save(current, new SqliteSource("Renamed", source.database(), source.driver()));
+        var reopened = new DatabaseSources();
+        reopened.loadState(sources.getState());
+        assertEquals(limits, reopened.profiles().stream().filter(profile -> profile.id().equals(current)).findFirst().orElseThrow().limits());
+        assertEquals(ResultLimits.DEFAULT,
+                reopened.profiles().stream().filter(profile -> profile.id().equals(previous)).findFirst().orElseThrow().limits());
     }
 
     private static <T extends Component & Accessible> T find(Component component, Class<T> type, String name) {

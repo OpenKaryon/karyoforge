@@ -14,8 +14,14 @@ final class SqliteBackend implements JdbcBackend {
     private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "INSERT", "UPDATE",
             "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "EXPLAIN", "ANALYZE", "REINDEX");
     private final SqliteSource source;
+    private final ResultLimits limits;
 
-    SqliteBackend(SqliteSource source) { this.source = source; }
+    SqliteBackend(SqliteSource source, ResultLimits limits) {
+        this.source = source;
+        this.limits = limits;
+    }
+
+    @Override public ResultLimits limits() { return limits; }
 
     @Override public String driverClass() { return "org.sqlite.JDBC"; }
 
@@ -47,9 +53,9 @@ final class SqliteBackend implements JdbcBackend {
                      SELECT name, type FROM main.sqlite_schema
                      WHERE type IN ('table', 'view') AND name NOT GLOB 'sqlite_*'
                      ORDER BY name COLLATE NOCASE
-                     LIMIT 2000
-                     """)) {
-            while (rows.next() && result.size() < CATALOG_LIMIT) {
+                     LIMIT
+                     """ + limits.catalogLimit())) {
+            while (rows.next() && result.size() < limits.catalogLimit()) {
                 String name = rows.getString(1);
                 if (name.length() <= 1024 && name.indexOf('\0') < 0) result.add(new JdbcSession.SchemaObject(name, rows.getString(2)));
             }
@@ -77,7 +83,7 @@ final class SqliteBackend implements JdbcBackend {
             statement.setString(1, object.name());
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
-                    if (columns.size() == COLUMN_LIMIT) throw new DatabaseProblem("The object exceeds 256 columns.");
+                    limits.checkColumns(columns.size() + 1);
                     String name = rows.getString(1);
                     String type = rows.getString(2);
                     if (name.length() > 1024 || type.length() > 1024) {
@@ -91,7 +97,7 @@ final class SqliteBackend implements JdbcBackend {
     }
 
     @Override public TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException {
-        return SqliteTableEditor.browse(connection, definition, source.writable(), request);
+        return SqliteTableEditor.browse(connection, definition, source.writable(), limits, request);
     }
 
     @Override public int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,

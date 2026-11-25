@@ -242,7 +242,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         }
         submit("Testing " + requested.source().engine() + " connection…", null, () -> {
             char[] password = input.password();
-            try (var probe = new JdbcSession(requested.source())) {
+            try (var probe = new JdbcSession(requested.source(), requested.limits())) {
                 password = resolvePassword(requested, password);
                 probe.connect(password);
                 return true;
@@ -266,7 +266,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
             try {
                 if (session != null) session.close();
                 password = resolvePassword(requested, password);
-                session = new JdbcSession(requested.source());
+                session = new JdbcSession(requested.source(), requested.limits());
                 session.connect(password);
                 var objects = session.schema();
                 boolean saved = true;

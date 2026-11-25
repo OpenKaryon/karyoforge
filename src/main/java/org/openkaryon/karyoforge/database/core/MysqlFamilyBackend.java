@@ -28,9 +28,15 @@ final class MysqlFamilyBackend implements JdbcBackend {
     private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC",
             "INSERT", "UPDATE", "DELETE", "REPLACE");
     private final MysqlSource source;
+    private final ResultLimits limits;
     private PinnedJdbcBundle bundle;
 
-    MysqlFamilyBackend(MysqlSource source) { this.source = source; }
+    MysqlFamilyBackend(MysqlSource source, ResultLimits limits) {
+        this.source = source;
+        this.limits = limits;
+    }
+
+    @Override public ResultLimits limits() { return limits; }
 
     private boolean maria() { return source.variant() == MysqlSource.Variant.MARIADB; }
 
@@ -118,7 +124,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
 
     @Override public void configureStatement(PreparedStatement statement) throws SQLException {
         statement.setQueryTimeout(30);
-        statement.setFetchSize(JdbcSession.PAGE_SIZE);
+        statement.setFetchSize(limits.pageSize());
     }
 
     @Override public List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException {
@@ -126,12 +132,12 @@ final class MysqlFamilyBackend implements JdbcBackend {
         try (var statement = connection.prepareStatement("""
                 SELECT table_schema, table_name, IF(table_type='VIEW','view','table'), table_rows
                 FROM information_schema.tables WHERE table_schema=? AND table_type IN ('BASE TABLE','VIEW')
-                ORDER BY table_name LIMIT 2000
-                """)) {
+                ORDER BY table_name LIMIT
+                """ + limits.catalogLimit())) {
             statement.setQueryTimeout(30);
             statement.setString(1, source.database());
             try (var rows = statement.executeQuery()) {
-                while (rows.next() && objects.size() < CATALOG_LIMIT) {
+                while (rows.next() && objects.size() < limits.catalogLimit()) {
                     objects.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1),
                             SqlText.Dialect.MYSQL, JdbcSession.SchemaObject.estimate(rows.getString(4))));
                 }
@@ -155,7 +161,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
             statement.setString(2, object.name());
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
-                    if (columns.size() >= COLUMN_LIMIT) throw new DatabaseProblem("The object exceeds 256 columns.");
+                    limits.checkColumns(columns.size() + 1);
                     String name = rows.getString(1);
                     String type = rows.getString(2);
                     if (name.length() > 1024 || type.length() > 1024) throw new DatabaseProblem("A column declaration exceeds 1024 characters.");

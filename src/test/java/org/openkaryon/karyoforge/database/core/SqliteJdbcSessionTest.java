@@ -176,6 +176,32 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test public void appliesProfileResultLimitsToQueriesCatalogsAndTableSnapshots() throws Exception {
+        var source = fixture();
+        var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);
+        var limits = new ResultLimits(3, 5, 1024, 3, 3, 1);
+        try (var session = new JdbcSession(writable, limits)) {
+            session.connect();
+            assertEquals(1, session.schema().size());
+            var table = session.schema().getFirst();
+            var first = query(session, "SELECT CAST(id AS TEXT) || '-test' FROM " + table.qualified() + " ORDER BY id",
+                    new QueryRequest());
+            assertEquals(3, first.rows().size());
+            assertTrue(first.hasNext());
+            assertEquals(new QueryPage.Cell(QueryPage.Cell.Kind.TEXT, "1-t", true), first.rows().getFirst().cells().getFirst());
+            var last = session.next(new QueryRequest());
+            assertEquals(2, last.rows().size());
+            assertEquals(5, last.totalRows());
+            assertFalse(last.hasNext());
+            assertTrue(last.notice().contains("5 rows"));
+            assertThrows(DatabaseProblem.class, () -> query(session, "SELECT 1, 2, 3, 4", new QueryRequest()));
+
+            var tablePage = session.openTable(table, new QueryRequest());
+            assertEquals(3, tablePage.data().rows().size());
+            assertFalse(tablePage.rowProtection(0).isEmpty());
+        }
+    }
+
     @Test public void stopsBetweenPagesWhileKeepingDetachedRowsAndPendingChanges() throws Exception {
         var source = fixture();
         var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);

@@ -21,10 +21,16 @@ final class ClickHouseBackend implements JdbcBackend {
                     "5411a0d44e2725182271230b9fb4c2c4062c1b5fa7df2d83e00c0302733db173"));
     private static final Set<String> QUERIES = Set.of("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC");
     private final ClickHouseSource source;
+    private final ResultLimits limits;
     private PinnedJdbcBundle bundle;
     private ClickHouseConnection transport;
 
-    ClickHouseBackend(ClickHouseSource source) { this.source = source; }
+    ClickHouseBackend(ClickHouseSource source, ResultLimits limits) {
+        this.source = source;
+        this.limits = limits;
+    }
+
+    @Override public ResultLimits limits() { return limits; }
 
     @Override public String driverClass() { return "com.clickhouse.jdbc.Driver"; }
 
@@ -67,11 +73,11 @@ final class ClickHouseBackend implements JdbcBackend {
         var objects = new ArrayList<JdbcSession.SchemaObject>();
         try (var statement = connection.prepareStatement("""
                 SELECT database,name,if(engine IN ('View','MaterializedView','LiveView','WindowView'),'view','table'),total_rows
-                FROM system.tables WHERE database=? AND is_temporary=0 ORDER BY name LIMIT 2000
-                """)) {
+                FROM system.tables WHERE database=? AND is_temporary=0 ORDER BY name LIMIT
+                """ + limits.catalogLimit())) {
             statement.setString(1, source.database());
             try (var rows = statement.executeQuery()) {
-                while (rows.next() && objects.size() < CATALOG_LIMIT) {
+                while (rows.next() && objects.size() < limits.catalogLimit()) {
                     String name = rows.getString(2);
                     if (name.length() <= 1024 && name.indexOf('\0') < 0) {
                         objects.add(new JdbcSession.SchemaObject(name, rows.getString(3), rows.getString(1),
@@ -95,7 +101,7 @@ final class ClickHouseBackend implements JdbcBackend {
             try (var rows = statement.executeQuery()) {
                 int keys = 0;
                 while (rows.next()) {
-                    if (columns.size() >= COLUMN_LIMIT) throw new DatabaseProblem("The object exceeds 256 columns.");
+                    limits.checkColumns(columns.size() + 1);
                     String name = rows.getString(1);
                     String type = rows.getString(2);
                     String defaultKind = rows.getString(4);

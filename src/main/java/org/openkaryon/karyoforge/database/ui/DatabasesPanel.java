@@ -42,7 +42,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
         if (profile != null) editSource(profile, profile.source().dialect());
     });
     private final JButton remove = button("Remove Source", this::removeSource);
-    private final JPanel toolbar = controls(profiles, add, addDuck, addServer, edit, remove);
+    private final JButton limits = button("Query Limits", this::editLimits);
+    private final JPanel toolbar = controls(profiles, add, addDuck, addServer, edit, remove, limits);
     private DatabaseSessionPanel selected;
     private boolean refreshing;
     private boolean disposed;
@@ -123,6 +124,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private void updateControls() {
         boolean ready = selected != null && !selected.busy();
         edit.setEnabled(ready);
+        limits.setEnabled(ready);
         remove.setEnabled(ready && !selected.connected());
     }
 
@@ -184,6 +186,17 @@ final class DatabasesPanel extends JPanel implements Disposable {
             forgetPassword(profile);
         }
         report("Data source saved.");
+    }
+
+    private void editLimits() {
+        var profile = selectedSource();
+        if (profile == null) return;
+        var dialog = new DatabaseResultLimitsDialog(project, profile.limits());
+        if (!dialog.showAndGet()) return;
+        boolean reconnect = selected != null && selected.connected();
+        sources.saveLimits(profile.id(), dialog.limits());
+        refreshProfiles(profile.id());
+        report(reconnect ? "Query limits saved. Reconnect this source to apply them." : "Query limits saved.");
     }
 
     private void removeSource() {

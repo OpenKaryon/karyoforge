@@ -10,6 +10,7 @@ import org.openkaryon.karyoforge.database.core.DatabaseSource;
 import org.openkaryon.karyoforge.database.core.DuckDbSource;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
+import org.openkaryon.karyoforge.database.core.ResultLimits;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 import org.openkaryon.karyoforge.database.core.SshForwarding;
 
@@ -29,11 +30,16 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
 
     synchronized String save(String id, DatabaseSource source) {
         String key = id == null ? UUID.randomUUID().toString() : id;
-        profiles.put(key, new Profile(key, source));
+        var existing = profiles.get(key);
+        profiles.put(key, new Profile(key, source, existing == null ? ResultLimits.DEFAULT : existing.limits()));
         return key;
     }
 
     synchronized void remove(String id) { profiles.remove(id); }
+
+    synchronized void saveLimits(String id, ResultLimits limits) {
+        profiles.computeIfPresent(id, (key, old) -> new Profile(key, old.source(), limits));
+    }
 
     @Override public synchronized @NotNull Snapshot getState() {
         var state = new Snapshot();
@@ -43,6 +49,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             row.name = profile.source().name();
             row.driver = profile.source().driver().toString();
             row.writable = profile.source().writable();
+            if (!profile.limits().equals(ResultLimits.DEFAULT)) row.resultLimits = new LimitsEntry(profile.limits());
             switch (profile.source()) {
                 case SqliteSource sqlite -> row.database = sqlite.database().toString();
                 case DuckDbSource duck -> {
@@ -96,14 +103,16 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                             "mariadb".equals(entry.kind) ? MysqlSource.Variant.MARIADB : MysqlSource.Variant.MYSQL);
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
-                profiles.putIfAbsent(id, new Profile(id, source));
+                ResultLimits limits = entry.resultLimits == null ? ResultLimits.DEFAULT : entry.resultLimits.value();
+                profiles.putIfAbsent(id, new Profile(id, source, limits));
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 // A malformed saved profile must not prevent valid profiles from loading.
             }
         }
     }
 
-    record Profile(String id, DatabaseSource source) {
+    record Profile(String id, DatabaseSource source, ResultLimits limits) {
+        Profile(String id, DatabaseSource source) { this(id, source, ResultLimits.DEFAULT); }
         @Override public String toString() { return source.name(); }
     }
 
@@ -123,6 +132,35 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         public String database;
         public String driver;
         public boolean writable;
+        public LimitsEntry resultLimits;
+    }
+
+    public static final class LimitsEntry {
+        public int pageSize;
+        public int maxRows;
+        public int maxBytes;
+        public int maxCellChars;
+        public int maxColumns;
+        public int catalogLimit;
+
+        public LimitsEntry() {}
+
+        LimitsEntry(ResultLimits limits) {
+            pageSize = limits.pageSize();
+            maxRows = limits.maxRows();
+            maxBytes = limits.maxBytes();
+            maxCellChars = limits.maxCellChars();
+            maxColumns = limits.maxColumns();
+            catalogLimit = limits.catalogLimit();
+        }
+
+        ResultLimits value() {
+            try {
+                return new ResultLimits(pageSize, maxRows, maxBytes, maxCellChars, maxColumns, catalogLimit);
+            } catch (IllegalArgumentException malformed) {
+                return ResultLimits.DEFAULT;
+            }
+        }
     }
 
     public static final class SshEntry {

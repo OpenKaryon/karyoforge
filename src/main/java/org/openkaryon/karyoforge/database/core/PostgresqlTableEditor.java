@@ -16,11 +16,9 @@ import static org.openkaryon.karyoforge.database.core.JdbcSession.SchemaObject.q
 import static org.openkaryon.karyoforge.database.core.QueryPage.Cell.Kind;
 
 final class PostgresqlTableEditor {
-    private static final int MAX_CELL = 16_384;
-    private static final int MAX_BYTES = 8 * 1024 * 1024;
 
     static TableSnapshot browse(Connection connection, TableDefinition definition, boolean writable,
-                                QueryRequest request) throws SQLException, IOException {
+                                ResultLimits limits, QueryRequest request) throws SQLException, IOException {
         Relation relation = identify(connection, definition.object());
         var columns = definition.columns();
         if (columns.isEmpty()) throw new DatabaseProblem("The object has no visible columns.");
@@ -31,7 +29,7 @@ final class PostgresqlTableEditor {
         String from = editable ? " FROM ONLY " : " FROM ";
         String order = keys.isEmpty() ? "" : " ORDER BY " + String.join(", ", keys.stream().map(key -> quote(key.name())).toList());
         String sql = "SELECT " + fields + (editable ? ", xmin::text" : "") + from + definition.object().qualified()
-                + order + " LIMIT " + (JdbcSession.PAGE_SIZE + 1);
+                + order + " LIMIT " + (limits.pageSize() + 1);
         var originalRows = new ArrayList<TableSnapshot.OriginalRow>();
         var grid = new ArrayList<QueryPage.Row>();
         int bytes = 0;
@@ -42,7 +40,7 @@ final class PostgresqlTableEditor {
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
                     request.check();
-                    if (grid.size() == JdbcSession.PAGE_SIZE) {
+                    if (grid.size() == limits.pageSize()) {
                         more = true;
                         break;
                     }
@@ -52,13 +50,16 @@ final class PostgresqlTableEditor {
                     for (int index = 0; index < columns.size(); index++) {
                         request.check();
                         var type = valueType(columns.get(index));
-                        var cell = JdbcValues.read(rows, index + 1, MAX_CELL);
-                        if (editable) {
+                        var cell = JdbcValues.read(rows, index + 1, limits.maxCellChars());
+                        if (editable && cell.clipped()) rowProtection = "The row has no complete editable original value.";
+                        else if (editable) {
                             try {
-                                cell = exactTemporal(rows, index + 1, type, cell);
-                                if (cell.clipped() || cell.kind() == Kind.NULL && columns.get(index).keyPosition() > 0) {
+                                var exact = exactTemporal(rows, index + 1, type, cell);
+                                if (exact.value() != null && exact.value().length() > limits.maxCellChars()
+                                        || exact.kind() == Kind.NULL && columns.get(index).keyPosition() > 0) {
                                     rowProtection = "The row has no complete editable original value.";
                                 } else {
+                                    cell = exact;
                                     originalValue(type, cell);
                                 }
                             } catch (IllegalArgumentException unsupported) {
@@ -66,10 +67,11 @@ final class PostgresqlTableEditor {
                             }
                         }
                         bytes += JdbcValues.bytes(cell);
+                        if (bytes > limits.maxBytes()) break;
                         originals.add(new TableSnapshot.OriginalCell(cell, null));
                         displayed.add(cell);
                     }
-                    if (bytes > MAX_BYTES) {
+                    if (bytes > limits.maxBytes()) {
                         more = true;
                         break;
                     }

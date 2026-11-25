@@ -14,29 +14,29 @@ import static org.openkaryon.karyoforge.database.core.QueryPage.Cell.Kind;
 
 /** Uses saved primary keys and original SQLite storage values, never an unkeyed table grid. */
 final class SqliteTableEditor {
-    private static final int CELL_CHARS = 16_384;
-    private static final int MAX_BYTES = 8 * 1024 * 1024;
 
     static TableSnapshot browse(Connection connection, TableDefinition definition, boolean writable,
-                                QueryRequest request) throws SQLException {
+                                ResultLimits limits, QueryRequest request) throws SQLException {
         int version = schemaVersion(connection);
         var columns = definition.columns();
         if (columns.isEmpty()) throw new DatabaseProblem("The object has no visible columns.");
         List<TableDefinition.Column> keys = keys(definition);
         String protection = protection(connection, definition, keys, writable);
+        int cellChars = limits.maxCellChars();
+        int inspectedBytes = cellChars / 2 + 1;
         var fields = new ArrayList<String>();
         for (var column : columns) {
             String identifier = quote(column.name());
             String type = "typeof(" + identifier + ")";
             fields.add(type);
-            fields.add("CASE " + type + " WHEN 'blob' THEN hex(substr(" + identifier + ",1,8193))"
-                    + " ELSE substr(CAST(" + identifier + " AS TEXT),1,16385) END");
-            fields.add("CASE WHEN " + type + " = 'text' THEN hex(substr(CAST(" + identifier + " AS BLOB),1,8193)) END");
+            fields.add("CASE " + type + " WHEN 'blob' THEN hex(substr(" + identifier + ",1," + inspectedBytes + "))"
+                    + " ELSE substr(CAST(" + identifier + " AS TEXT),1," + (cellChars + 1) + ") END");
+            fields.add("CASE WHEN " + type + " = 'text' THEN hex(substr(CAST(" + identifier + " AS BLOB),1," + inspectedBytes + ")) END");
             fields.add("CASE WHEN " + type + " = 'text' THEN instr(" + identifier + ",char(0)) ELSE 0 END");
         }
         String order = keys.isEmpty() ? "" : " ORDER BY " + String.join(", ", keys.stream().map(key -> quote(key.name())).toList());
         String sql = "SELECT " + String.join(", ", fields) + " FROM " + table(definition) + order
-                + " LIMIT " + (JdbcSession.PAGE_SIZE + 1);
+                + " LIMIT " + (limits.pageSize() + 1);
         var originals = new ArrayList<TableSnapshot.OriginalRow>();
         var displayRows = new ArrayList<QueryPage.Row>();
         boolean more = false;
@@ -46,7 +46,7 @@ final class SqliteTableEditor {
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
                     request.check();
-                    if (displayRows.size() == JdbcSession.PAGE_SIZE) {
+                    if (displayRows.size() == limits.pageSize()) {
                         more = true;
                         break;
                     }
@@ -56,17 +56,18 @@ final class SqliteTableEditor {
                     for (int column = 0; column < columns.size(); column++) {
                         request.check();
                         int offset = column * 4 + 1;
-                        var original = original(rows, offset);
+                        var original = original(rows, offset, cellChars);
                         var value = original.value();
                         cells.add(original);
                         values.add(value);
                         String witness = original.textBytes();
                         bytes += JdbcValues.bytes(value) + (witness == null ? 0 : witness.length());
+                        if (bytes > limits.maxBytes()) break;
                         if (value.clipped() || rows.getInt(offset + 3) != 0) reason = "An original value has no exact editable preview.";
                         if (value.kind() == Kind.DECIMAL || value.kind() == Kind.OTHER) reason = "This row has an unsupported original storage value.";
                         if (value.kind() == Kind.NULL && columns.get(column).keyPosition() > 0) reason = "This row has a NULL key component.";
                     }
-                    if (bytes > MAX_BYTES) {
+                    if (bytes > limits.maxBytes()) {
                         more = true;
                         break;
                     }
@@ -83,7 +84,7 @@ final class SqliteTableEditor {
         return new TableSnapshot(definition, grid, protection, version, originals, SqliteTableEditor::editableType);
     }
 
-    private static TableSnapshot.OriginalCell original(ResultSet rows, int offset) throws SQLException {
+    private static TableSnapshot.OriginalCell original(ResultSet rows, int offset, int cellChars) throws SQLException {
         Kind kind = switch (rows.getString(offset)) {
             case "null" -> Kind.NULL;
             case "integer" -> Kind.INTEGER;
@@ -94,9 +95,9 @@ final class SqliteTableEditor {
         };
         String raw = rows.getString(offset + 1);
         String witness = rows.getString(offset + 2);
-        boolean clipped = raw != null && raw.length() > CELL_CHARS || witness != null && witness.length() > CELL_CHARS;
-        if (raw != null && raw.length() > CELL_CHARS) {
-            int end = Character.isHighSurrogate(raw.charAt(CELL_CHARS - 1)) ? CELL_CHARS - 1 : CELL_CHARS;
+        boolean clipped = raw != null && raw.length() > cellChars || witness != null && witness.length() > cellChars;
+        if (raw != null && raw.length() > cellChars) {
+            int end = Character.isHighSurrogate(raw.charAt(cellChars - 1)) ? cellChars - 1 : cellChars;
             raw = raw.substring(0, end);
         }
         return new TableSnapshot.OriginalCell(new QueryPage.Cell(kind, raw, clipped), witness);

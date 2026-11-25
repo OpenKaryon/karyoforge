@@ -38,12 +38,13 @@ timestamps, hexadecimal BLOBs and explicit NULL values. Repeated names share
 a value. Literal and comment text is left intact. Cancelling the dialog leaves the existing result
 and database session untouched.
 
-Results show 200 rows per page. **Next Result Page** continues the active cursor.
-The preview is bounded to 10,000 rows, 8 MiB of detached cell text, 256 columns
-and 16,384 characters per cell. Large text and BLOB cells show clipped previews.
+**Next Result Page** continues the active cursor. **Query Limits** sets
+the page size, total rows, detached bytes, cell characters, columns and
+catalog size for the next connection. Defaults are 200 rows per page,
+10,000 total rows, 8 MiB of detached values, 256 columns, 16,384 characters
+per cell and 2,000 catalog objects. Large text and BLOB cells show clipped previews.
 NULL is distinct from empty text, BLOBs appear as hexadecimal, and SQLite
-integers retain their full precision. The catalog groups up to 2,000 tables
-and views by schema. **Filter tables** narrows the loaded catalog. Expand an
+integers retain their full precision. The catalog groups tables and views by schema. **Filter tables** narrows the loaded catalog. Expand an
 object to load its columns, or choose **Inspect** for declared column types,
 null constraints, primary-key order and hidden/generated columns in **Structure**.
 PostgreSQL, MySQL, MariaDB and ClickHouse show row estimates when their catalogs

@@ -28,11 +28,17 @@ final class PostgresqlBackend implements JdbcBackend {
     private static final String FORWARDING_DRIVER_SHA256 =
             "73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c";
     private final PostgresqlSource source;
+    private final ResultLimits limits;
     private Path verifiedDriver;
     private OpenSshTunnel tunnel;
     private Class<?> forwardSockets;
 
-    PostgresqlBackend(PostgresqlSource source) { this.source = source; }
+    PostgresqlBackend(PostgresqlSource source, ResultLimits limits) {
+        this.source = source;
+        this.limits = limits;
+    }
+
+    @Override public ResultLimits limits() { return limits; }
 
     @Override public String driverClass() { return "org.postgresql.Driver"; }
 
@@ -148,7 +154,7 @@ final class PostgresqlBackend implements JdbcBackend {
 
     @Override public void configureStatement(PreparedStatement statement) throws SQLException {
         statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
-        statement.setFetchSize(JdbcSession.PAGE_SIZE);
+        statement.setFetchSize(limits.pageSize());
     }
 
     @Override public boolean statementSavepoints() { return true; }
@@ -167,9 +173,9 @@ final class PostgresqlBackend implements JdbcBackend {
                       AND n.nspname <> 'information_schema'
                       AND pg_catalog.left(n.nspname, 3) <> 'pg_'
                       AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
-                    ORDER BY n.nspname, c.relname LIMIT 2000
-                    """)) {
-                while (rows.next() && result.size() < CATALOG_LIMIT) {
+                    ORDER BY n.nspname, c.relname LIMIT
+                    """ + limits.catalogLimit())) {
+                while (rows.next() && result.size() < limits.catalogLimit()) {
                     result.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1),
                             SqlText.Dialect.POSTGRESQL, JdbcSession.SchemaObject.estimate(rows.getString(4))));
                 }
@@ -217,7 +223,7 @@ final class PostgresqlBackend implements JdbcBackend {
             statement.setLong(1, oid);
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
-                    if (columns.size() == COLUMN_LIMIT) throw new DatabaseProblem("The object exceeds 256 columns.");
+                    limits.checkColumns(columns.size() + 1);
                     String name = rows.getString(1);
                     String type = rows.getString(2);
                     if (name.length() > 1024 || type.length() > 1024) {
@@ -259,7 +265,7 @@ final class PostgresqlBackend implements JdbcBackend {
 
     @Override public TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request)
             throws SQLException, IOException {
-        return PostgresqlTableEditor.browse(connection, definition, source.writable(), request);
+        return PostgresqlTableEditor.browse(connection, definition, source.writable(), limits, request);
     }
 
     @Override public int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,

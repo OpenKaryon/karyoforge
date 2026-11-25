@@ -11,8 +11,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 interface JdbcBackend {
-    int CATALOG_LIMIT = 2000;
-    int COLUMN_LIMIT = 256;
+    ResultLimits limits();
 
     String driverClass();
     Connection connect(Driver driver, char[] password) throws SQLException;
@@ -21,7 +20,7 @@ interface JdbcBackend {
     TableDefinition describe(Connection connection, JdbcSession.SchemaObject object) throws SQLException;
     void validate(SqlText.Command command);
     default TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException {
-        return ReadOnlyTable.open(connection, definition, request);
+        return ReadOnlyTable.open(connection, definition, limits(), request);
     }
 
     default int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
@@ -46,13 +45,13 @@ interface JdbcBackend {
     default void configureStatement(PreparedStatement statement) throws SQLException {}
     default boolean statementSavepoints() { return false; }
 
-    static JdbcBackend forSource(DatabaseSource source) {
+    static JdbcBackend forSource(DatabaseSource source, ResultLimits limits) {
         return switch (source) {
-            case SqliteSource sqlite -> new SqliteBackend(sqlite);
-            case PostgresqlSource postgres -> new PostgresqlBackend(postgres);
-            case MysqlSource mysql -> new MysqlFamilyBackend(mysql);
-            case DuckDbSource duck -> new DuckDbBackend(duck);
-            case ClickHouseSource click -> new ClickHouseBackend(click);
+            case SqliteSource sqlite -> new SqliteBackend(sqlite, limits);
+            case PostgresqlSource postgres -> new PostgresqlBackend(postgres, limits);
+            case MysqlSource mysql -> new MysqlFamilyBackend(mysql, limits);
+            case DuckDbSource duck -> new DuckDbBackend(duck, limits);
+            case ClickHouseSource click -> new ClickHouseBackend(click, limits);
         };
     }
 }

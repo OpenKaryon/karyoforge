@@ -20,8 +20,14 @@ final class DuckDbBackend implements JdbcBackend {
     private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "FROM", "TABLE", "SHOW", "DESCRIBE",
             "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "MERGE", "TRUNCATE");
     private final DuckDbSource source;
+    private final ResultLimits limits;
 
-    DuckDbBackend(DuckDbSource source) { this.source = source; }
+    DuckDbBackend(DuckDbSource source, ResultLimits limits) {
+        this.source = source;
+        this.limits = limits;
+    }
+
+    @Override public ResultLimits limits() { return limits; }
 
     @Override public String driverClass() { return "org.duckdb.DuckDBDriver"; }
 
@@ -75,9 +81,9 @@ final class DuckDbBackend implements JdbcBackend {
                      UNION ALL
                      SELECT schema_name, view_name AS object_name, 'view' AS object_type
                        FROM duckdb_views() WHERE database_name=current_database() AND NOT internal AND NOT temporary
-                     ORDER BY 1,2 LIMIT 2000
-                     """)) {
-            while (rows.next() && objects.size() < CATALOG_LIMIT) {
+                     ORDER BY 1,2 LIMIT
+                     """ + limits.catalogLimit())) {
+            while (rows.next() && objects.size() < limits.catalogLimit()) {
                 String name = rows.getString(2);
                 String schema = rows.getString(1);
                 if (name.length() > 1024 || schema.length() > 1024) continue;
@@ -106,7 +112,7 @@ final class DuckDbBackend implements JdbcBackend {
             statement.setString(2, object.name());
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
-                    if (columns.size() == COLUMN_LIMIT) throw new DatabaseProblem("The object exceeds 256 columns.");
+                    limits.checkColumns(columns.size() + 1);
                     String name = rows.getString(1);
                     String type = rows.getString(2);
                     if (name.length() > 1024 || type.length() > 1024) throw new DatabaseProblem("A column declaration exceeds 1024 characters.");
