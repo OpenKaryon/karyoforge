@@ -46,6 +46,9 @@ class SqliteDatabasesUiTest {
             }
             ideFrame {
                 x { byVisibleText("Data source saved.") }.shouldBe("Saving is passive", present, 1.minutes)
+                button { byVisibleText("Test Connection") }.click()
+                x { byVisibleText("Connection test passed. The temporary session was closed.") }
+                    .shouldBe("Testing releases the temporary connection", present, 1.minutes)
                 button { byVisibleText("Connect") }.click()
                 x { contains(byVisibleText("Connected in read-only mode.")) }
                     .shouldBe("The driver opens the owned source", present, 1.minutes)

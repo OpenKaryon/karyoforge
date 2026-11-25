@@ -6,6 +6,15 @@ SQLite JDBC JAR. The name and paths are saved in application settings. The IDE
 opens the file and loads the driver only when you choose **Connect**. A JDBC
 driver runs executable code in the IDE process. Use an artifact whose origin
 and checksum you trust. The IDE neither ships nor downloads JDBC drivers.
+Use **Test Connection** to open and close a temporary session for the selected
+profile. It leaves the project's active connection and catalog in place.
+
+Server profiles can save their password with **Remember password in PasswordSafe**
+when connecting. This choice starts unchecked. Leave the field blank to reuse
+a remembered password. The entry belongs to the profile and its destination,
+including the selected driver, TLS trust file and SSH configuration. Renaming
+a profile keeps that entry. Changing the destination or removing the profile
+clears its prior entry. Database settings contain no passwords.
 
 SQLite opens an existing file read-only by default and verifies the
 connection's query-only setting. Select a table or view and choose **Show
@@ -82,7 +91,7 @@ Connections without TLS are limited to loopback. For verified TLS, enable
 **Verify server TLS certificate and host name** and select the server's CA
 certificate. The connection requires that CA and that the certificate match
 the configured host name or IP. The profile stores the endpoint, database,
-user name and CA path. **Connect** asks for the password for that session.
+user name and CA path. **Connect** prompts for the session password.
 The default access mode is an engine-enforced read-only transaction.
 A PostgreSQL profile configured for writes uses manual **Commit** and
 **Rollback**. A failed or stopped statement rolls back to its own

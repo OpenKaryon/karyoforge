@@ -72,6 +72,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     });
     private final JButton remove = button("Remove Source", this::removeSource);
     private final JButton connect = button("Connect", this::connect);
+    private final JButton testConnection = button("Test Connection", this::testConnection);
     private final JButton disconnect = button("Disconnect", this::disconnect);
     private final JButton show = button("Show Rows", this::showRows);
     private final JButton inspect = button("Inspect", this::inspect);
@@ -134,7 +135,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setCellRenderer(literalListRenderer());
         profiles.setRenderer(literalListRenderer());
 
-        var sourceControls = controls(profiles, add, addDuck, addServer, edit, remove, connect, disconnect, commit, rollback);
+        var sourceControls = controls(profiles, add, addDuck, addServer, edit, remove, connect, testConnection, disconnect, commit, rollback);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
@@ -253,7 +254,12 @@ final class DatabasesPanel extends JPanel implements Disposable {
         if (source == null) return;
         String id = sources.save(profile == null ? null : profile.id(), source);
         refreshProfiles(id);
-        report("Data source saved.");
+        if (profile != null && profile.source().usesPassword()
+                && !DatabaseCredentials.sameDestination(profile, new DatabaseSources.Profile(id, source))) {
+            forgetPassword(profile, "Data source saved.");
+        } else {
+            report("Data source saved.");
+        }
     }
 
     private void removeSource() {
@@ -264,45 +270,94 @@ final class DatabasesPanel extends JPanel implements Disposable {
         if (result != Messages.YES) return;
         sources.remove(profile.id());
         refreshProfiles(null);
-        report("Data source removed.");
+        if (profile.source().usesPassword()) forgetPassword(profile, "Data source removed.");
+        else report("Data source removed.");
+    }
+
+    private void forgetPassword(DatabaseSources.Profile profile, String confirmation) {
+        submit("Clearing the previous database credential…", null, () -> {
+            try {
+                DatabaseCredentials.forget(profile);
+                return true;
+            } catch (RuntimeException unavailable) {
+                return false;
+            }
+        }, cleared -> report(cleared ? confirmation : confirmation + " PasswordSafe could not clear the previous credential."));
+    }
+
+    private ConnectionPasswordDialog.Input askForPassword(DatabaseSources.Profile profile, boolean test) {
+        if (!profile.source().usesPassword()) return new ConnectionPasswordDialog.Input(new char[0], false);
+        var dialog = new ConnectionPasswordDialog(project, profile.source().engine(), test);
+        return dialog.showAndGet() ? dialog.takeInput() : null;
+    }
+
+    private static char[] resolvePassword(DatabaseSources.Profile profile, char[] entered) {
+        if (!profile.source().usesPassword() || entered.length != 0) return entered;
+        try {
+            return DatabaseCredentials.recall(profile);
+        } catch (RuntimeException unavailable) {
+            throw new DatabaseProblem("PasswordSafe could not read the remembered password. Enter the password explicitly.");
+        }
+    }
+
+    private void testConnection() {
+        var profile = selectedSource();
+        if (profile == null || disposed || busy) return;
+        var input = askForPassword(profile, true);
+        if (input == null) return;
+        submit("Testing " + profile.source().engine() + " connection…", null, () -> {
+            char[] password = input.password();
+            try (var probe = new JdbcSession(profile.source())) {
+                password = resolvePassword(profile, password);
+                probe.connect(password);
+                return true;
+            } finally {
+                Arrays.fill(password, '\0');
+            }
+        }, ignored -> report("Connection test passed. The temporary session was closed."));
     }
 
     private void connect() {
         var profile = selectedSource();
-        if (profile == null) return;
-        char[] password = new char[0];
-        if (profile.source().usesPassword()) {
-            var dialog = new ConnectionPasswordDialog(project, profile.source().engine());
-            if (!dialog.showAndGet()) return;
-            password = dialog.takePassword();
-        }
-        final char[] entered = password;
-        if (disposed || busy) {
-            Arrays.fill(entered, '\0');
-            return;
-        }
+        if (profile == null || disposed || busy) return;
+        var input = askForPassword(profile, false);
+        if (input == null) return;
         submit("Connecting to " + profile.source().engine() + "…", null, () -> {
+            char[] password = input.password();
             try {
                 if (session != null) session.close();
+                password = resolvePassword(profile, password);
                 session = new JdbcSession(profile.source());
-                session.connect(entered);
-                return session.schema();
+                session.connect(password);
+                var objects = session.schema();
+                boolean saved = true;
+                if (input.remember() && input.password().length != 0) {
+                    try {
+                        DatabaseCredentials.remember(profile, password);
+                    } catch (RuntimeException unavailable) {
+                        saved = false;
+                    }
+                }
+                return new Connected(objects, saved);
             } catch (DatabaseProblem unavailable) {
                 if (session != null) session.close();
                 session = null;
                 throw unavailable;
             } finally {
-                Arrays.fill(entered, '\0');
+                Arrays.fill(password, '\0');
             }
-        }, objects -> {
+        }, opened -> {
             connected = true;
             activeSource = profile.source();
             writable = profile.source().writable();
-            showSchema(objects);
-            report(writable ? "Connected in read-write mode. Use Commit or Rollback to finish changes."
-                    : "Connected in read-only mode. " + objects.size() + " schema objects.");
+            showSchema(opened.objects());
+            String message = writable ? "Connected in read-write mode. Use Commit or Rollback to finish changes."
+                    : "Connected in read-only mode. " + opened.objects().size() + " schema objects.";
+            report(opened.passwordSaved() ? message : message + " PasswordSafe could not remember the password.");
         });
     }
+
+    private record Connected(List<JdbcSession.SchemaObject> objects, boolean passwordSaved) {}
 
     private void disconnect() {
         if (!discardTableDraft()) return;
@@ -751,6 +806,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         edit.setEnabled(canManage && selected);
         remove.setEnabled(canManage && selected);
         connect.setEnabled(canManage && selected);
+        testConnection.setEnabled(!busy && selected);
         disconnect.setEnabled(!busy && connected);
         refresh.setEnabled(!busy && connected);
         commit.setVisible(writable);
