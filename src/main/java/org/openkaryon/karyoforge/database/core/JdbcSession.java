@@ -115,7 +115,7 @@ public final class JdbcSession implements AutoCloseable {
         closeCursor();
         editableSnapshot = null;
         return this.<SqlResult>requestResult("Executing SQL", request, () -> {
-            backend.beforeStatement(connection);
+            backend.beforeStatement(connection, request);
             cursor = new Cursor();
             if (backend.statementSavepoints()) cursor.savepoint = connection.setSavepoint();
             var statement = connection.prepareStatement(command.sql());
@@ -295,6 +295,10 @@ public final class JdbcSession implements AutoCloseable {
         }
 
         String identifier(String value) {
+            if (dialect == SqlText.Dialect.CLICKHOUSE) {
+                String tick = Character.toString(96);
+                return tick + value.replace("\\", "\\\\").replace(tick, "\\" + tick) + tick;
+            }
             return dialect == SqlText.Dialect.MYSQL ? mysqlQuote(value) : quote(value);
         }
         public String selectSql() { return "SELECT * FROM " + qualified(); }

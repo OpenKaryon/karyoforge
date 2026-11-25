@@ -137,6 +137,9 @@ tasks.test {
     val duckDriver = providers.gradleProperty("duckdbDriver").orElse("").get()
     if (duckDriver.isBlank()) exclude("**/DuckDbJdbcSessionTest.class")
     systemProperty("karyoforge.database.duckdb.driver", duckDriver)
+    val clickhouseDriver = providers.gradleProperty("clickhouseDriver").orElse("").get()
+    if (clickhouseDriver.isBlank()) exclude("**/ClickHouseJdbcSessionTest.class")
+    systemProperty("karyoforge.database.clickhouse.driver", clickhouseDriver)
     if (!providers.gradleProperty("postgresSshTests").orElse("false").get().toBoolean()) {
         exclude("**/PostgresqlSshJdbcSessionTest.class")
     }

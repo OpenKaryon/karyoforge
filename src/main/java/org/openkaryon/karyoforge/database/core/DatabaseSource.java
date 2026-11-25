@@ -3,7 +3,7 @@ package org.openkaryon.karyoforge.database.core;
 import java.nio.file.Path;
 import java.util.Objects;
 
-public sealed interface DatabaseSource permits SqliteSource, PostgresqlSource, MysqlSource, DuckDbSource {
+public sealed interface DatabaseSource permits SqliteSource, PostgresqlSource, MysqlSource, DuckDbSource, ClickHouseSource {
     String name();
     Path driver();
     boolean writable();

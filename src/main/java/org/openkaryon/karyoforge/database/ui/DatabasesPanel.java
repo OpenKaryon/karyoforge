@@ -11,6 +11,7 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.table.JBTable;
+import org.openkaryon.karyoforge.database.core.ClickHouseSource;
 import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
 import org.openkaryon.karyoforge.database.core.DuckDbSource;
@@ -210,6 +211,9 @@ final class DatabasesPanel extends JPanel implements Disposable {
         var maria = new JMenuItem("MariaDB");
         maria.addActionListener(event -> editSource(null, SqlText.Dialect.MYSQL, MysqlSource.Variant.MARIADB));
         menu.add(maria);
+        var click = new JMenuItem("ClickHouse");
+        click.addActionListener(event -> editSource(null, SqlText.Dialect.CLICKHOUSE));
+        menu.add(click);
         menu.show(addServer, 0, addServer.getHeight());
     }
 
@@ -230,6 +234,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
             }
             case POSTGRESQL -> {
                 var dialog = new PostgresqlSourceDialog(project, (PostgresqlSource) existing);
+                yield dialog.showAndGet() ? dialog.source() : null;
+            }
+            case CLICKHOUSE -> {
+                var dialog = new ClickHouseSourceDialog(project, (ClickHouseSource) existing);
                 yield dialog.showAndGet() ? dialog.source() : null;
             }
             case MYSQL -> {

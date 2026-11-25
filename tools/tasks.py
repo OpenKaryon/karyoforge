@@ -44,6 +44,8 @@ HELP = """KaryoForge local commands:
                                 Real MariaDB tests in an owned loopback Docker container
   make test-duckdb DUCKDB_DRIVER="/path/to/duckdb_jdbc.jar"
                                 Real DuckDB tests with a verified local driver and owned files
+  make test-clickhouse CLICKHOUSE_DRIVER="/path/to/clickhouse-jdbc-all.jar"
+                                Real SELECT-only ClickHouse tests in an owned loopback container
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
   make notebook-fixtures        Prepare SHA-256-locked offline Windows notebook wheels
@@ -170,7 +172,8 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
 
 def execute(task: str, root: Path, reference: str = "", output: str = "",
             python_executable: str = "", sqlite_driver: str = "", postgres_driver: str = "",
-            openssh: str = "", mysql_driver: str = "", duckdb_driver: str = "") -> int:
+            openssh: str = "", mysql_driver: str = "", duckdb_driver: str = "",
+            clickhouse_driver: str = "") -> int:
     if task == "help":
         print(HELP)
         return 0
@@ -220,6 +223,10 @@ def execute(task: str, root: Path, reference: str = "", output: str = "",
         if not selected.is_file() or selected.suffix.lower() != ".jar":
             raise ValueError("DUCKDB_DRIVER must name an existing local JAR")
         command = gradle_command(root, ["test", "--tests", "*DuckDbJdbcSessionTest", f"-PduckdbDriver={selected}"])
+    elif task == "test-clickhouse":
+        if not clickhouse_driver.strip():
+            raise ValueError("CLICKHOUSE_DRIVER is required; supply the verified ClickHouse JDBC JAR")
+        command = [sys.executable, "tools/clickhouse_fixture.py", "--driver", clickhouse_driver]
     elif task == "notebook-fixtures":
         command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
     elif task in {"notebook-runtime", "test-notebook"}:
@@ -280,10 +287,11 @@ def main() -> int:
     parser.add_argument("--openssh", default="")
     parser.add_argument("--mysql-driver", default="")
     parser.add_argument("--duckdb-driver", default="")
+    parser.add_argument("--clickhouse-driver", default="")
     args = parser.parse_args()
     try:
         return execute(args.task, ROOT, args.reference, args.output, args.python_executable,
-                       args.sqlite_driver, args.postgres_driver, args.openssh, args.mysql_driver, args.duckdb_driver)
+                       args.sqlite_driver, args.postgres_driver, args.openssh, args.mysql_driver, args.duckdb_driver, args.clickhouse_driver)
     except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2

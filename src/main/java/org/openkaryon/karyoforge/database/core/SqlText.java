@@ -11,7 +11,7 @@ public final class SqlText {
     private static final int MAX_CHARS = 256 * 1024;
     private static final int MAX_BINDINGS = 64;
 
-    public enum Dialect { SQLITE, POSTGRESQL, MYSQL, DUCKDB }
+    public enum Dialect { SQLITE, POSTGRESQL, MYSQL, DUCKDB, CLICKHOUSE }
 
     public static String activeStatement(String text, int start, int end) {
         return activeStatement(text, start, end, Dialect.SQLITE);
@@ -190,7 +190,7 @@ public final class SqlText {
                     int closing = text.indexOf(dollar, index + dollar.length());
                     end = closing < 0 ? -1 : closing + dollar.length();
                 } else {
-                    boolean escapes = dialect == Dialect.MYSQL && (c == '\'' || c == '"')
+                    boolean escapes = dialect == Dialect.CLICKHOUSE || dialect == Dialect.MYSQL && (c == '\'' || c == '"')
                             || postgresLike && c == '\'' && index > 0
                             && (text.charAt(index - 1) == 'E' || text.charAt(index - 1) == 'e')
                             && (index < 2 || !identifierPart(text.charAt(index - 2)));

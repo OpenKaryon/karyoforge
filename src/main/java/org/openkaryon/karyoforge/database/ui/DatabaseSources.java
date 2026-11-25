@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import org.jetbrains.annotations.NotNull;
+import org.openkaryon.karyoforge.database.core.ClickHouseSource;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
 import org.openkaryon.karyoforge.database.core.DuckDbSource;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
@@ -57,6 +58,12 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     if (postgres.verifiedTls()) row.caFile = postgres.caFile().toString();
                     if (postgres.forwarding() != null) row.ssh = new SshEntry(postgres.forwarding());
                 }
+                case ClickHouseSource click -> {
+                    row.kind = "clickhouse";
+                    row.port = click.port();
+                    row.database = click.database();
+                    row.user = click.user();
+                }
                 case MysqlSource mysql -> {
                     row.kind = mysql.variant() == MysqlSource.Variant.MARIADB ? "mariadb" : "mysql";
                     row.host = mysql.host();
@@ -83,6 +90,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
                             Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile),
                             entry.ssh == null ? null : entry.ssh.forwarding());
+                    case "clickhouse" -> new ClickHouseSource(entry.name, entry.port, entry.database, entry.user, Path.of(entry.driver));
                     case "mysql", "mariadb" -> new MysqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
                             Path.of(entry.driver), entry.writable,
                             "mariadb".equals(entry.kind) ? MysqlSource.Variant.MARIADB : MysqlSource.Variant.MYSQL);

@@ -40,6 +40,9 @@ interface JdbcBackend {
     default void releaseDriverFiles() throws IOException {}
 
     default void beforeStatement(Connection connection) throws SQLException {}
+    default void beforeStatement(Connection connection, QueryRequest request) throws SQLException {
+        beforeStatement(connection);
+    }
     default void configureStatement(PreparedStatement statement) throws SQLException {}
     default boolean statementSavepoints() { return false; }
 
@@ -49,6 +52,7 @@ interface JdbcBackend {
             case PostgresqlSource postgres -> new PostgresqlBackend(postgres);
             case MysqlSource mysql -> new MysqlFamilyBackend(mysql);
             case DuckDbSource duck -> new DuckDbBackend(duck);
+            case ClickHouseSource click -> new ClickHouseBackend(click);
         };
     }
 }

@@ -167,6 +167,26 @@ The owned test uses DuckDB JDBC 1.5.6.0 (SHA-256
 make test-duckdb DUCKDB_DRIVER="/path/to/duckdb_jdbc-1.5.6.0.jar"
 ```
 
+## ClickHouse
+
+Choose **Add Server Source → ClickHouse** and supply the loopback HTTP port.
+Use ClickHouse JDBC V2 0.10.0-all with `slf4j-api-2.0.7.jar` and
+`slf4j-nop-2.0.7.jar` beside it. KaryoForge verifies the bundle and requires
+a server account with direct SELECT grants. The connection checks
+`readonly=1` and the server's finite request budget before running SQL.
+
+Browse the selected database, inspect columns and server-produced CREATE
+definitions, and read bounded typed pages. This profile supports read-only
+queries. **Stop** retires the active request's UUID and independently checks
+that the operation has stopped on the server. The transport limits request
+and response bytes and time on its configured loopback authority.
+
+The owned fixture uses ClickHouse 26.8.20.9 with the verified JDBC bundle.
+
+```sh
+make test-clickhouse CLICKHOUSE_DRIVER="/path/to/clickhouse-jdbc-0.10.0-all.jar"
+```
+
 ## Checks
 
 The SQLite tests use an owned database and an explicit local JDBC JAR. The
