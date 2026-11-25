@@ -55,7 +55,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JPanel tableDataTab = new JPanel(new BorderLayout());
     private final JBTextArea definition = new JBTextArea();
     private final JTabbedPane details = new JTabbedPane();
-    private final JScrollPane resultsTab = new JBScrollPane(table);
+    private final JPanel resultsTab = new JPanel(new BorderLayout());
     private final JScrollPane structureTab = new JBScrollPane(structure);
     private final JBLabel status = new JBLabel("Choose or add a data source.");
     private final JButton add = button("Add SQLite Source", () -> editSource(null, false));
@@ -125,13 +125,16 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setCellRenderer(literalListRenderer());
         profiles.setRenderer(literalListRenderer());
 
-        var sourceControls = controls(profiles, add, addPostgresql, edit, remove, connect, disconnect);
+        var sourceControls = controls(profiles, add, addPostgresql, edit, remove, connect, disconnect, commit, rollback);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
         queryPanel.add(new JBScrollPane(sql), BorderLayout.CENTER);
-        queryPanel.add(controls(run, next, stop, resultOptions, export, commit, rollback), BorderLayout.SOUTH);
+        queryPanel.add(controls(run, next, stop, resultOptions, export), BorderLayout.SOUTH);
+        var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, new JBScrollPane(table));
+        queryAndResult.setResizeWeight(0.25);
+        resultsTab.add(queryAndResult, BorderLayout.CENTER);
         details.addTab("Results", resultsTab);
         details.addTab("Structure", structureTab);
         details.addTab("DDL", new JBScrollPane(definition));
@@ -141,9 +144,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         tableDataTab.add(controls(editRow, deleteRow, undoRow, applyRows), BorderLayout.SOUTH);
         details.addTab("Table Data", tableDataTab);
         details.setEnabledAt(3, false);
-        var queryAndResult = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryPanel, details);
-        queryAndResult.setResizeWeight(0.25);
-        var explorer = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, objectPanel, queryAndResult);
+        var explorer = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, objectPanel, details);
         explorer.setResizeWeight(0.25);
         add(sourceControls, BorderLayout.NORTH);
         add(explorer, BorderLayout.CENTER);
