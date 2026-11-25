@@ -12,6 +12,9 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.table.JBTable;
 import org.openkaryon.karyoforge.database.core.DatabaseProblem;
+import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.PostgresqlSource;
+import org.openkaryon.karyoforge.database.core.SqliteSource;
 import org.openkaryon.karyoforge.database.core.JdbcSession;
 import org.openkaryon.karyoforge.database.core.QueryPage;
 import org.openkaryon.karyoforge.database.core.QueryRequest;
@@ -31,6 +34,7 @@ import java.awt.FlowLayout;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.Map;
@@ -53,9 +57,13 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JTabbedPane details = new JTabbedPane();
     private final JScrollPane resultsTab = new JBScrollPane(table);
     private final JScrollPane structureTab = new JBScrollPane(structure);
-    private final JBLabel status = new JBLabel("Choose or add a SQLite data source.");
-    private final JButton add = button("Add SQLite Source", () -> editSource(null));
-    private final JButton edit = button("Edit Source", () -> editSource(selectedSource()));
+    private final JBLabel status = new JBLabel("Choose or add a data source.");
+    private final JButton add = button("Add SQLite Source", () -> editSource(null, false));
+    private final JButton addPostgresql = button("Add PostgreSQL Source", () -> editSource(null, true));
+    private final JButton edit = button("Edit Source", () -> {
+        var profile = selectedSource();
+        if (profile != null) editSource(profile, profile.source() instanceof PostgresqlSource);
+    });
     private final JButton remove = button("Remove Source", this::removeSource);
     private final JButton connect = button("Connect", this::connect);
     private final JButton disconnect = button("Disconnect", this::disconnect);
@@ -81,6 +89,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private JdbcSession session; // Accessed only by the command executor.
     private boolean connected;
     private boolean writable;
+    private DatabaseSource activeSource;
     private boolean busy;
     private boolean disposed;
     private QueryRequest active;
@@ -116,7 +125,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setCellRenderer(literalListRenderer());
         profiles.setRenderer(literalListRenderer());
 
-        var sourceControls = controls(profiles, add, edit, remove, connect, disconnect);
+        var sourceControls = controls(profiles, add, addPostgresql, edit, remove, connect, disconnect);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
@@ -186,19 +195,26 @@ final class DatabasesPanel extends JPanel implements Disposable {
         }
     }
 
-    private void editSource(DatabaseSources.Profile profile) {
-        var dialog = new SqliteSourceDialog(project, profile == null ? null : profile.source());
-        if (dialog.showAndGet()) {
-            String id = sources.save(profile == null ? null : profile.id(), dialog.source());
-            refreshProfiles(id);
-            report("Data source saved.");
+    private void editSource(DatabaseSources.Profile profile, boolean postgresql) {
+        DatabaseSource source;
+        if (postgresql) {
+            var dialog = new PostgresqlSourceDialog(project, profile == null ? null : (PostgresqlSource) profile.source());
+            if (!dialog.showAndGet()) return;
+            source = dialog.source();
+        } else {
+            var dialog = new SqliteSourceDialog(project, profile == null ? null : (SqliteSource) profile.source());
+            if (!dialog.showAndGet()) return;
+            source = dialog.source();
         }
+        String id = sources.save(profile == null ? null : profile.id(), source);
+        refreshProfiles(id);
+        report("Data source saved.");
     }
 
     private void removeSource() {
         var profile = selectedSource();
         if (profile == null) return;
-        int result = Messages.showYesNoDialog(project, "Remove the saved data source? The database file will be kept.",
+        int result = Messages.showYesNoDialog(project, "Remove the saved data source from the IDE?",
                 "Remove Data Source", Messages.getQuestionIcon());
         if (result != Messages.YES) return;
         sources.remove(profile.id());
@@ -209,19 +225,33 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private void connect() {
         var profile = selectedSource();
         if (profile == null) return;
-        submit("Connecting to SQLite…", null, () -> {
-            if (session != null) session.close();
-            session = new JdbcSession(profile.source());
+        char[] password = new char[0];
+        if (profile.source() instanceof PostgresqlSource) {
+            var dialog = new ConnectionPasswordDialog(project);
+            if (!dialog.showAndGet()) return;
+            password = dialog.takePassword();
+        }
+        final char[] entered = password;
+        if (disposed || busy) {
+            Arrays.fill(entered, '\0');
+            return;
+        }
+        submit("Connecting to " + profile.source().engine() + "…", null, () -> {
             try {
-                session.connect();
+                if (session != null) session.close();
+                session = new JdbcSession(profile.source());
+                session.connect(entered);
                 return session.schema();
             } catch (DatabaseProblem unavailable) {
-                session.close();
+                if (session != null) session.close();
                 session = null;
                 throw unavailable;
+            } finally {
+                Arrays.fill(entered, '\0');
             }
         }, objects -> {
             connected = true;
+            activeSource = profile.source();
             writable = profile.source().writable();
             showSchema(objects);
             report(writable ? "Connected in read-write mode. Use Commit or Rollback to finish changes."
@@ -240,6 +270,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         }, ignored -> {
             connected = false;
             writable = false;
+            activeSource = null;
             showSchema(List.of());
             clearResult();
             details.setSelectedComponent(resultsTab);
@@ -263,7 +294,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
         if (!connected || busy) return;
         SqlText.Command command;
         try {
-            command = SqlText.compile(SqlText.activeStatement(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd()));
+            var dialect = activeSource.dialect();
+            command = SqlText.compile(SqlText.activeStatement(sql.getText(), sql.getSelectionStart(), sql.getSelectionEnd(), dialect), dialect);
         } catch (IllegalArgumentException malformed) {
             report(malformed.getMessage());
             return;
@@ -641,6 +673,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean selected = selectedSource() != null;
         profiles.setEnabled(canManage);
         add.setEnabled(canManage);
+        addPostgresql.setEnabled(canManage);
         edit.setEnabled(canManage && selected);
         remove.setEnabled(canManage && selected);
         connect.setEnabled(canManage && selected);
@@ -654,7 +687,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
         show.setEnabled(canBrowse);
         inspect.setEnabled(canBrowse);
-        openTable.setEnabled(canBrowse);
+        openTable.setEnabled(canBrowse && activeSource instanceof SqliteSource);
         int row = dataGrid.getSelectedRow();
         boolean readyRow = !busy && canEditRow(row);
         var draft = drafts.get(row);

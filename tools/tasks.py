@@ -36,6 +36,8 @@ HELP = """KaryoForge local commands:
   make test-ide                 Gradle IDE integration tests
   make test-database SQLITE_DRIVER="/path/to/sqlite-jdbc.jar"
                                 Real SQLite tests with an explicit local JAR
+  make test-postgresql POSTGRES_DRIVER="/path/to/postgresql.jar"
+                                Real PostgreSQL tests in an owned loopback Docker container
   make test-python PYTHON_EXECUTABLE="/path/to/python"
                                 Native script, selected unittest/pytest and debugger checks
   make notebook-fixtures        Prepare SHA-256-locked offline Windows notebook wheels
@@ -161,7 +163,7 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
 
 
 def execute(task: str, root: Path, reference: str = "", output: str = "",
-            python_executable: str = "", sqlite_driver: str = "") -> int:
+            python_executable: str = "", sqlite_driver: str = "", postgres_driver: str = "") -> int:
     if task == "help":
         print(HELP)
         return 0
@@ -193,6 +195,10 @@ def execute(task: str, root: Path, reference: str = "", output: str = "",
         elif task == "test-database":
             raise ValueError("SQLITE_DRIVER is required; supply a verified SQLite JDBC JAR")
         command = gradle_command(root, arguments)
+    elif task == "test-postgresql":
+        if not postgres_driver.strip():
+            raise ValueError("POSTGRES_DRIVER is required; supply a verified PostgreSQL JDBC JAR")
+        command = [sys.executable, "tools/postgres_fixture.py", "--driver", postgres_driver]
     elif task == "notebook-fixtures":
         command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
     elif task in {"notebook-runtime", "test-notebook"}:
@@ -249,9 +255,11 @@ def main() -> int:
     parser.add_argument("--output", default="")
     parser.add_argument("--python-executable", default="")
     parser.add_argument("--sqlite-driver", default="")
+    parser.add_argument("--postgres-driver", default="")
     args = parser.parse_args()
     try:
-        return execute(args.task, ROOT, args.reference, args.output, args.python_executable, args.sqlite_driver)
+        return execute(args.task, ROOT, args.reference, args.output, args.python_executable,
+                       args.sqlite_driver, args.postgres_driver)
     except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2

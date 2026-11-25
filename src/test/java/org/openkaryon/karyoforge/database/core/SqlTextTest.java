@@ -19,6 +19,20 @@ public final class SqlTextTest {
         assertThrows(IllegalArgumentException.class, () -> SqlText.activeStatement(text, 0, third));
     }
 
+
+    @Test public void postgresqlKeepsDollarQuotesEscapesAndCastNamesOutsideBindings() {
+        var dialect = SqlText.Dialect.POSTGRESQL;
+        String text = "/* outer ; /* inner */ */ SELECT $tag$:ignored;?$tag$, E'one\\'two;?', :value::bigint, '{}'::jsonb ?| array['a']; SELECT 3";
+        int begin = text.lastIndexOf("SELECT 3");
+        var command = SqlText.compile(SqlText.activeStatement(text, 0, 0, dialect), dialect);
+        assertEquals(List.of("value"), command.parameters());
+        assertEquals(List.of("value"), command.bindingOrder());
+        assertTrue(command.sql().contains("?::bigint,"));
+        assertTrue(command.sql().contains("??|"));
+        assertEquals("SELECT 3", SqlText.activeStatement(text, begin, begin, dialect));
+        assertThrows(IllegalArgumentException.class, () -> SqlText.compile("SELECT $1", dialect));
+    }
+
     @Test public void compilationPreservesQuotedTextAndBindsRepeatedNamesInOrder() {
         var command = SqlText.compile("""
                 -- :ignored

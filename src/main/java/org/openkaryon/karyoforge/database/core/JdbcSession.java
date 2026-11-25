@@ -3,17 +3,15 @@ package org.openkaryon.karyoforge.database.core;
 import org.openkaryon.karyoforge.database.driver.DriverLease;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.Savepoint;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 
 /** Owns the connection and retained cursor. Except for QueryRequest.stop, use one command lane. */
 public final class JdbcSession implements AutoCloseable {
@@ -22,11 +20,8 @@ public final class JdbcSession implements AutoCloseable {
     private static final int MAX_COLUMNS = 256;
     private static final int MAX_BYTES = 8 * 1024 * 1024;
     private static final int MAX_CELL_CHARS = 16_384;
-    private static final int MAX_SCHEMA_OBJECTS = 2000;
-    private static final Set<String> READ_COMMANDS = Set.of("SELECT", "WITH");
-    private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "INSERT", "UPDATE",
-            "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "EXPLAIN", "ANALYZE", "REINDEX");
-    private final SqliteSource source;
+    private final DatabaseSource source;
+    private final JdbcBackend backend;
     private DriverLease lease;
     private Connection connection;
     private Cursor cursor;
@@ -34,58 +29,39 @@ public final class JdbcSession implements AutoCloseable {
     private boolean ready;
     private boolean quarantined;
 
-    public JdbcSession(SqliteSource source) { this.source = source; }
+    public JdbcSession(DatabaseSource source) {
+        this.source = source;
+        backend = JdbcBackend.forSource(source);
+    }
 
-    public void connect() {
+    public void connect() { connect(null); }
+
+    public void connect(char[] password) {
         if (lease != null || connection != null) throw new DatabaseProblem("Disconnect before reopening this data source.");
-        if (!Files.isRegularFile(source.database())) throw new DatabaseProblem("Choose an existing local SQLite database file.");
         try {
-            lease = DriverLease.open(source.driver(), "org.sqlite.JDBC");
+            lease = DriverLease.open(source.driver(), backend.driverClass());
         } catch (IOException failure) {
-            throw new DatabaseProblem("Choose a trusted local SQLite JDBC JAR that can be loaded.");
+            throw new DatabaseProblem("Choose a trusted local " + source.engine() + " JDBC JAR that can be loaded.");
         }
-        Properties settings = new Properties();
-        settings.setProperty("busy_timeout", "5000");
-        settings.setProperty("enable_load_extension", "false");
         try {
-            connection = lease.driver().connect(source.jdbcUrl(), settings);
+            connection = backend.connect(lease.driver(), password);
             if (connection == null) throw new SQLException("The driver rejected the data source.");
-            try (var statement = connection.createStatement()) {
-                int expectedQueryOnly = source.writable() ? 0 : 1;
-                statement.execute("PRAGMA query_only = " + expectedQueryOnly);
-                try (var rows = statement.executeQuery("PRAGMA query_only")) {
-                    if (!rows.next() || rows.getInt(1) != expectedQueryOnly) {
-                        throw new SQLException("Could not establish the selected SQLite access mode.");
-                    }
-                }
-            }
-            if (source.writable()) connection.setAutoCommit(false);
+            backend.initialize(connection);
             quarantined = false;
             ready = true;
+        } catch (DatabaseProblem policy) {
+            close();
+            throw policy;
         } catch (SQLException | RuntimeException failure) {
             close();
-            throw new DatabaseProblem("Could not open the selected SQLite database in "
-                    + (source.writable() ? "read-write" : "read-only") + " mode.");
-        } finally {
-            settings.clear();
+            throw DatabaseProblem.connection(source.engine(), source.writable(), failure);
         }
     }
 
     public List<SchemaObject> schema() {
         checkReady();
-        var result = new ArrayList<SchemaObject>();
-        try (var statement = connection.createStatement();
-             var rows = statement.executeQuery("""
-                     SELECT name, type FROM main.sqlite_schema
-                     WHERE type IN ('table', 'view') AND name NOT GLOB 'sqlite_*'
-                     ORDER BY name COLLATE NOCASE
-                     LIMIT 2000
-                     """)) {
-            while (rows.next() && result.size() < MAX_SCHEMA_OBJECTS) {
-                String name = rows.getString(1);
-                if (name.length() <= 1024 && name.indexOf('\0') < 0) result.add(new SchemaObject(name, rows.getString(2)));
-            }
-            return List.copyOf(result);
+        try {
+            return backend.schema(connection);
         } catch (SQLException error) {
             throw DatabaseProblem.query("Reading the schema", error);
         }
@@ -94,36 +70,7 @@ public final class JdbcSession implements AutoCloseable {
     public TableDefinition describe(SchemaObject object) {
         checkReady();
         try {
-            String ddl;
-            try (var statement = connection.prepareStatement("""
-                    SELECT substr(sql, 1, 65537) FROM main.sqlite_schema
-                    WHERE name = ? AND type = ?
-                    """)) {
-                statement.setString(1, object.name());
-                statement.setString(2, object.type());
-                try (var rows = statement.executeQuery()) {
-                    if (!rows.next()) throw new DatabaseProblem("The selected table or view no longer exists.");
-                    ddl = rows.getString(1);
-                }
-            }
-            var columns = new ArrayList<TableDefinition.Column>();
-            try (var statement = connection.prepareStatement("""
-                    SELECT name, type, "notnull", pk, hidden FROM pragma_table_xinfo(?, 'main') ORDER BY cid
-                    """)) {
-                statement.setString(1, object.name());
-                try (var rows = statement.executeQuery()) {
-                    while (rows.next()) {
-                        if (columns.size() == MAX_COLUMNS) throw new DatabaseProblem("The object exceeds 256 columns.");
-                        String name = rows.getString(1);
-                        String type = rows.getString(2);
-                        if (name.length() > 1024 || type.length() > 1024) {
-                            throw new DatabaseProblem("A column name or declaration exceeds 1024 characters.");
-                        }
-                        columns.add(new TableDefinition.Column(name, type, rows.getInt(3) != 0, rows.getInt(4), rows.getInt(5)));
-                    }
-                }
-            }
-            return TableDefinition.snapshot(object, columns, ddl);
+            return backend.describe(connection, object);
         } catch (SQLException failure) {
             throw DatabaseProblem.query("Reading the object definition", failure);
         }
@@ -134,8 +81,9 @@ public final class JdbcSession implements AutoCloseable {
         request.check();
         closeCursor();
         editableSnapshot = null;
+        if (!(source instanceof SqliteSource)) throw new DatabaseProblem("Use Show Rows to browse this data source.");
         TableDefinition definition = describe(object);
-        var result = requestResult(request, () -> SqliteTableEditor.browse(connection, definition, source.writable(), request));
+        var result = requestResult("Reading table data", request, () -> SqliteTableEditor.browse(connection, definition, source.writable(), request));
         editableSnapshot = result;
         return result;
     }
@@ -148,17 +96,14 @@ public final class JdbcSession implements AutoCloseable {
         }
         editableSnapshot = null;
         closeCursor();
-        return requestResult(request, () -> SqliteTableEditor.apply(connection, snapshot, changes, request,
+        return requestResult("Applying table changes", request, () -> SqliteTableEditor.apply(connection, snapshot, changes, request,
                 () -> quarantined = true));
     }
 
     public SqlResult execute(SqlText.Command command, Map<String, SqlValue> values, QueryRequest request) {
         checkReady();
-        if (!allowedCommands().contains(command.keyword())) {
-            throw new IllegalArgumentException(source.writable()
-                    ? "This SQLite command is unavailable. Use Commit and Rollback to control the transaction."
-                    : "Enter one SELECT or WITH query.");
-        }
+        if (command.dialect() != source.dialect()) throw new IllegalArgumentException("The SQL dialect differs from the selected source.");
+        backend.validate(command);
         var bindings = Map.copyOf(values);
         if (!bindings.keySet().containsAll(command.parameters()) || bindings.size() != command.parameters().size()) {
             throw new IllegalArgumentException("Provide one value for each SQL parameter.");
@@ -166,17 +111,21 @@ public final class JdbcSession implements AutoCloseable {
         request.check();
         closeCursor();
         editableSnapshot = null;
-        return this.<SqlResult>requestResult(request, () -> {
+        return this.<SqlResult>requestResult("Executing SQL", request, () -> {
+            backend.beforeStatement(connection);
+            cursor = new Cursor();
+            if (backend.statementSavepoints()) cursor.savepoint = connection.setSavepoint();
             var statement = connection.prepareStatement(command.sql());
-            cursor = new Cursor(statement);
+            cursor.statement = statement;
             request.attach(statement);
-            if (statement.getParameterMetaData().getParameterCount() != command.bindingOrder().size()) {
-                throw new DatabaseProblem("The driver's SQL parameter count differs from the console's bindings.");
-            }
+            backend.configureStatement(statement);
             int index = 1;
             for (String name : command.bindingOrder()) {
                 request.check();
                 bindings.get(name).bind(statement, index++);
+            }
+            if (statement.getParameterMetaData().getParameterCount() != command.bindingOrder().size()) {
+                throw new DatabaseProblem("The driver's SQL parameter count differs from the console's bindings.");
             }
             if (!statement.execute()) return new SqlResult.UpdateCount(statement.getUpdateCount());
             cursor.rows = statement.getResultSet();
@@ -185,30 +134,30 @@ public final class JdbcSession implements AutoCloseable {
         });
     }
 
-    private Set<String> allowedCommands() { return source.writable() ? WRITE_COMMANDS : READ_COMMANDS; }
-
     public QueryPage next(QueryRequest request) {
         checkReady();
         if (cursor == null) throw new DatabaseProblem("This query has no next page.");
-        return requestResult(request, () -> {
+        return requestResult("Reading query results", request, () -> {
             request.attach(cursor.statement);
             return readPage(cursor, request);
         });
     }
 
-    private <T> T requestResult(QueryRequest request, ReadResult<T> work) {
+    private <T> T requestResult(String operation, QueryRequest request, ReadResult<T> work) {
         T result = null;
         try {
             result = work.run();
         } catch (SQLException failure) {
             request.check();
-            throw DatabaseProblem.query("Reading query results", failure);
+            throw DatabaseProblem.query(operation, failure);
         } catch (IOException failure) {
             request.check();
             throw new DatabaseProblem("Could not read a detached query value.");
         } finally {
-            if (request.finish()) quarantined = true;
-            if (request.stopped() || !(result instanceof QueryPage page) || !page.hasNext()) closeCursor();
+            boolean cancelUnconfirmed = request.finish();
+            if (cancelUnconfirmed) quarantined = true;
+            boolean failed = cancelUnconfirmed || request.stopped() || result == null;
+            if (failed || !(result instanceof QueryPage page) || !page.hasNext()) closeCursor(failed);
         }
         if (quarantined) throw new DatabaseProblem("Stop could not be confirmed. Disconnect this data source.");
         request.check();
@@ -217,7 +166,7 @@ public final class JdbcSession implements AutoCloseable {
 
     public void finishTransaction(boolean commit) {
         checkReady();
-        if (!source.writable()) throw new DatabaseProblem("This SQLite source is read-only.");
+        if (!source.writable()) throw new DatabaseProblem("This data source is read-only.");
         closeCursor();
         editableSnapshot = null;
         try {
@@ -279,14 +228,24 @@ public final class JdbcSession implements AutoCloseable {
         if (!ready || quarantined) throw new DatabaseProblem("Connect an available data source first.");
     }
 
-    private void closeCursor() {
+    private void closeCursor() { closeCursor(false); }
+
+    private void closeCursor(boolean failed) {
         if (cursor == null) return;
         try {
             if (cursor.rows != null) {
                 cursor.rows.close();
                 cursor.rows = null;
             }
-            cursor.statement.close();
+            if (cursor.statement != null) {
+                cursor.statement.close();
+                cursor.statement = null;
+            }
+            if (cursor.savepoint != null) {
+                if (failed) connection.rollback(cursor.savepoint);
+                connection.releaseSavepoint(cursor.savepoint);
+                cursor.savepoint = null;
+            }
             cursor = null;
         } catch (SQLException failure) {
             quarantined = true;
@@ -313,16 +272,25 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
-    public record SchemaObject(String name, String type) {
-        public String selectSql() { return "SELECT * FROM main.\"" + name.replace("\"", "\"\"") + "\""; }
-        @Override public String toString() { return name + " (" + type + ")"; }
+    public record SchemaObject(String name, String type, String schema) {
+        public SchemaObject(String name, String type) { this(name, type, "main"); }
+
+        public String qualified() { return (schema.equals("main") ? "main" : quote(schema)) + "." + quote(name); }
+        public String selectSql() { return "SELECT * FROM " + qualified(); }
+
+        static String quote(String identifier) { return "\"" + identifier.replace("\"", "\"\"") + "\""; }
+
+        @Override public String toString() {
+            return (schema.equals("main") ? name : schema + "." + name) + " (" + type + ")";
+        }
     }
 
     @FunctionalInterface
     private interface ReadResult<T> { T run() throws SQLException, IOException; }
 
     private static final class Cursor {
-        private final Statement statement;
+        private Statement statement;
+        private Savepoint savepoint;
         private ResultSet rows;
         private List<QueryPage.Column> columns;
         private boolean positioned;
@@ -330,6 +298,5 @@ public final class JdbcSession implements AutoCloseable {
         private int totalBytes;
         private int page;
 
-        private Cursor(Statement statement) { this.statement = statement; }
     }
 }

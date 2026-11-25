@@ -12,6 +12,17 @@ public final class DatabaseProblem extends RuntimeException {
 
     public DatabaseProblem(String message) { super(message, null, false, false); }
 
+    static DatabaseProblem connection(String engine, boolean writable, Exception failure) {
+        if (failure instanceof SQLException sql && sql.getSQLState() != null) {
+            String state = sql.getSQLState();
+            if (state.startsWith("28")) return new DatabaseProblem(engine + " rejected the selected credentials.");
+            if (state.equals("3D000")) return new DatabaseProblem("The selected " + engine + " database does not exist.");
+            if (state.startsWith("08")) return new DatabaseProblem("Could not reach the selected " + engine + " database.");
+        }
+        return new DatabaseProblem("Could not open the selected " + engine + " database in "
+                + (writable ? "read-write" : "read-only") + " mode.");
+    }
+
     static DatabaseProblem query(String operation, SQLException exception) {
         String message = exception.getMessage();
         if (message == null) message = "";

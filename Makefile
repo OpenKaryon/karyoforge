@@ -5,8 +5,9 @@ REFERENCE_DIR ?=
 AUDIT_OUTPUT ?= docs/audit/reference-inventory.json
 PYTHON_EXECUTABLE ?=
 SQLITE_DRIVER ?=
+POSTGRES_DRIVER ?=
 
-.PHONY: test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
+.PHONY: test-postgresql test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
 
 help:
 	"$(PYTHON)" tools/tasks.py help
@@ -66,6 +67,9 @@ package-linux:
 
 test-database:
 	"$(PYTHON)" tools/tasks.py test-database --sqlite-driver "$(SQLITE_DRIVER)"
+
+test-postgresql:
+	"$(PYTHON)" tools/tasks.py test-postgresql --postgres-driver "$(POSTGRES_DRIVER)"
 
 gui-bundle:
 	"$(PYTHON)" tools/tasks.py gui-bundle --sqlite-driver "$(SQLITE_DRIVER)"

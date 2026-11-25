@@ -6,21 +6,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-/** SQLite statement ranges and prepared bindings. Access mode is enforced by the connection. */
+/** Statement ranges and prepared bindings. Access mode is enforced by the connection. */
 public final class SqlText {
     private static final int MAX_CHARS = 256 * 1024;
     private static final int MAX_BINDINGS = 64;
 
+    public enum Dialect { SQLITE, POSTGRESQL }
+
     public static String activeStatement(String text, int start, int end) {
+        return activeStatement(text, start, end, Dialect.SQLITE);
+    }
+
+    public static String activeStatement(String text, int start, int end, Dialect dialect) {
         if (start < 0 || start > end || end > text.length()) throw new IllegalArgumentException("Invalid SQL selection.");
-        var scan = scan(text, true);
+        var scan = scan(text, dialect, true);
         if (start != end) {
             for (var span : scan.spans()) {
                 if (span.cuts(start) || span.cuts(end)) {
                     throw new IllegalArgumentException("The selection cuts a quoted token or comment.");
                 }
             }
-            return single(scan(text.substring(start, end), false));
+            return single(scan(text.substring(start, end), dialect, false));
         }
         Segment chosen = null;
         for (var segment : scan.segments()) {
@@ -36,7 +42,11 @@ public final class SqlText {
     }
 
     public static Command compile(String text) {
-        var initial = scan(text, false);
+        return compile(text, Dialect.SQLITE);
+    }
+
+    public static Command compile(String text, Dialect dialect) {
+        var initial = scan(text, dialect, false);
         var segment = requireSingle(initial);
         text = initial.text().substring(segment.start(), segment.end());
         var compiled = new StringBuilder(text.length());
@@ -54,7 +64,17 @@ public final class SqlText {
                 continue;
             }
             char current = text.charAt(offset);
-            if (current == '?' || current == ':' && identifierStart(text, offset + 1)) {
+            if (dialect == Dialect.POSTGRESQL && current == '?' && offset + 1 < text.length()) {
+                char next = text.charAt(offset + 1);
+                if (next == '?' || next == '|' || next == '&') {
+                    compiled.append("??");
+                    if (next != '?') compiled.append(next);
+                    offset += 2;
+                    continue;
+                }
+            }
+            if (current == '?' || current == ':' && (offset == 0 || text.charAt(offset - 1) != ':')
+                    && identifierStart(text, offset + 1)) {
                 String name;
                 if (current == '?') {
                     if (offset + 1 < text.length() && Character.isDigit(text.charAt(offset + 1))) {
@@ -72,9 +92,14 @@ public final class SqlText {
                 if (order.size() > MAX_BINDINGS) throw new IllegalArgumentException("A statement can use up to 64 parameters.");
                 compiled.append('?');
             } else {
-                if ((current == '$' || current == '@') && identifierStart(text, offset + 1)
-                        && (offset == 0 || !identifierPart(text.charAt(offset - 1)))) {
+                boolean startsToken = offset == 0 || !identifierPart(text.charAt(offset - 1));
+                if (dialect == Dialect.SQLITE && (current == '$' || current == '@')
+                        && identifierStart(text, offset + 1) && startsToken) {
                     throw new IllegalArgumentException("Use :name for a named SQL parameter.");
+                }
+                if (dialect == Dialect.POSTGRESQL && current == '$' && startsToken && offset + 1 < text.length()
+                        && Character.isDigit(text.charAt(offset + 1))) {
+                    throw new IllegalArgumentException("Use JDBC ? placeholders or :name for PostgreSQL parameters.");
                 }
                 compiled.append(current);
                 offset++;
@@ -83,7 +108,7 @@ public final class SqlText {
         if (!names.isEmpty() && positions != 0) {
             throw new IllegalArgumentException("Use either named or positional SQL parameters in one statement.");
         }
-        return new Command(compiled.toString(), segment.keyword(),
+        return new Command(dialect, compiled.toString(), segment.keyword(),
                 names.isEmpty() ? order : new ArrayList<>(names), order);
     }
 
@@ -97,7 +122,7 @@ public final class SqlText {
         return scan.segments().getFirst();
     }
 
-    private static Scan scan(String text, boolean allowIncomplete) {
+    private static Scan scan(String text, Dialect dialect, boolean allowIncomplete) {
         Objects.requireNonNull(text);
         if (text.length() > MAX_CHARS || text.indexOf('\0') >= 0) {
             throw new IllegalArgumentException("The SQL text exceeds the supported statement limits.");
@@ -113,7 +138,7 @@ public final class SqlText {
                 index++;
                 continue;
             }
-            int commentEnd = commentEnd(text, index);
+            int commentEnd = commentEnd(text, index, dialect);
             if (commentEnd < 0) {
                 if (!allowIncomplete) throw new IllegalArgumentException("Unterminated SQL comment.");
                 incompleteAt = index;
@@ -138,8 +163,19 @@ public final class SqlText {
                 while (end < text.length() && identifierPart(text.charAt(end))) end++;
                 keyword = text.substring(index, end).toUpperCase(Locale.ROOT);
             }
-            if (c == '\'' || c == '"' || c == '`' || c == '[') {
-                int end = quotedEnd(text, index, c);
+            String dollar = dialect == Dialect.POSTGRESQL ? dollarDelimiter(text, index) : null;
+            boolean quote = c == '\'' || c == '"' || dialect == Dialect.SQLITE && (c == '`' || c == '[');
+            if (quote || dollar != null) {
+                int end;
+                if (dollar != null) {
+                    int closing = text.indexOf(dollar, index + dollar.length());
+                    end = closing < 0 ? -1 : closing + dollar.length();
+                } else {
+                    boolean escapes = dialect == Dialect.POSTGRESQL && c == '\'' && index > 0
+                            && (text.charAt(index - 1) == 'E' || text.charAt(index - 1) == 'e')
+                            && (index < 2 || !identifierPart(text.charAt(index - 2)));
+                    end = quotedEnd(text, index, c, escapes);
+                }
                 if (end < 0) {
                     if (!allowIncomplete) throw new IllegalArgumentException("Unterminated SQL quote.");
                     incompleteAt = index;
@@ -156,21 +192,47 @@ public final class SqlText {
         return new Scan(text, spans, segments, incompleteAt);
     }
 
-    private static int commentEnd(String text, int index) {
+    private static int commentEnd(String text, int index, Dialect dialect) {
         if (text.startsWith("--", index)) {
             int end = text.indexOf('\n', index + 2);
             return end < 0 ? text.length() : end;
         }
         if (text.startsWith("/*", index)) {
-            int end = text.indexOf("*/", index + 2);
-            return end < 0 ? -1 : end + 2;
+            if (dialect == Dialect.SQLITE) {
+                int end = text.indexOf("*/", index + 2);
+                return end < 0 ? -1 : end + 2;
+            }
+            int depth = 1;
+            for (int offset = index + 2; offset + 1 < text.length(); offset++) {
+                if (text.startsWith("/*", offset)) {
+                    depth++;
+                    offset++;
+                } else if (text.startsWith("*/", offset)) {
+                    if (--depth == 0) return offset + 2;
+                    offset++;
+                }
+            }
+            return -1;
         }
         return index;
     }
 
-    private static int quotedEnd(String text, int index, char opening) {
+    private static String dollarDelimiter(String text, int index) {
+        if (text.charAt(index) != '$' || index > 0 && identifierPart(text.charAt(index - 1))) return null;
+        if (index + 1 < text.length() && text.charAt(index + 1) == '$') return "$$";
+        if (!identifierStart(text, index + 1)) return null;
+        int end = index + 2;
+        while (end < text.length() && text.charAt(end) != '$' && identifierPart(text.charAt(end))) end++;
+        return end < text.length() && text.charAt(end) == '$' ? text.substring(index, end + 1) : null;
+    }
+
+    private static int quotedEnd(String text, int index, char opening, boolean escapes) {
         char closing = opening == '[' ? ']' : opening;
         while (++index < text.length()) {
+            if (escapes && text.charAt(index) == '\\') {
+                index++;
+                continue;
+            }
             if (text.charAt(index) != closing) continue;
             int next = index + 1;
             if (opening == '[' || next == text.length() || text.charAt(next) != closing) return next;
@@ -190,18 +252,21 @@ public final class SqlText {
     private static boolean identifierPart(char c) { return Character.isLetterOrDigit(c) || c == '_' || c == '$'; }
 
     public static final class Command {
+        private final Dialect dialect;
         private final String sql;
         private final String keyword;
         private final List<String> parameters;
         private final List<String> bindingOrder;
 
-        private Command(String sql, String keyword, List<String> parameters, List<String> bindingOrder) {
+        private Command(Dialect dialect, String sql, String keyword, List<String> parameters, List<String> bindingOrder) {
+            this.dialect = dialect;
             this.sql = sql;
             this.keyword = keyword;
             this.parameters = List.copyOf(parameters);
             this.bindingOrder = List.copyOf(bindingOrder);
         }
 
+        Dialect dialect() { return dialect; }
         String sql() { return sql; }
         String keyword() { return keyword; }
         public List<String> parameters() { return parameters; }

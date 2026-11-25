@@ -21,8 +21,8 @@ transaction control and **Refresh Schema** after schema changes.
 
 Use named `:name` or positional `?` parameters in one statement. The SQL
 Parameters dialog binds text, integers, decimals, booleans, ISO dates, times,
-timestamps, hexadecimal BLOBs and explicit NULL values. Repeated names share a value. Literal and
-comment text is left intact. Cancelling the dialog leaves the existing result
+timestamps, hexadecimal BLOBs and explicit NULL values. Repeated names share
+a value. Literal and comment text is left intact. Cancelling the dialog leaves the existing result
 and database session untouched.
 
 Results show 200 rows per page. **Next Result Page** continues the active cursor.
@@ -64,6 +64,29 @@ fields, hidden and generated columns, unsupported values, views and virtual
 tables are protected. The batch checks the saved key and original row content
 before each mutation. A conflict or failed change rolls back the entire
 batch while keeping earlier pending SQL changes.
+
+## PostgreSQL
+
+Choose **Add PostgreSQL Source** to connect via a direct loopback endpoint and
+an explicitly selected pgJDBC JAR. The profile stores the endpoint, database
+and user name. **Connect** asks for the password for that session. The
+default access mode is an engine-enforced read-only transaction.
+A PostgreSQL profile configured for writes uses manual **Commit** and
+**Rollback**. A failed or stopped statement rolls back to its own
+savepoint, preserving earlier pending work.
+
+The schema list shows visible PostgreSQL tables and views. **Inspect** shows
+declared column and key metadata. PostgreSQL **DDL** is a description assembled
+from catalog definitions. Use **Show Rows** or run typed SQL. For a PostgreSQL
+JSON operator written as a bare question mark, use pgJDBC's `??` escape.
+
+The owned acceptance fixture uses PostgreSQL 17.11 and pgJDBC 42.7.14
+(SHA-256 `73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c`).
+Run the test with an available Docker engine and the explicit driver.
+
+```sh
+make test-postgresql POSTGRES_DRIVER="/path/to/postgresql-42.7.14.jar"
+```
 
 ## Checks
 

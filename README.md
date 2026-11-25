@@ -12,8 +12,8 @@ explicit module interpreter setup, notebook creation/cell editing with shared
 JSON Save/Undo, explicit local Python kernels, ordered execution, input/getpass
 and bounded passive rich-output previews, reversible spell-checking preferences,
 bounded local CSV/TSV, FASTA, FASTQ and VCF previews, SQLite browsing, typed
-queries and explicit transactions, a pinned IntelliJ plugin
-foundation and local validation tools. The plugin identity is
+queries and explicit transactions, direct local PostgreSQL access, a pinned
+IntelliJ plugin foundation and local validation tools. The plugin identity is
 `org.openkaryon.karyoforge`. The reference implementation is supplied separately
 when running its audit.
 

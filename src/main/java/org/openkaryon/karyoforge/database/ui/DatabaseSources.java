@@ -5,6 +5,8 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import org.jetbrains.annotations.NotNull;
+import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 
 import java.nio.file.Path;
@@ -21,7 +23,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
 
     synchronized List<Profile> profiles() { return List.copyOf(profiles.values()); }
 
-    synchronized String save(String id, SqliteSource source) {
+    synchronized String save(String id, DatabaseSource source) {
         String key = id == null ? UUID.randomUUID().toString() : id;
         profiles.put(key, new Profile(key, source));
         return key;
@@ -35,9 +37,18 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             var row = new Entry();
             row.id = profile.id();
             row.name = profile.source().name();
-            row.database = profile.source().database().toString();
             row.driver = profile.source().driver().toString();
             row.writable = profile.source().writable();
+            switch (profile.source()) {
+                case SqliteSource sqlite -> row.database = sqlite.database().toString();
+                case PostgresqlSource postgres -> {
+                    row.kind = "postgresql";
+                    row.host = postgres.host();
+                    row.port = postgres.port();
+                    row.database = postgres.database();
+                    row.user = postgres.user();
+                }
+            }
             state.entries.add(row);
         }
         return state;
@@ -50,7 +61,12 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             if (entry == null || entry.id == null) continue;
             try {
                 String id = UUID.fromString(entry.id).toString();
-                var source = new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
+                DatabaseSource source = switch (entry.kind == null ? "sqlite" : entry.kind) {
+                    case "sqlite" -> new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
+                    case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
+                            Path.of(entry.driver), entry.writable);
+                    default -> throw new IllegalArgumentException("Unknown database source.");
+                };
                 profiles.putIfAbsent(id, new Profile(id, source));
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 // A malformed saved profile must not prevent valid profiles from loading.
@@ -58,7 +74,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         }
     }
 
-    record Profile(String id, SqliteSource source) {
+    record Profile(String id, DatabaseSource source) {
         @Override public String toString() { return source.name(); }
     }
 
@@ -69,6 +85,10 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
     public static final class Entry {
         public String id;
         public String name;
+        public String kind;
+        public String host;
+        public int port;
+        public String user;
         public String database;
         public String driver;
         public boolean writable;
