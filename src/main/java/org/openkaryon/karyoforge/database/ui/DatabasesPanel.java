@@ -360,7 +360,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private record Connected(List<JdbcSession.SchemaObject> objects, boolean passwordSaved) {}
 
     private void disconnect() {
-        if (!discardTableDraft()) return;
+        var profile = selectedSource();
+        if (profile == null || !discardTableDraft()) return;
         submit("Disconnecting…", null, () -> {
             if (session != null) {
                 session.close();
@@ -371,6 +372,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
             connected = false;
             writable = false;
             activeSource = null;
+            editorBridge.forgetCatalog(profile.id());
+            editorBridge.selectCatalog(null);
             showSchema(List.of());
             clearResult();
             details.setSelectedComponent(resultsTab);
@@ -568,6 +571,8 @@ final class DatabasesPanel extends JPanel implements Disposable {
     }
 
     private void showDefinition(TableDefinition object) {
+        var profile = selectedSource();
+        if (profile != null) editorBridge.publishDefinition(profile.id(), object);
         structure.setModel(new AbstractTableModel() {
             private final List<String> headers = List.of("Column", "Declared type", "Declared NOT NULL", "Primary key position", "Storage");
             @Override public int getRowCount() { return object.columns().size(); }
@@ -601,6 +606,11 @@ final class DatabasesPanel extends JPanel implements Disposable {
     }
 
     private void showSchema(List<JdbcSession.SchemaObject> objects) {
+        var profile = selectedSource();
+        if (connected && profile != null) {
+            editorBridge.publishCatalog(profile.id(), objects);
+            editorBridge.selectCatalog(profile.id());
+        }
         var selected = schema.getSelectedValue();
         schema.setListData(objects.toArray(JdbcSession.SchemaObject[]::new));
         if (selected != null) schema.setSelectedValue(selected, false);

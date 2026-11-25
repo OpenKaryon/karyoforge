@@ -6,6 +6,7 @@ import com.intellij.codeInsight.completion.CompletionResultSet;
 import com.intellij.codeInsight.lookup.LookupElementBuilder;
 import com.intellij.psi.PsiElement;
 import org.jetbrains.annotations.NotNull;
+import org.openkaryon.karyoforge.database.ui.DatabaseEditorBridge;
 
 public final class DatabaseSqlCompletion extends CompletionContributor {
     @Override public void fillCompletionVariants(@NotNull CompletionParameters parameters, @NotNull CompletionResultSet result) {
@@ -13,6 +14,15 @@ public final class DatabaseSqlCompletion extends CompletionContributor {
         if (isLiteral(position)) return;
         var matches = result.caseInsensitive();
         for (String keyword : DatabaseSqlLexer.KEYWORDS) matches.addElement(LookupElementBuilder.create(keyword).bold());
+        var file = parameters.getOriginalFile();
+        var virtualFile = file.getVirtualFile();
+        if (virtualFile == null || !virtualFile.isWritable()) return;
+        var catalog = file.getProject().getService(DatabaseEditorBridge.class).catalogFor(virtualFile);
+        if (catalog.objects().isEmpty()) return;
+        for (var suggestion : DatabaseSqlReferences.complete(file.getText(), parameters.getOffset(), catalog)) {
+            matches.addElement(LookupElementBuilder.create(suggestion.insertion()).withLookupString(suggestion.lookup())
+                    .withTypeText(suggestion.detail(), true));
+        }
     }
 
     private static boolean isLiteral(PsiElement position) {

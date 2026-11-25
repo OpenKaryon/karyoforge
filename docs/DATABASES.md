@@ -52,8 +52,15 @@ Use **Run SQL Selection / Current Statement** in that editor or in a
 project's `.sql` file, or press Ctrl+Enter. A console uses its bound source.
 A regular SQL file uses the connected source selected in the Databases
 tool window. Run, Stop, bindings and result pages share that window's
-connection. The editor highlights SQL tokens and completes keywords
-without opening any connection.
+connection. The editor highlights SQL tokens and completes keywords.
+After opening or refreshing a connection's catalog, SQL completion can
+suggest its tables and views. **Inspect** or **Open Table** loads column
+names that the editor can complete for a simple SELECT, including a
+qualified relation or alias. **Go to Declaration** opens a read-only
+description of an unambiguous loaded object. Completion and navigation
+use that detached catalog and issue no queries. Complex scopes
+such as CTEs, subqueries and UNIONs use keyword completion only.
+Refresh Schema clears cached column definitions.
 
 ## Result views and export
 

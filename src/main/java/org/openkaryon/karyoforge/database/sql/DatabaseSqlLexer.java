@@ -20,7 +20,7 @@ final class DatabaseSqlLexer extends LexerBase {
             "CREATE", "CROSS", "DEFAULT", "DELETE", "DESC", "DESCRIBE", "DISTINCT", "DROP", "ELSE", "END",
             "EXCEPT", "EXISTS", "EXPLAIN", "FALSE", "FETCH", "FILTER", "FIRST", "FOLLOWING", "FOREIGN", "FROM",
             "FULL", "GROUP", "HAVING", "IF", "IN", "INDEX", "INNER", "INSERT", "INTERSECT", "INTO", "IS", "JOIN",
-            "KEY", "LAST", "LEFT", "LIKE", "LIMIT", "NOT", "NULL", "NULLS", "OFFSET", "ON", "OR", "ORDER",
+            "KEY", "LAST", "LATERAL", "LEFT", "LIKE", "LIMIT", "NOT", "NULL", "NULLS", "OFFSET", "ON", "ONLY", "OR", "ORDER",
             "OUTER", "OVER", "PARTITION", "PRECEDING", "PRIMARY", "RECURSIVE", "REFERENCES", "RETURNING",
             "RIGHT", "ROW", "ROWS", "SELECT", "SET", "SHOW", "TABLE", "THEN", "TRUE", "UNBOUNDED", "UNION",
             "UNIQUE", "UPDATE", "USING", "VALUES", "VIEW", "WHEN", "WHERE", "WINDOW", "WITH");
