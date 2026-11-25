@@ -11,8 +11,12 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import org.jetbrains.annotations.Nullable;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
+import org.openkaryon.karyoforge.database.core.SshForwarding;
 
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JPanel;
+import java.awt.FlowLayout;
 import java.nio.file.Path;
 
 final class PostgresqlSourceDialog extends DialogWrapper {
@@ -24,10 +28,14 @@ final class PostgresqlSourceDialog extends DialogWrapper {
     private final TextFieldWithBrowseButton driver = new TextFieldWithBrowseButton();
     private final TextFieldWithBrowseButton ca = new TextFieldWithBrowseButton();
     private final JBCheckBox tls = new JBCheckBox("Verify server TLS certificate and host name");
+    private final Project project;
+    private SshForwarding forwarding;
+    private final JBLabel forwardingStatus = new JBLabel("Direct connection");
     private final JBCheckBox writable = new JBCheckBox("Allow writes (manual Commit and Rollback)");
 
     PostgresqlSourceDialog(Project project, PostgresqlSource existing) {
         super(project);
+        this.project = project;
         setTitle(existing == null ? "Add PostgreSQL Data Source" : "Edit PostgreSQL Data Source");
         setOKButtonText("Save");
         driver.addBrowseFolderListener(project, FileChooserDescriptorFactory.singleFile()
@@ -45,6 +53,8 @@ final class PostgresqlSourceDialog extends DialogWrapper {
             writable.setSelected(existing.writable());
             tls.setSelected(existing.verifiedTls());
             if (existing.verifiedTls()) ca.setText(existing.caFile().toString());
+            forwarding = existing.forwarding();
+            updateForwardingLabel();
         }
         ca.setEnabled(tls.isSelected());
         init();
@@ -58,7 +68,7 @@ final class PostgresqlSourceDialog extends DialogWrapper {
             throw new IllegalArgumentException("Enter an integer port.");
         }
         return new PostgresqlSource(name.getText(), host.getText(), number, database.getText(), user.getText(),
-                Path.of(driver.getText().strip()), writable.isSelected(), tls.isSelected() ? Path.of(ca.getText().strip()) : null);
+                Path.of(driver.getText().strip()), writable.isSelected(), tls.isSelected() ? Path.of(ca.getText().strip()) : null, forwarding);
     }
 
     @Override protected @Nullable ValidationInfo doValidate() {
@@ -82,9 +92,35 @@ final class PostgresqlSourceDialog extends DialogWrapper {
                 .addLabeledComponent("Trusted JDBC JAR", driver)
                 .addComponent(tls)
                 .addLabeledComponent("CA certificate", ca)
+                .addLabeledComponent("Transport", transport())
                 .addComponent(writable)
                 .addComponent(new JBLabel("Connections without TLS use loopback. Saving the source does not connect."))
                 .getPanel();
+    }
+
+    private JComponent transport() {
+        var panel = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        var edit = new JButton("Configure SSH…");
+        edit.addActionListener(event -> {
+            var dialog = new SshForwardingDialog(project, forwarding);
+            if (dialog.showAndGet()) {
+                forwarding = dialog.forwarding();
+                updateForwardingLabel();
+            }
+        });
+        var clear = new JButton("Use Direct Connection");
+        clear.addActionListener(event -> {
+            forwarding = null;
+            updateForwardingLabel();
+        });
+        panel.add(forwardingStatus);
+        panel.add(edit);
+        panel.add(clear);
+        return panel;
+    }
+
+    private void updateForwardingLabel() {
+        forwardingStatus.setText(forwarding == null ? "Direct connection" : "OpenSSH configured");
     }
 
     @Override public JComponent getPreferredFocusedComponent() { return name; }

@@ -8,9 +8,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 public record PostgresqlSource(String name, String host, int port, String database, String user, Path driver,
-                               boolean writable, Path caFile) implements DatabaseSource {
+                               boolean writable, Path caFile, SshForwarding forwarding) implements DatabaseSource {
     public PostgresqlSource(String name, String host, int port, String database, String user, Path driver, boolean writable) {
-        this(name, host, port, database, user, driver, writable, null);
+        this(name, host, port, database, user, driver, writable, null, null);
+    }
+
+    public PostgresqlSource(String name, String host, int port, String database, String user, Path driver,
+                            boolean writable, Path caFile) {
+        this(name, host, port, database, user, driver, writable, caFile, null);
     }
 
     public PostgresqlSource {
@@ -21,9 +26,12 @@ public record PostgresqlSource(String name, String host, int port, String databa
         user = DatabaseSource.text(user, "a PostgreSQL user name", 255);
         driver = DatabaseSource.absolute(driver, "driver");
         if (caFile != null) caFile = DatabaseSource.absolute(caFile, "CA certificate");
+        if (forwarding != null && caFile == null && !forwarding.loopbackTarget()) {
+            throw new IllegalArgumentException("An SSH forward to a non-loopback PostgreSQL target requires verified TLS.");
+        }
     }
 
-    private static String validateHost(String value, boolean tls) {
+    static String validateHost(String value, boolean tls) {
         String host = DatabaseSource.text(value, "a PostgreSQL host", 255);
         if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
         if (host.isEmpty()) throw new IllegalArgumentException("Enter a PostgreSQL host.");

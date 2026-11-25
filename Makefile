@@ -6,6 +6,7 @@ AUDIT_OUTPUT ?= docs/audit/reference-inventory.json
 PYTHON_EXECUTABLE ?=
 SQLITE_DRIVER ?=
 POSTGRES_DRIVER ?=
+OPENSSH_EXECUTABLE ?=
 
 .PHONY: test-postgresql test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
 
@@ -69,7 +70,7 @@ test-database:
 	"$(PYTHON)" tools/tasks.py test-database --sqlite-driver "$(SQLITE_DRIVER)"
 
 test-postgresql:
-	"$(PYTHON)" tools/tasks.py test-postgresql --postgres-driver "$(POSTGRES_DRIVER)"
+	"$(PYTHON)" tools/tasks.py test-postgresql --postgres-driver "$(POSTGRES_DRIVER)" --openssh "$(OPENSSH_EXECUTABLE)"
 
 gui-bundle:
 	"$(PYTHON)" tools/tasks.py gui-bundle --sqlite-driver "$(SQLITE_DRIVER)"

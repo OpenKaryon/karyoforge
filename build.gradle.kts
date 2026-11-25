@@ -131,6 +131,9 @@ tasks.test {
     val postgresDriver = providers.gradleProperty("postgresDriver").orElse("").get()
     if (postgresDriver.isBlank()) exclude("**/PostgresqlJdbcSessionTest.class")
     systemProperty("karyoforge.database.postgresql.driver", postgresDriver)
+    if (!providers.gradleProperty("postgresSshTests").orElse("false").get().toBoolean()) {
+        exclude("**/PostgresqlSshJdbcSessionTest.class")
+    }
     maxHeapSize = if (providers.gradleProperty("pythonRuntimeTests").orElse("false").get().toBoolean()) "2g" else "1g"
 }
 

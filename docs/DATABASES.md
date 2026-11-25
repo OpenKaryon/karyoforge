@@ -89,12 +89,23 @@ The batch matches the original key, row values and PostgreSQL's `xmin`.
 Views, foreign tables, partitioned or inherited tables and identity or
 generated fields are protected.
 
+For an SSH connection, choose **Configure SSH** in the PostgreSQL source.
+Supply the jump host and user, a local OpenSSH executable, an identity file,
+a known-hosts file and the target as seen by the jump host. KaryoForge opens
+an owned loopback listener and checks the SSH host key against the selected
+file. A non-loopback target requires verified PostgreSQL TLS. TLS validates
+the database profile's host, including when the socket travels inside SSH.
+This transport uses the verified pgJDBC artifact below.
+
 The owned acceptance fixture uses PostgreSQL 17.11 and pgJDBC 42.7.14
 (SHA-256 `73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c`).
 Run the test with an available Docker engine and the explicit driver.
+Add `OPENSSH_EXECUTABLE` to include the SSH fixture, with a short-lived
+SSH server and generated keys.
 
 ```sh
 make test-postgresql POSTGRES_DRIVER="/path/to/postgresql-42.7.14.jar"
+make test-postgresql POSTGRES_DRIVER="/path/to/postgresql-42.7.14.jar" OPENSSH_EXECUTABLE="/path/to/ssh"
 ```
 
 ## Checks

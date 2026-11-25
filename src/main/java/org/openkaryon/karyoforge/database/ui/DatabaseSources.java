@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
+import org.openkaryon.karyoforge.database.core.SshForwarding;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -48,6 +49,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     row.database = postgres.database();
                     row.user = postgres.user();
                     if (postgres.verifiedTls()) row.caFile = postgres.caFile().toString();
+                    if (postgres.forwarding() != null) row.ssh = new SshEntry(postgres.forwarding());
                 }
             }
             state.entries.add(row);
@@ -65,7 +67,8 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                 DatabaseSource source = switch (entry.kind == null ? "sqlite" : entry.kind) {
                     case "sqlite" -> new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
-                            Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile));
+                            Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile),
+                            entry.ssh == null ? null : entry.ssh.forwarding());
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
                 profiles.putIfAbsent(id, new Profile(id, source));
@@ -91,8 +94,37 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         public int port;
         public String user;
         public String caFile;
+        public SshEntry ssh;
         public String database;
         public String driver;
         public boolean writable;
+    }
+
+    public static final class SshEntry {
+        public String host;
+        public int port;
+        public String user;
+        public String executable;
+        public String identity;
+        public String knownHosts;
+        public String target;
+        public int targetPort;
+
+        public SshEntry() {}
+
+        SshEntry(SshForwarding entry) {
+            host = entry.host();
+            port = entry.port();
+            user = entry.user();
+            executable = entry.executable().toString();
+            identity = entry.identity().toString();
+            knownHosts = entry.knownHosts().toString();
+            target = entry.target();
+            targetPort = entry.targetPort();
+        }
+
+        SshForwarding forwarding() {
+            return new SshForwarding(host, port, user, Path.of(executable), Path.of(identity), Path.of(knownHosts), target, targetPort);
+        }
     }
 }

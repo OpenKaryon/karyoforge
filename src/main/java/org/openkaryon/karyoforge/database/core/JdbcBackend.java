@@ -1,6 +1,7 @@
 package org.openkaryon.karyoforge.database.core;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.PreparedStatement;
@@ -20,6 +21,10 @@ interface JdbcBackend {
     TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException;
     int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
                           QueryRequest request, Runnable quarantine) throws SQLException;
+
+    default Path selectDriver(Path driver) throws IOException { return driver; }
+    default void closeTransport() throws IOException {}
+    default void releaseDriverFiles() throws IOException {}
 
     default void beforeStatement(Connection connection) throws SQLException {}
     default void configureStatement(PreparedStatement statement) throws SQLException {}

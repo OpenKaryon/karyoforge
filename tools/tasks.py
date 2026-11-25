@@ -163,7 +163,8 @@ def gradle_command(root: Path, tasks: list[str]) -> list[str]:
 
 
 def execute(task: str, root: Path, reference: str = "", output: str = "",
-            python_executable: str = "", sqlite_driver: str = "", postgres_driver: str = "") -> int:
+            python_executable: str = "", sqlite_driver: str = "", postgres_driver: str = "",
+            openssh: str = "") -> int:
     if task == "help":
         print(HELP)
         return 0
@@ -199,6 +200,8 @@ def execute(task: str, root: Path, reference: str = "", output: str = "",
         if not postgres_driver.strip():
             raise ValueError("POSTGRES_DRIVER is required; supply a verified PostgreSQL JDBC JAR")
         command = [sys.executable, "tools/postgres_fixture.py", "--driver", postgres_driver]
+        if openssh.strip():
+            command.extend(["--openssh", openssh])
     elif task == "notebook-fixtures":
         command = [sys.executable, "tools/notebook_fixtures.py", "--prepare"]
     elif task in {"notebook-runtime", "test-notebook"}:
@@ -256,10 +259,11 @@ def main() -> int:
     parser.add_argument("--python-executable", default="")
     parser.add_argument("--sqlite-driver", default="")
     parser.add_argument("--postgres-driver", default="")
+    parser.add_argument("--openssh", default="")
     args = parser.parse_args()
     try:
         return execute(args.task, ROOT, args.reference, args.output, args.python_executable,
-                       args.sqlite_driver, args.postgres_driver)
+                       args.sqlite_driver, args.postgres_driver, args.openssh)
     except (OSError, ValueError, SyntaxError, KeyError, ET.ParseError) as error:
         print(f"Task failed: {error}", file=sys.stderr)
         return 2

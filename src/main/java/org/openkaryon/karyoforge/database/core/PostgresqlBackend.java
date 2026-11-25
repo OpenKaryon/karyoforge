@@ -2,14 +2,22 @@ package org.openkaryon.karyoforge.database.core;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+import org.openkaryon.karyoforge.database.driver.ForwardSocketFactory;
 
 final class PostgresqlBackend implements JdbcBackend {
     private static final Set<String> READ_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "TABLE", "SHOW", "EXPLAIN");
@@ -17,11 +25,36 @@ final class PostgresqlBackend implements JdbcBackend {
             "INSERT", "UPDATE", "DELETE", "MERGE", "CREATE", "ALTER", "DROP", "COMMENT", "GRANT", "REVOKE",
             "TRUNCATE", "REINDEX", "ANALYZE", "REFRESH");
     private static final int QUERY_TIMEOUT_SECONDS = 30;
+    private static final String FORWARDING_DRIVER_SHA256 =
+            "73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c";
     private final PostgresqlSource source;
+    private Path verifiedDriver;
+    private OpenSshTunnel tunnel;
+    private Class<?> forwardSockets;
 
     PostgresqlBackend(PostgresqlSource source) { this.source = source; }
 
     @Override public String driverClass() { return "org.postgresql.Driver"; }
+
+    @Override public Path selectDriver(Path driver) throws IOException {
+        if (source.forwarding() == null) return driver;
+        if (!Files.isRegularFile(driver) || Files.size(driver) > 4 * 1024 * 1024) throw forwardingDriverRequired();
+        verifiedDriver = Files.createTempFile("karyoforge-pgjdbc-", ".jar");
+        Files.copy(driver, verifiedDriver, StandardCopyOption.REPLACE_EXISTING);
+        byte[] digest;
+        try (var input = new DigestInputStream(Files.newInputStream(verifiedDriver), MessageDigest.getInstance("SHA-256"))) {
+            input.transferTo(java.io.OutputStream.nullOutputStream());
+            digest = input.getMessageDigest().digest();
+        } catch (NoSuchAlgorithmException unavailable) {
+            throw new IOException("Could not verify the PostgreSQL driver.");
+        }
+        if (!FORWARDING_DRIVER_SHA256.equals(HexFormat.of().formatHex(digest))) throw forwardingDriverRequired();
+        return verifiedDriver;
+    }
+
+    private static DatabaseProblem forwardingDriverRequired() {
+        return new DatabaseProblem("PostgreSQL SSH forwarding requires the verified pgJDBC 42.7.14 JAR.");
+    }
 
     @Override public Connection connect(Driver driver, char[] password) throws SQLException {
         if (source.verifiedTls() && !Files.isRegularFile(source.caFile())) {
@@ -45,9 +78,47 @@ final class PostgresqlBackend implements JdbcBackend {
         properties.setProperty("cancelSignalTimeout", "5");
         properties.setProperty("ApplicationName", "KaryoForge Databases");
         try {
+            if (source.forwarding() != null) configureForwarding(driver, properties);
             return driver.connect(source.jdbcUrl(), properties);
         } finally {
             properties.clear();
+        }
+    }
+
+    private void configureForwarding(Driver driver, Properties properties) {
+        tunnel = new OpenSshTunnel(source.forwarding());
+        tunnel.open();
+        try {
+            String name = ForwardSocketFactory.class.getName();
+            forwardSockets = Class.forName(name, true, driver.getClass().getClassLoader());
+            forwardSockets.getMethod("configure", int.class, BooleanSupplier.class)
+                    .invoke(null, tunnel.port(), (BooleanSupplier) tunnel::healthy);
+            properties.setProperty("socketFactory", name);
+        } catch (ReflectiveOperationException | LinkageError incompatible) {
+            throw new DatabaseProblem("The PostgreSQL SSH socket adapter could not be initialized.");
+        }
+    }
+
+    @Override public void closeTransport() throws IOException {
+        try {
+            if (forwardSockets != null) {
+                forwardSockets.getMethod("closeOwned").invoke(null);
+                forwardSockets = null;
+            }
+        } catch (ReflectiveOperationException | LinkageError problem) {
+            throw new IOException("Could not close the owned PostgreSQL SSH sockets.");
+        } finally {
+            if (tunnel != null) {
+                tunnel.close();
+                tunnel = null;
+            }
+        }
+    }
+
+    @Override public void releaseDriverFiles() throws IOException {
+        if (verifiedDriver != null) {
+            Files.deleteIfExists(verifiedDriver);
+            verifiedDriver = null;
         }
     }
 
@@ -58,6 +129,7 @@ final class PostgresqlBackend implements JdbcBackend {
     }
 
     @Override public void beforeStatement(Connection connection) throws SQLException {
+        if (tunnel != null && !tunnel.healthy()) throw new DatabaseProblem("The owned SSH tunnel stopped. Disconnect and reconnect the source.");
         try (var statement = connection.createStatement()) {
             statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
             try (var rows = statement.executeQuery("""

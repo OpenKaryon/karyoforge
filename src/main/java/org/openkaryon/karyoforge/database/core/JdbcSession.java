@@ -39,8 +39,12 @@ public final class JdbcSession implements AutoCloseable {
     public void connect(char[] password) {
         if (lease != null || connection != null) throw new DatabaseProblem("Disconnect before reopening this data source.");
         try {
-            lease = DriverLease.open(source.driver(), backend.driverClass());
+            lease = DriverLease.open(backend.selectDriver(source.driver()), backend.driverClass());
+        } catch (DatabaseProblem unavailable) {
+            close();
+            throw unavailable;
         } catch (IOException failure) {
+            close();
             throw new DatabaseProblem("Choose a trusted local " + source.engine() + " JDBC JAR that can be loaded.");
         }
         try {
@@ -255,17 +259,28 @@ public final class JdbcSession implements AutoCloseable {
     @Override public void close() {
         ready = false;
         editableSnapshot = null;
-        closeCursor();
         try {
+            try {
+                closeCursor();
+            } catch (DatabaseProblem cursorFailure) {
+                // Closing the owning JDBC connection also retires its cursor.
+            }
             if (connection != null) {
-                if (!connection.getAutoCommit()) connection.rollback();
+                try {
+                    if (!connection.isClosed() && !connection.getAutoCommit()) connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    // Closing the owned connection rolls back the server-side transaction.
+                }
                 connection.close();
                 connection = null;
             }
+            cursor = null;
+            backend.closeTransport();
             if (lease != null) {
                 lease.close();
                 lease = null;
             }
+            backend.releaseDriverFiles();
         } catch (SQLException | IOException failure) {
             throw new DatabaseProblem("The database connection could not be released. Try disconnecting again.");
         }

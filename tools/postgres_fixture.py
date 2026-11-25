@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import socket
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -53,14 +54,92 @@ printf '%s\n' "$material"
             "KARYOFORGE_TEST_PG_OTHER_CA": str(directory / "other.pem")}
 
 
+
+def provision_ssh(container: str, directory: Path, executable: Path) -> dict[str, str]:
+    keygen = executable.with_name("ssh-keygen.exe" if os.name == "nt" else "ssh-keygen")
+    key = directory / "client"
+    subprocess.run([str(keygen), "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True, timeout=25)
+    docker("exec", container, "install", "-d", "-m", "755", "/etc/karyoforge-ssh", "/run/sshd")
+    docker("cp", str(key.with_suffix(".pub")), f"{container}:/etc/karyoforge-ssh/authorized_keys")
+    setup = r"""
+set -eu
+root=/etc/karyoforge-ssh
+useradd -m -s /usr/sbin/nologin karyoforge_ssh
+usermod -p "$(openssl passwd -6 "$(openssl rand -hex 32)")" karyoforge_ssh
+chmod 644 "$root/authorized_keys"
+ssh-keygen -q -t ed25519 -N '' -f "$root/host"
+cat > "$root/config" <<'CONFIG'
+Port 22
+ListenAddress 0.0.0.0
+HostKey /etc/karyoforge-ssh/host
+AuthorizedKeysFile /etc/karyoforge-ssh/authorized_keys
+StrictModes yes
+UsePAM no
+AllowUsers karyoforge_ssh
+AuthenticationMethods publickey
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowTcpForwarding local
+PermitOpen 127.0.0.1:5432
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+PermitTTY no
+ForceCommand /bin/false
+CONFIG
+/usr/sbin/sshd -t -f "$root/config"
+"""
+    docker("exec", container, "/bin/sh", "-c", setup)
+    docker("exec", "-d", container, "/usr/sbin/sshd", "-D", "-f", "/etc/karyoforge-ssh/config")
+    endpoint = docker("port", container, "22/tcp")
+    binding = re.fullmatch(r"127\.0\.0\.1:([0-9]{1,5})", endpoint)
+    if not binding:
+        raise ValueError("SSH fixture was not published exclusively on loopback")
+    port = int(binding.group(1))
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as connection:
+                if connection.recv(128).startswith(b"SSH-"):
+                    break
+        except OSError:
+            pass
+        time.sleep(0.25)
+    else:
+        raise ValueError("The owned SSH server did not become ready")
+    host_key = " ".join(docker("exec", container, "cat", "/etc/karyoforge-ssh/host.pub").split()[:2])
+    unrelated = " ".join(key.with_suffix(".pub").read_text(encoding="ascii").split()[:2])
+    if not re.fullmatch(r"ssh-ed25519 [A-Za-z0-9+/=]+", host_key):
+        raise ValueError("Unexpected SSH fixture host key")
+    known = directory / "known_hosts"
+    wrong = directory / "wrong_hosts"
+    known.write_text(f"[127.0.0.1]:{port} {host_key}\n", encoding="ascii")
+    wrong.write_text(f"[127.0.0.1]:{port} {unrelated}\n", encoding="ascii")
+    return {"KARYOFORGE_TEST_SSH_EXECUTABLE": str(executable), "KARYOFORGE_TEST_SSH_PORT": str(port),
+            "KARYOFORGE_TEST_SSH_KEY": str(key), "KARYOFORGE_TEST_SSH_KNOWN": str(known),
+            "KARYOFORGE_TEST_SSH_WRONG": str(wrong)}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--driver", required=True)
     parser.add_argument("--offline-gradle", action="store_true")
+    parser.add_argument("--openssh", default="")
     args = parser.parse_args()
     driver = (ROOT / Path(args.driver).expanduser()).resolve()
     if driver.suffix.lower() != ".jar" or not driver.is_file():
         raise ValueError("POSTGRES_DRIVER must name an existing local JDBC JAR")
+    ssh = Path(args.openssh).expanduser().resolve() if args.openssh else None
+    if ssh is not None and (not ssh.is_file() or ssh.name.lower() not in {"ssh", "ssh.exe"}):
+        raise ValueError("OPENSSH_EXECUTABLE must name an existing native OpenSSH executable")
+    image = IMAGE
+    extra: list[str] = []
+    if ssh is not None:
+        image = docker("build", "--quiet", "-f", str(ROOT / "tools/postgres-ssh.Dockerfile"), str(ROOT / "tools"))
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
+            raise ValueError("Docker did not identify the owned PostgreSQL SSH fixture image")
+        extra = ["--publish", "127.0.0.1::22"]
     password = secrets.token_urlsafe(30)
     environment = {**os.environ, "POSTGRES_PASSWORD": password, "POSTGRES_DB": DATABASE}
     container = docker("run", "--rm", "-d", "--pull=missing",
@@ -68,7 +147,7 @@ def main() -> int:
                        "--label", "org.openkaryon.karyoforge.fixture=postgresql",
                        "--publish", "127.0.0.1::5432",
                        "--tmpfs", "/var/lib/postgresql/data:rw",
-                       "--env", "POSTGRES_PASSWORD", "--env", "POSTGRES_DB", IMAGE, env=environment)
+                       "--env", "POSTGRES_PASSWORD", "--env", "POSTGRES_DB", *extra, image, env=environment)
     if not re.fullmatch(r"[0-9a-f]{64}", container):
         raise ValueError("Docker did not return the identity of the acceptance container")
     try:
@@ -88,11 +167,15 @@ def main() -> int:
         if keep_waiting:
             raise ValueError("The owned PostgreSQL container did not become ready")
         selection = ["test", "--tests", "*PostgresqlJdbcSessionTest", f"-PpostgresDriver={driver}"]
+        if ssh is not None:
+            selection.extend(["--tests", "*PostgresqlSshJdbcSessionTest", "-PpostgresSshTests=true"])
         if args.offline_gradle:
             selection.insert(0, "--offline")
         tests = {**os.environ, "KARYOFORGE_TEST_PG_PORT": binding.group(1), "KARYOFORGE_TEST_PG_PASSWORD": password}
         with TemporaryDirectory(prefix="karyoforge-pg-certs-") as directory:
             tests.update(provision_tls(container, Path(directory)))
+            if ssh is not None:
+                tests.update(provision_ssh(container, Path(directory), ssh))
             print("Running JDBC acceptance on the owned PostgreSQL 17.11 container.", flush=True)
             return subprocess.run(gradle_command(ROOT, selection), cwd=ROOT, env=tests, check=False).returncode
     finally:

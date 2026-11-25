@@ -13,6 +13,7 @@ import java.util.jar.JarFile;
 /** Loads an explicit trusted driver without adding it to the IDE classpath. */
 public final class DriverLease implements AutoCloseable {
     private static final String BRIDGE = DriverRegistration.class.getName();
+    private static final String FORWARD_SOCKET = ForwardSocketFactory.class.getName();
     private final Loader loader;
     private final Class<?> registration;
     private final Driver driver;
@@ -68,8 +69,9 @@ public final class DriverLease implements AutoCloseable {
         }
 
         @Override protected Class<?> findClass(String name) throws ClassNotFoundException {
-            if (!name.equals(BRIDGE)) return super.findClass(name);
-            try (var source = DriverRegistration.class.getResourceAsStream("DriverRegistration.class")) {
+            if (!name.equals(BRIDGE) && !name.equals(FORWARD_SOCKET)) return super.findClass(name);
+            String classFile = name.substring(name.lastIndexOf('.') + 1) + ".class";
+            try (var source = DriverLease.class.getResourceAsStream(classFile)) {
                 if (source == null) throw new ClassNotFoundException(name);
                 byte[] bytes = source.readAllBytes();
                 return defineClass(name, bytes, 0, bytes.length);
