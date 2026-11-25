@@ -11,7 +11,7 @@ public final class SqlText {
     private static final int MAX_CHARS = 256 * 1024;
     private static final int MAX_BINDINGS = 64;
 
-    public enum Dialect { SQLITE, POSTGRESQL, MYSQL }
+    public enum Dialect { SQLITE, POSTGRESQL, MYSQL, DUCKDB }
 
     public static String activeStatement(String text, int start, int end) {
         return activeStatement(text, start, end, Dialect.SQLITE);
@@ -180,8 +180,9 @@ public final class SqlText {
                 while (end < text.length() && identifierPart(text.charAt(end))) end++;
                 keyword = text.substring(index, end).toUpperCase(Locale.ROOT);
             }
-            String dollar = dialect == Dialect.POSTGRESQL ? dollarDelimiter(text, index) : null;
-            boolean quote = c == '\'' || c == '"' || dialect != Dialect.POSTGRESQL && c == '`'
+            boolean postgresLike = dialect == Dialect.POSTGRESQL || dialect == Dialect.DUCKDB;
+            String dollar = postgresLike ? dollarDelimiter(text, index) : null;
+            boolean quote = c == '\'' || c == '"' || !postgresLike && c == '`'
                     || dialect == Dialect.SQLITE && c == '[';
             if (quote || dollar != null) {
                 int end;
@@ -190,7 +191,7 @@ public final class SqlText {
                     end = closing < 0 ? -1 : closing + dollar.length();
                 } else {
                     boolean escapes = dialect == Dialect.MYSQL && (c == '\'' || c == '"')
-                            || dialect == Dialect.POSTGRESQL && c == '\'' && index > 0
+                            || postgresLike && c == '\'' && index > 0
                             && (text.charAt(index - 1) == 'E' || text.charAt(index - 1) == 'e')
                             && (index < 2 || !identifierPart(text.charAt(index - 2)));
                     end = quotedEnd(text, index, c, escapes);
@@ -222,7 +223,7 @@ public final class SqlText {
             if (mysql && (text.startsWith("/*!", index) || text.regionMatches(true, index, "/*M!", 0, 4))) {
                 throw new IllegalArgumentException("Executable MySQL or MariaDB comments are unavailable.");
             }
-            if (dialect != Dialect.POSTGRESQL) {
+            if (dialect == Dialect.SQLITE || dialect == Dialect.MYSQL) {
                 int end = text.indexOf("*/", index + 2);
                 return end < 0 ? -1 : end + 2;
             }

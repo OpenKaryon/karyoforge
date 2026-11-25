@@ -146,6 +146,27 @@ read-only access, cancellation and transaction visibility.
 make test-mariadb MARIADB_DRIVER="/path/to/mariadb-java-client-3.5.10.jar"
 ```
 
+## DuckDB
+
+Choose **Add DuckDB Source** and select the verified DuckDB JDBC 1.5.6.0 JAR
+and a local database file. Read-only sources require an existing database.
+A writable source can create a file in an existing folder and uses manual
+**Commit** and **Rollback**. After a failed statement that aborts the
+transaction, use **Rollback** before running more SQL.
+
+The connection verifies that external file and network access and automatic
+extension installation and loading are disabled. The catalog shows local
+tables and views with column definitions and stored CREATE statements.
+SQL results are bounded after the driver reads a cell, and the table grid
+is view-only. Restart the IDE to select a different DuckDB driver file.
+
+The owned test uses DuckDB JDBC 1.5.6.0 (SHA-256
+`04ae3375d7c40dc88dc9bf0014b82ba5e66715564584af4e3abea39c7ba144d3`).
+
+```sh
+make test-duckdb DUCKDB_DRIVER="/path/to/duckdb_jdbc-1.5.6.0.jar"
+```
+
 ## Checks
 
 The SQLite tests use an owned database and an explicit local JDBC JAR. The

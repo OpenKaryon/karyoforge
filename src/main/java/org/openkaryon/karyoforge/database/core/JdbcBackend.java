@@ -1,5 +1,7 @@
 package org.openkaryon.karyoforge.database.core;
 
+import org.openkaryon.karyoforge.database.driver.DriverLease;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -27,6 +29,11 @@ interface JdbcBackend {
         throw new DatabaseProblem("This engine's table grid is read-only.");
     }
 
+    default DriverLease openDriver(Path driver) throws IOException {
+        return DriverLease.open(selectDrivers(driver), driverClass());
+    }
+    default void releaseDriver(DriverLease lease) throws IOException { lease.close(); }
+
     default Path selectDriver(Path driver) throws IOException { return driver; }
     default List<Path> selectDrivers(Path driver) throws IOException { return List.of(selectDriver(driver)); }
     default void closeTransport() throws IOException {}
@@ -41,6 +48,7 @@ interface JdbcBackend {
             case SqliteSource sqlite -> new SqliteBackend(sqlite);
             case PostgresqlSource postgres -> new PostgresqlBackend(postgres);
             case MysqlSource mysql -> new MysqlFamilyBackend(mysql);
+            case DuckDbSource duck -> new DuckDbBackend(duck);
         };
     }
 }

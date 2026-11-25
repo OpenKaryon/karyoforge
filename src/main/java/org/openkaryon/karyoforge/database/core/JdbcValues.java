@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.HexFormat;
 
@@ -22,8 +23,8 @@ final class JdbcValues {
             case Types.DECIMAL, Types.NUMERIC, Types.REAL, Types.FLOAT, Types.DOUBLE -> scalar(rows, index, Kind.DECIMAL);
             case Types.BOOLEAN, Types.BIT -> scalar(rows, index, Kind.BOOLEAN);
             case Types.DATE -> scalar(rows, index, Kind.DATE);
-            case Types.TIME -> scalar(rows, index, Kind.TIME);
-            case Types.TIMESTAMP -> scalar(rows, index, Kind.TIMESTAMP);
+            case Types.TIME, Types.TIME_WITH_TIMEZONE -> scalar(rows, index, Kind.TIME);
+            case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE -> scalar(rows, index, Kind.TIMESTAMP);
             case Types.NULL -> nullCell();
             default -> bounded(rows.getString(index), Kind.OTHER, limit);
         };
@@ -47,6 +48,8 @@ final class JdbcValues {
                 used += count;
             }
             return bounded(new String(buffer, 0, used), Kind.TEXT, limit);
+        } catch (SQLFeatureNotSupportedException unsupported) {
+            return bounded(rows.getString(index), Kind.TEXT, limit);
         }
     }
 
@@ -57,6 +60,11 @@ final class JdbcValues {
             byte[] data = stream.readNBytes(bytes + 1);
             return new QueryPage.Cell(Kind.BINARY, HexFormat.of().formatHex(data, 0, Math.min(bytes, data.length)),
                     data.length > bytes);
+        } catch (SQLFeatureNotSupportedException unsupported) {
+            byte[] data = rows.getBytes(index);
+            if (data == null) return nullCell();
+            int bytes = limit / 2;
+            return new QueryPage.Cell(Kind.BINARY, HexFormat.of().formatHex(data, 0, Math.min(bytes, data.length)), data.length > bytes);
         }
     }
 

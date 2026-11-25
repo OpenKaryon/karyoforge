@@ -39,7 +39,7 @@ public final class JdbcSession implements AutoCloseable {
     public void connect(char[] password) {
         if (lease != null || connection != null) throw new DatabaseProblem("Disconnect before reopening this data source.");
         try {
-            lease = DriverLease.open(backend.selectDrivers(source.driver()), backend.driverClass());
+            lease = backend.openDriver(source.driver());
         } catch (DatabaseProblem unavailable) {
             close();
             throw unavailable;
@@ -277,7 +277,7 @@ public final class JdbcSession implements AutoCloseable {
             cursor = null;
             backend.closeTransport();
             if (lease != null) {
-                lease.close();
+                backend.releaseDriver(lease);
                 lease = null;
             }
             backend.releaseDriverFiles();

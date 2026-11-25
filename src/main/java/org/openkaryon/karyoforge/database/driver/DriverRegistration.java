@@ -22,6 +22,7 @@ public final class DriverRegistration {
             switch (driverClass) {
                 case "com.mysql.cj.jdbc.Driver" -> shutdownMysql();
                 case "org.mariadb.jdbc.Driver" -> shutdownMaria();
+                case "org.duckdb.DuckDBDriver" -> shutdownDuckDb();
                 default -> {}
             }
         } catch (InterruptedException interrupted) {
@@ -49,6 +50,13 @@ public final class DriverRegistration {
         timeout.shutdownNow();
         if (!timeout.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)) {
             throw new IllegalStateException("The owned MariaDB timeout executor is still running.");
+        }
+    }
+
+    private static void shutdownDuckDb() throws ReflectiveOperationException {
+        Class<?> driver = Class.forName("org.duckdb.DuckDBDriver", false, DriverRegistration.class.getClassLoader());
+        if (!Boolean.TRUE.equals(driver.getMethod("shutdownQueryCancelScheduler").invoke(null))) {
+            throw new IllegalStateException("The owned DuckDB cancellation service is still running.");
         }
     }
 

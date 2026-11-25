@@ -6,6 +6,7 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import org.jetbrains.annotations.NotNull;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.DuckDbSource;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
@@ -43,6 +44,10 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             row.writable = profile.source().writable();
             switch (profile.source()) {
                 case SqliteSource sqlite -> row.database = sqlite.database().toString();
+                case DuckDbSource duck -> {
+                    row.kind = "duckdb";
+                    row.database = duck.database().toString();
+                }
                 case PostgresqlSource postgres -> {
                     row.kind = "postgresql";
                     row.host = postgres.host();
@@ -74,6 +79,7 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                 String id = UUID.fromString(entry.id).toString();
                 DatabaseSource source = switch (entry.kind == null ? "sqlite" : entry.kind) {
                     case "sqlite" -> new SqliteSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
+                    case "duckdb" -> new DuckDbSource(entry.name, Path.of(entry.database), Path.of(entry.driver), entry.writable);
                     case "postgresql" -> new PostgresqlSource(entry.name, entry.host, entry.port, entry.database, entry.user,
                             Path.of(entry.driver), entry.writable, entry.caFile == null ? null : Path.of(entry.caFile),
                             entry.ssh == null ? null : entry.ssh.forwarding());

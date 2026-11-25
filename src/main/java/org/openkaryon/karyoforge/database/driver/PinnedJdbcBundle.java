@@ -23,7 +23,7 @@ public final class PinnedJdbcBundle implements AutoCloseable {
                 Path original = index == 0 ? selected : selected.resolveSibling(jar.filename());
                 Path copy = bundle.stage.resolve(jar.filename());
                 bundle.staged.add(copy);
-                bundle.copyVerified(original, copy, jar);
+                copyVerified(original, copy, jar);
             }
             return bundle;
         } catch (IOException | RuntimeException failure) {
@@ -38,7 +38,9 @@ public final class PinnedJdbcBundle implements AutoCloseable {
 
     public List<Path> paths() { return List.copyOf(staged); }
 
-    private void copyVerified(Path source, Path target, Jar expected) throws IOException {
+    public static void verify(Path source, Jar expected) throws IOException { copyVerified(source, null, expected); }
+
+    private static void copyVerified(Path source, Path target, Jar expected) throws IOException {
         if (!Files.isRegularFile(source) || Files.size(source) != expected.size()) throw invalid(expected);
         MessageDigest digest;
         try {
@@ -48,7 +50,7 @@ public final class PinnedJdbcBundle implements AutoCloseable {
         }
         long length = 0;
         byte[] buffer = new byte[65_536];
-        try (var input = Files.newInputStream(source); var output = Files.newOutputStream(target)) {
+        try (var input = Files.newInputStream(source); var output = target == null ? java.io.OutputStream.nullOutputStream() : Files.newOutputStream(target)) {
             for (int count; (count = input.read(buffer)) >= 0;) {
                 length += count;
                 if (length > expected.size()) throw invalid(expected);

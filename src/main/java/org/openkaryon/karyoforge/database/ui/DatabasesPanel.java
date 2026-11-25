@@ -13,6 +13,7 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.table.JBTable;
 import org.openkaryon.karyoforge.database.core.DatabaseProblem;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.DuckDbSource;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
@@ -60,6 +61,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private final JScrollPane structureTab = new JBScrollPane(structure);
     private final JBLabel status = new JBLabel("Choose or add a data source.");
     private final JButton add = button("Add SQLite Source", () -> editSource(null, SqlText.Dialect.SQLITE));
+    private final JButton addDuck = button("Add DuckDB Source", () -> editSource(null, SqlText.Dialect.DUCKDB));
     private final JButton addServer = button("Add Server Source", this::addServerSource);
     private final JButton edit = button("Edit Source", () -> {
         var profile = selectedSource();
@@ -126,7 +128,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         schema.setCellRenderer(literalListRenderer());
         profiles.setRenderer(literalListRenderer());
 
-        var sourceControls = controls(profiles, add, addServer, edit, remove, connect, disconnect, commit, rollback);
+        var sourceControls = controls(profiles, add, addDuck, addServer, edit, remove, connect, disconnect, commit, rollback);
         var objectPanel = new JPanel(new BorderLayout());
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
@@ -220,6 +222,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
         DatabaseSource source = switch (dialect) {
             case SQLITE -> {
                 var dialog = new SqliteSourceDialog(project, (SqliteSource) existing);
+                yield dialog.showAndGet() ? dialog.source() : null;
+            }
+            case DUCKDB -> {
+                var dialog = new DuckDbSourceDialog(project, (DuckDbSource) existing);
                 yield dialog.showAndGet() ? dialog.source() : null;
             }
             case POSTGRESQL -> {
@@ -699,6 +705,7 @@ final class DatabasesPanel extends JPanel implements Disposable {
         boolean selected = selectedSource() != null;
         profiles.setEnabled(canManage);
         add.setEnabled(canManage);
+        addDuck.setEnabled(canManage);
         addServer.setEnabled(canManage);
         edit.setEnabled(canManage && selected);
         remove.setEnabled(canManage && selected);

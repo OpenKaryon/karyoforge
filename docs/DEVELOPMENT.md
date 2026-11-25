@@ -38,6 +38,7 @@ outputs and profile locations. Linux packaging is not implemented.
 | `audit-reference-check` | Check the same inputs for drift without rewriting the inventory |
 | `build` | Delegate to Gradle `buildPlugin verifyPluginStructure`; fail if build prerequisites are absent |
 | `verify` | Delegate to Gradle `verifyPlugin`; fail if build prerequisites are absent |
+| `test-duckdb` | Run DuckDB checks on owned local files with the verified `DUCKDB_DRIVER` |
 | `test-mariadb` | Run MariaDB in an owned Docker container with a verified `MARIADB_DRIVER` and its two companion JARs |
 | `test-mysql` | Run MySQL in an owned Docker container with a verified `MYSQL_DRIVER` |
 | `test-postgresql` | Run PostgreSQL in an owned Docker container with an explicit local `POSTGRES_DRIVER` |

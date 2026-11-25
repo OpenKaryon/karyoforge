@@ -9,8 +9,9 @@ POSTGRES_DRIVER ?=
 OPENSSH_EXECUTABLE ?=
 MYSQL_DRIVER ?=
 MARIADB_DRIVER ?=
+DUCKDB_DRIVER ?=
 
-.PHONY: test-mariadb test-mysql test-postgresql test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
+.PHONY: test-duckdb test-mariadb test-mysql test-postgresql test-database notebook-fixtures notebook-runtime test-notebook gui-bundle test-gui help lint test audit check audit-reference audit-reference-check build verify test-ide test-python branding test-branding run dist-windows zip-windows verify-dist-windows package-windows package-linux
 
 help:
 	"$(PYTHON)" tools/tasks.py help
@@ -79,6 +80,9 @@ test-mysql:
 
 test-mariadb:
 	"$(PYTHON)" tools/tasks.py test-mariadb --mysql-driver "$(MARIADB_DRIVER)"
+
+test-duckdb:
+	"$(PYTHON)" tools/tasks.py test-duckdb --duckdb-driver "$(DUCKDB_DRIVER)"
 
 gui-bundle:
 	"$(PYTHON)" tools/tasks.py gui-bundle --sqlite-driver "$(SQLITE_DRIVER)"
