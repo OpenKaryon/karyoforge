@@ -21,13 +21,16 @@ final class DuckDbBackend implements JdbcBackend {
             "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "MERGE", "TRUNCATE");
     private final DuckDbSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
 
-    DuckDbBackend(DuckDbSource source, ResultLimits limits) {
+    DuckDbBackend(DuckDbSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         this.source = source;
         this.limits = limits;
+        this.timeouts = timeouts;
     }
 
     @Override public ResultLimits limits() { return limits; }
+    @Override public DatabaseTimeouts timeouts() { return timeouts; }
 
     @Override public String driverClass() { return "org.duckdb.DuckDBDriver"; }
 
@@ -70,7 +73,7 @@ final class DuckDbBackend implements JdbcBackend {
         if (source.writable()) connection.setAutoCommit(false);
     }
 
-    @Override public void configureStatement(PreparedStatement statement) throws SQLException { statement.setQueryTimeout(30); }
+    @Override public void configureStatement(PreparedStatement statement) throws SQLException { statement.setQueryTimeout(timeouts.querySeconds()); }
 
     @Override public List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException {
         var objects = new ArrayList<JdbcSession.SchemaObject>();

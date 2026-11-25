@@ -29,14 +29,17 @@ final class MysqlFamilyBackend implements JdbcBackend {
             "INSERT", "UPDATE", "DELETE", "REPLACE");
     private final MysqlSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
     private PinnedJdbcBundle bundle;
 
-    MysqlFamilyBackend(MysqlSource source, ResultLimits limits) {
+    MysqlFamilyBackend(MysqlSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         this.source = source;
         this.limits = limits;
+        this.timeouts = timeouts;
     }
 
     @Override public ResultLimits limits() { return limits; }
+    @Override public DatabaseTimeouts timeouts() { return timeouts; }
 
     private boolean maria() { return source.variant() == MysqlSource.Variant.MARIADB; }
 
@@ -58,8 +61,8 @@ final class MysqlFamilyBackend implements JdbcBackend {
         var properties = new Properties();
         properties.setProperty("user", source.user());
         properties.setProperty("password", password == null ? "" : new String(password));
-        properties.setProperty("connectTimeout", "10000");
-        properties.setProperty("socketTimeout", "35000");
+        properties.setProperty("connectTimeout", Integer.toString(timeouts.connectSeconds() * 1000));
+        properties.setProperty("socketTimeout", Integer.toString((timeouts.querySeconds() + 5) * 1000));
         properties.setProperty("allowMultiQueries", "false");
         if (maria()) {
             properties.setProperty("sslMode", "disable");
@@ -104,7 +107,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
 
     @Override public void beforeStatement(Connection connection) throws SQLException {
         try (var statement = connection.createStatement()) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(timeouts.querySeconds());
             String variable = maria() ? "tx_read_only" : "transaction_read_only";
             try (var row = statement.executeQuery("SELECT @@session." + variable + ", @@session.sql_mode")) {
                 if (!row.next() || row.getInt(1) != (source.writable() ? 0 : 1)) {
@@ -123,7 +126,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
     }
 
     @Override public void configureStatement(PreparedStatement statement) throws SQLException {
-        statement.setQueryTimeout(30);
+        statement.setQueryTimeout(timeouts.querySeconds());
         statement.setFetchSize(limits.pageSize());
     }
 
@@ -134,7 +137,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
                 FROM information_schema.tables WHERE table_schema=? AND table_type IN ('BASE TABLE','VIEW')
                 ORDER BY table_name LIMIT
                 """ + limits.catalogLimit())) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(timeouts.querySeconds());
             statement.setString(1, source.database());
             try (var rows = statement.executeQuery()) {
                 while (rows.next() && objects.size() < limits.catalogLimit()) {
@@ -156,7 +159,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
                      AND k.table_name=c.table_name AND k.column_name=c.column_name AND k.constraint_name='PRIMARY'
                 WHERE c.table_schema=? AND c.table_name=? ORDER BY c.ordinal_position
                 """)) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(timeouts.querySeconds());
             statement.setString(1, object.schema());
             statement.setString(2, object.name());
             try (var rows = statement.executeQuery()) {
@@ -174,7 +177,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
         if (columns.isEmpty()) throw new DatabaseProblem("The selected object no longer has visible columns.");
         String ddl;
         try (var statement = connection.createStatement()) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(timeouts.querySeconds());
             String kind = object.type().equals("view") ? "VIEW " : "TABLE ";
             try (var rows = statement.executeQuery("SHOW CREATE " + kind + object.qualified())) {
                 if (!rows.next()) throw new DatabaseProblem("The selected object definition is unavailable.");

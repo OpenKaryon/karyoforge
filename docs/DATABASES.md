@@ -39,8 +39,8 @@ a value. Literal and comment text is left intact. Cancelling the dialog leaves t
 and database session untouched.
 
 **Next Result Page** continues the active cursor. **Query Limits** sets
-the page size, total rows, detached bytes, cell characters, columns and
-catalog size for the next connection. Defaults are 200 rows per page,
+the page size, total rows, detached bytes, cell characters, columns,
+catalog size and timeouts for the next connection. Defaults are 200 rows per page,
 10,000 total rows, 8 MiB of detached values, 256 columns, 16,384 characters
 per cell and 2,000 catalog objects. Large text and BLOB cells show clipped previews.
 NULL is distinct from empty text, BLOBs appear as hexadecimal, and SQLite
@@ -50,9 +50,13 @@ null constraints, primary-key order and hidden/generated columns in **Structure*
 PostgreSQL, MySQL, MariaDB and ClickHouse show row estimates when their catalogs
 already have them. Browsing uses those statistics without counting table rows.
 The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
-statement. **Stop** cancels an active query or page request. Between pages it
-closes the retained cursor while keeping the fetched rows and the current
-transaction. **Disconnect** releases the cursor, connection and driver lease.
+statement. An active query, table operation or page request can be cancelled
+with **Stop**, or is cancelled at its configured query deadline, 30 seconds by
+default. Network connection and OpenSSH handshake timeouts default to 15 seconds.
+ClickHouse also verifies the server budget against the configured query timeout.
+The owning session retains its resources while a driver is still cancelling.
+Between pages, **Stop** closes the retained cursor while keeping fetched rows
+and the current transaction. **Disconnect** releases the cursor, connection and driver lease.
 
 ## SQL editor
 

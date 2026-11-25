@@ -16,13 +16,17 @@ final class OpenSshTunnel implements AutoCloseable {
     private static final Pattern BOUND = Pattern.compile(
             "debug1: channel [0-9]+: new (?:port-listener )?\\[port listener\\](?: \\(inactive timeout: [0-9]+\\))?");
     private final SshForwarding profile;
+    private final int connectSeconds;
     private final CompletableFuture<Void> listening = new CompletableFuture<>();
     private volatile Process process;
     private volatile boolean diagnosticsEnded;
     private Thread reader;
     private int port;
 
-    OpenSshTunnel(SshForwarding profile) { this.profile = profile; }
+    OpenSshTunnel(SshForwarding profile, int connectSeconds) {
+        this.profile = profile;
+        this.connectSeconds = connectSeconds;
+    }
 
     void open() {
         profile.verifyFiles();
@@ -47,7 +51,7 @@ final class OpenSshTunnel implements AutoCloseable {
             process = launch.start();
             process.getOutputStream().close();
             reader = Thread.ofPlatform().daemon().name("KaryoForge OpenSSH diagnostics").start(this::readReadiness);
-            listening.get(12, TimeUnit.SECONDS);
+            listening.get(connectSeconds, TimeUnit.SECONDS);
             if (healthy()) return;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -79,7 +83,7 @@ final class OpenSshTunnel implements AutoCloseable {
                 "-o", "PreferredAuthentications=publickey", "-o", "PasswordAuthentication=no",
                 "-o", "KbdInteractiveAuthentication=no", "-o", "ForwardAgent=no", "-o", "ControlMaster=no",
                 "-o", "ControlPath=none", "-o", "ProxyCommand=none", "-o", "ProxyJump=none",
-                "-o", "ExitOnForwardFailure=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=5",
+                "-o", "ExitOnForwardFailure=yes", "-o", "ConnectTimeout=" + connectSeconds, "-o", "ServerAliveInterval=5",
                 "-o", "ServerAliveCountMax=2",
                 "-L", "127.0.0.1:" + port + ":" + target + ":" + profile.targetPort(),
                 "-p", Integer.toString(profile.port()), "-l", profile.user(), "-i", profile.identity().toString(),

@@ -37,8 +37,8 @@ final class ClickHouseGateway implements AutoCloseable {
     private static final List<String> RESPONSE_HEADERS = List.of("Content-Type", "Content-Encoding", "X-ClickHouse-Format",
             "X-ClickHouse-Timezone", "X-ClickHouse-Query-Id", "X-ClickHouse-Summary", "X-ClickHouse-Server-Display-Name",
             "X-ClickHouse-Exception-Code");
-    private final HttpClient upstream = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8))
-            .followRedirects(HttpClient.Redirect.NEVER).proxy(ProxySelector.of(null)).version(HttpClient.Version.HTTP_1_1).build();
+    private final HttpClient upstream;
+    private final int querySeconds;
     private final java.util.concurrent.ExecutorService requests =
             Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("KaryoForge ClickHouse HTTP-", 1).factory());
     private final java.util.concurrent.ScheduledExecutorService deadlines = Executors.newSingleThreadScheduledExecutor(
@@ -48,7 +48,10 @@ final class ClickHouseGateway implements AutoCloseable {
     private final String authority;
     private final HttpServer route;
 
-    ClickHouseGateway(int port) throws IOException {
+    ClickHouseGateway(int port, DatabaseTimeouts timeouts) throws IOException {
+        upstream = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(timeouts.connectSeconds()))
+                .followRedirects(HttpClient.Redirect.NEVER).proxy(ProxySelector.of(null)).version(HttpClient.Version.HTTP_1_1).build();
+        querySeconds = timeouts.querySeconds();
         authority = "http://127.0.0.1:" + port;
         route = HttpServer.create(new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), 0), 16);
         route.createContext("/", this::receive);
@@ -85,7 +88,7 @@ final class ClickHouseGateway implements AutoCloseable {
                 try { stream.close(); } catch (IOException ignored) {}
             }
             exchange.close();
-        }, 37, TimeUnit.SECONDS);
+        }, querySeconds + 7, TimeUnit.SECONDS);
         try {
             URI incoming = exchange.getRequestURI();
             String path = incoming.getRawPath();
@@ -109,7 +112,7 @@ final class ClickHouseGateway implements AutoCloseable {
                 reject(exchange, 413);
                 return;
             }
-            var outgoing = HttpRequest.newBuilder(URI.create(authority + target)).timeout(Duration.ofSeconds(34));
+            var outgoing = HttpRequest.newBuilder(URI.create(authority + target)).timeout(Duration.ofSeconds(querySeconds + 4));
             var supplied = new AtomicBoolean();
             outgoing.POST(HttpRequest.BodyPublishers.ofInputStream(() ->
                     supplied.compareAndSet(false, true) ? new ByteArrayInputStream(bytes) : null));

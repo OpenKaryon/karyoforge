@@ -24,21 +24,23 @@ final class PostgresqlBackend implements JdbcBackend {
     private static final Set<String> WRITE_COMMANDS = Set.of("SELECT", "WITH", "VALUES", "TABLE", "SHOW", "EXPLAIN",
             "INSERT", "UPDATE", "DELETE", "MERGE", "CREATE", "ALTER", "DROP", "COMMENT", "GRANT", "REVOKE",
             "TRUNCATE", "REINDEX", "ANALYZE", "REFRESH");
-    private static final int QUERY_TIMEOUT_SECONDS = 30;
     private static final String FORWARDING_DRIVER_SHA256 =
             "73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c";
     private final PostgresqlSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
     private Path verifiedDriver;
     private OpenSshTunnel tunnel;
     private Class<?> forwardSockets;
 
-    PostgresqlBackend(PostgresqlSource source, ResultLimits limits) {
+    PostgresqlBackend(PostgresqlSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         this.source = source;
         this.limits = limits;
+        this.timeouts = timeouts;
     }
 
     @Override public ResultLimits limits() { return limits; }
+    @Override public DatabaseTimeouts timeouts() { return timeouts; }
 
     @Override public String driverClass() { return "org.postgresql.Driver"; }
 
@@ -79,8 +81,8 @@ final class PostgresqlBackend implements JdbcBackend {
         properties.setProperty("sslcert", "");
         properties.setProperty("sslkey", "");
         properties.setProperty("readOnlyMode", "always");
-        properties.setProperty("connectTimeout", "10");
-        properties.setProperty("socketTimeout", "35");
+        properties.setProperty("connectTimeout", Integer.toString(timeouts.connectSeconds()));
+        properties.setProperty("socketTimeout", Integer.toString(timeouts.querySeconds() + 5));
         properties.setProperty("cancelSignalTimeout", "5");
         properties.setProperty("ApplicationName", "KaryoForge Databases");
         try {
@@ -92,7 +94,7 @@ final class PostgresqlBackend implements JdbcBackend {
     }
 
     private void configureForwarding(Driver driver, Properties properties) {
-        tunnel = new OpenSshTunnel(source.forwarding());
+        tunnel = new OpenSshTunnel(source.forwarding(), timeouts.connectSeconds());
         tunnel.open();
         try {
             String name = ForwardSocketFactory.class.getName();
@@ -137,7 +139,7 @@ final class PostgresqlBackend implements JdbcBackend {
     @Override public void beforeStatement(Connection connection) throws SQLException {
         if (tunnel != null && !tunnel.healthy()) throw new DatabaseProblem("The owned SSH tunnel stopped. Disconnect and reconnect the source.");
         try (var statement = connection.createStatement()) {
-            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setQueryTimeout(timeouts.querySeconds());
             try (var rows = statement.executeQuery("""
                     SELECT pg_catalog.current_setting('transaction_read_only'),
                            pg_catalog.current_setting('standard_conforming_strings')
@@ -153,7 +155,7 @@ final class PostgresqlBackend implements JdbcBackend {
     }
 
     @Override public void configureStatement(PreparedStatement statement) throws SQLException {
-        statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+        statement.setQueryTimeout(timeouts.querySeconds());
         statement.setFetchSize(limits.pageSize());
     }
 
@@ -162,7 +164,7 @@ final class PostgresqlBackend implements JdbcBackend {
     @Override public List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException {
         var result = new ArrayList<JdbcSession.SchemaObject>();
         try (var statement = connection.createStatement()) {
-            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setQueryTimeout(timeouts.querySeconds());
             try (var rows = statement.executeQuery("""
                     SELECT n.nspname, c.relname,
                            CASE WHEN c.relkind IN ('v','m') THEN 'view' ELSE 'table' END,
@@ -195,7 +197,7 @@ final class PostgresqlBackend implements JdbcBackend {
                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = ? AND c.relname = ? AND c.relkind IN ('r','p','v','m','f')
                 """)) {
-            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setQueryTimeout(timeouts.querySeconds());
             statement.setString(1, object.schema());
             statement.setString(2, object.name());
             try (var row = statement.executeQuery()) {
@@ -219,7 +221,7 @@ final class PostgresqlBackend implements JdbcBackend {
                 WHERE a.attrelid = CAST(? AS oid) AND a.attnum > 0 AND NOT a.attisdropped
                 ORDER BY a.attnum
                 """)) {
-            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setQueryTimeout(timeouts.querySeconds());
             statement.setLong(1, oid);
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {
@@ -252,7 +254,7 @@ final class PostgresqlBackend implements JdbcBackend {
                 SELECT conname, pg_catalog.left(pg_catalog.pg_get_constraintdef(oid, true), 4096)
                 FROM pg_catalog.pg_constraint WHERE conrelid = CAST(? AS oid) ORDER BY conname LIMIT 256
                 """)) {
-            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setQueryTimeout(timeouts.querySeconds());
             statement.setLong(1, oid);
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) declarations.add("CONSTRAINT " + JdbcSession.SchemaObject.quote(rows.getString(1)) + " " + rows.getString(2));
@@ -265,7 +267,7 @@ final class PostgresqlBackend implements JdbcBackend {
 
     @Override public TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request)
             throws SQLException, IOException {
-        return PostgresqlTableEditor.browse(connection, definition, source.writable(), limits, request);
+        return PostgresqlTableEditor.browse(connection, definition, source.writable(), limits, timeouts, request);
     }
 
     @Override public int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,

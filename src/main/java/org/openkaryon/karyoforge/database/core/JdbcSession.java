@@ -12,25 +12,43 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /** Owns the connection and retained cursor. Except for QueryRequest.stop, use one command lane. */
 public final class JdbcSession implements AutoCloseable {
+    private static final ScheduledThreadPoolExecutor DEADLINES = new ScheduledThreadPoolExecutor(1,
+            Thread.ofPlatform().daemon().name("KaryoForge database deadline").factory());
+    private static final java.util.concurrent.ExecutorService TIMEOUT_CANCELLATIONS = Executors.newCachedThreadPool(
+            Thread.ofPlatform().daemon().name("KaryoForge database timeout", 1).factory());
+
+    static {
+        DEADLINES.setRemoveOnCancelPolicy(true);
+    }
+
     private final DatabaseSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
     private final JdbcBackend backend;
     private DriverLease lease;
     private Connection connection;
     private Cursor cursor;
+    private QueryRequest pendingCancellation;
     private TableSnapshot editableSnapshot;
     private boolean ready;
     private boolean quarantined;
 
     public JdbcSession(DatabaseSource source) { this(source, ResultLimits.DEFAULT); }
 
-    public JdbcSession(DatabaseSource source, ResultLimits limits) {
+    public JdbcSession(DatabaseSource source, ResultLimits limits) { this(source, limits, DatabaseTimeouts.DEFAULT); }
+
+    public JdbcSession(DatabaseSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
+        timeouts.checkSource(source);
         this.source = source;
         this.limits = limits;
-        backend = JdbcBackend.forSource(source, limits);
+        this.timeouts = timeouts;
+        backend = JdbcBackend.forSource(source, limits, timeouts);
     }
 
     public void connect() { connect(null); }
@@ -127,6 +145,7 @@ public final class JdbcSession implements AutoCloseable {
         editableSnapshot = null;
         return this.<SqlResult>requestResult("Executing SQL", request, () -> {
             backend.beforeStatement(connection, request);
+            request.check();
             cursor = new Cursor();
             if (backend.statementSavepoints()) cursor.savepoint = connection.setSavepoint();
             var statement = connection.prepareStatement(command.sql());
@@ -166,6 +185,8 @@ public final class JdbcSession implements AutoCloseable {
 
     private <T> T requestResult(String operation, QueryRequest request, ReadResult<T> work) {
         T result = null;
+        var deadline = DEADLINES.schedule(() -> TIMEOUT_CANCELLATIONS.execute(request::expire),
+                timeouts.querySeconds(), TimeUnit.SECONDS);
         try {
             result = work.run();
         } catch (SQLException failure) {
@@ -175,12 +196,16 @@ public final class JdbcSession implements AutoCloseable {
             request.check();
             throw new DatabaseProblem("Could not read a detached query value.");
         } finally {
+            deadline.cancel(false);
             boolean cancelUnconfirmed = request.finish();
-            if (cancelUnconfirmed) quarantined = true;
+            if (cancelUnconfirmed) {
+                quarantined = true;
+                if (!request.cancellationSettled()) pendingCancellation = request;
+            }
             boolean failed = cancelUnconfirmed || request.stopped() || result == null;
-            if (failed || !(result instanceof QueryPage page) || !page.hasNext()) closeCursor(failed);
+            if (pendingCancellation == null && (failed || !(result instanceof QueryPage page) || !page.hasNext())) closeCursor(failed);
+            if (cancelUnconfirmed) throw new DatabaseProblem("Cancellation could not be confirmed. Disconnect this data source.");
         }
-        if (quarantined) throw new DatabaseProblem("Stop could not be confirmed. Disconnect this data source.");
         request.check();
         return result;
     }
@@ -278,6 +303,10 @@ public final class JdbcSession implements AutoCloseable {
     @Override public void close() {
         ready = false;
         editableSnapshot = null;
+        if (pendingCancellation != null && !pendingCancellation.cancellationSettled()) {
+            throw new DatabaseProblem("The cancelling driver still owns this session. Try disconnecting again after it settles.");
+        }
+        pendingCancellation = null;
         try {
             try {
                 closeCursor();

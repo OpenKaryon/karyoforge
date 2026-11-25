@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 /** A JDBC connection and its independent cancellation client share a guarded, owned route. */
 final class ClickHouseConnection implements AutoCloseable {
     private final ClickHouseSource source;
+    private final DatabaseTimeouts timeouts;
     private final ThreadLocal<ClickHouseGateway.Permit> dispatch = new ThreadLocal<>();
     private ClickHouseGateway gateway;
     private Connection client;
@@ -24,14 +25,17 @@ final class ClickHouseConnection implements AutoCloseable {
     private boolean opening = true;
     private volatile boolean quarantined;
 
-    ClickHouseConnection(ClickHouseSource source) { this.source = source; }
+    ClickHouseConnection(ClickHouseSource source, DatabaseTimeouts timeouts) {
+        this.source = source;
+        this.timeouts = timeouts;
+    }
 
     Connection open(Driver driver, char[] password) throws SQLException {
         if (!System.getProperty("jdk.httpclient.HttpClient.log", "").isBlank()) {
             throw new DatabaseProblem("Disable JVM HTTP debug logging before using ClickHouse credentials.");
         }
         try {
-            gateway = new ClickHouseGateway(source.port());
+            gateway = new ClickHouseGateway(source.port(), timeouts);
         } catch (java.io.IOException unavailable) {
             throw new DatabaseProblem("Could not open the owned ClickHouse HTTP route.");
         }
@@ -55,11 +59,11 @@ final class ClickHouseConnection implements AutoCloseable {
         properties.setProperty("jdbc_ignore_unsupported_values", "false");
         properties.setProperty("async", "false");
         properties.setProperty("retry", "0");
-        properties.setProperty("connection_timeout", "8000");
-        properties.setProperty("connection_request_timeout", "8000");
-        properties.setProperty("socket_timeout", "35000");
+        properties.setProperty("connection_timeout", Integer.toString(timeouts.connectSeconds() * 1000));
+        properties.setProperty("connection_request_timeout", Integer.toString(timeouts.connectSeconds() * 1000));
+        properties.setProperty("socket_timeout", Integer.toString((timeouts.querySeconds() + 5) * 1000));
         properties.setProperty("clickhouse_setting_readonly", "1");
-        properties.setProperty("clickhouse_setting_max_execution_time", "30");
+        properties.setProperty("clickhouse_setting_max_execution_time", Integer.toString(timeouts.querySeconds()));
         properties.put("jdbc_query_id_generator", ids);
         try {
             String url = "jdbc:clickhouse:http://127.0.0.1:" + gateway.localPort() + "/" + source.database();
@@ -78,7 +82,7 @@ final class ClickHouseConnection implements AutoCloseable {
         throw new IllegalStateException("The ClickHouse operation has no owned request.");
     }
 
-    static void verify(Connection connection, QueryRequest request) throws SQLException {
+    void verify(Connection connection, QueryRequest request) throws SQLException {
         int verified = 0;
         try (var statement = connection.createStatement()) {
             if (request != null) request.attach(statement);
@@ -93,7 +97,7 @@ final class ClickHouseConnection implements AutoCloseable {
                     if (name.equals("max_execution_time")) {
                         try {
                             var seconds = new BigDecimal(rows.getString(2));
-                            if (seconds.signum() > 0 && seconds.compareTo(BigDecimal.valueOf(30)) <= 0) verified++;
+                            if (seconds.signum() > 0 && seconds.compareTo(BigDecimal.valueOf(timeouts.querySeconds())) <= 0) verified++;
                         } catch (NumberFormatException ignored) {
                             // Leave the execution budget unverified.
                         }

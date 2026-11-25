@@ -37,7 +37,7 @@ public final class ClickHouseGatewayTest {
             exchange.close();
         });
         server.start();
-        try (var route = new ClickHouseGateway(server.getAddress().getPort());
+        try (var route = new ClickHouseGateway(server.getAddress().getPort(), DatabaseTimeouts.DEFAULT);
              var client = HttpClient.newBuilder().proxy(ProxySelector.of(null)).build()) {
             var permit = route.issue(false);
             var path = "?query_id=" + permit.id();

@@ -8,7 +8,7 @@ import java.util.List;
 
 final class ReadOnlyTable {
 
-    static TableSnapshot open(Connection connection, TableDefinition definition, ResultLimits limits, QueryRequest request)
+    static TableSnapshot open(Connection connection, TableDefinition definition, ResultLimits limits, DatabaseTimeouts timeouts, QueryRequest request)
             throws SQLException, IOException {
         var columns = definition.columns().stream().map(column -> new QueryPage.Column(column.name(), column.type())).toList();
         var grid = new ArrayList<QueryPage.Row>();
@@ -19,7 +19,7 @@ final class ReadOnlyTable {
         int bytes = 0;
         boolean more = false;
         try (var command = connection.prepareStatement(sql)) {
-            command.setQueryTimeout(30);
+            command.setQueryTimeout(timeouts.querySeconds());
             request.attach(command);
             try (var rows = command.executeQuery()) {
                 if (rows.getMetaData().getColumnCount() != columns.size()) {

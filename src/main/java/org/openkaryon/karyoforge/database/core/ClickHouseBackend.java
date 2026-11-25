@@ -22,15 +22,18 @@ final class ClickHouseBackend implements JdbcBackend {
     private static final Set<String> QUERIES = Set.of("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC");
     private final ClickHouseSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
     private PinnedJdbcBundle bundle;
     private ClickHouseConnection transport;
 
-    ClickHouseBackend(ClickHouseSource source, ResultLimits limits) {
+    ClickHouseBackend(ClickHouseSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         this.source = source;
         this.limits = limits;
+        this.timeouts = timeouts;
     }
 
     @Override public ResultLimits limits() { return limits; }
+    @Override public DatabaseTimeouts timeouts() { return timeouts; }
 
     @Override public String driverClass() { return "com.clickhouse.jdbc.Driver"; }
 
@@ -40,7 +43,7 @@ final class ClickHouseBackend implements JdbcBackend {
     }
 
     @Override public Connection connect(Driver driver, char[] password) throws SQLException {
-        transport = new ClickHouseConnection(source);
+        transport = new ClickHouseConnection(source, timeouts);
         return transport.open(driver, password);
     }
 
@@ -48,7 +51,7 @@ final class ClickHouseBackend implements JdbcBackend {
 
     @Override public void beforeStatement(Connection connection, QueryRequest request) throws SQLException {
         transport.checkHealthy();
-        ClickHouseConnection.verify(connection, request);
+        transport.verify(connection, request);
     }
 
     @Override public void closeTransport() throws IOException {

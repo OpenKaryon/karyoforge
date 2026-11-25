@@ -18,7 +18,7 @@ import static org.openkaryon.karyoforge.database.core.QueryPage.Cell.Kind;
 final class PostgresqlTableEditor {
 
     static TableSnapshot browse(Connection connection, TableDefinition definition, boolean writable,
-                                ResultLimits limits, QueryRequest request) throws SQLException, IOException {
+                                ResultLimits limits, DatabaseTimeouts timeouts, QueryRequest request) throws SQLException, IOException {
         Relation relation = identify(connection, definition.object());
         var columns = definition.columns();
         if (columns.isEmpty()) throw new DatabaseProblem("The object has no visible columns.");
@@ -35,7 +35,7 @@ final class PostgresqlTableEditor {
         int bytes = 0;
         boolean more = false;
         try (var statement = connection.prepareStatement(sql)) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(timeouts.querySeconds());
             request.attach(statement);
             try (var rows = statement.executeQuery()) {
                 while (rows.next()) {

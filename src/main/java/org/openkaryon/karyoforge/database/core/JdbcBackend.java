@@ -12,6 +12,7 @@ import java.util.List;
 
 interface JdbcBackend {
     ResultLimits limits();
+    DatabaseTimeouts timeouts();
 
     String driverClass();
     Connection connect(Driver driver, char[] password) throws SQLException;
@@ -20,7 +21,7 @@ interface JdbcBackend {
     TableDefinition describe(Connection connection, JdbcSession.SchemaObject object) throws SQLException;
     void validate(SqlText.Command command);
     default TableSnapshot openTable(Connection connection, TableDefinition definition, QueryRequest request) throws SQLException, IOException {
-        return ReadOnlyTable.open(connection, definition, limits(), request);
+        return ReadOnlyTable.open(connection, definition, limits(), timeouts(), request);
     }
 
     default int applyTableChanges(Connection connection, TableSnapshot snapshot, List<TableSnapshot.Change> changes,
@@ -45,13 +46,13 @@ interface JdbcBackend {
     default void configureStatement(PreparedStatement statement) throws SQLException {}
     default boolean statementSavepoints() { return false; }
 
-    static JdbcBackend forSource(DatabaseSource source, ResultLimits limits) {
+    static JdbcBackend forSource(DatabaseSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         return switch (source) {
-            case SqliteSource sqlite -> new SqliteBackend(sqlite, limits);
-            case PostgresqlSource postgres -> new PostgresqlBackend(postgres, limits);
-            case MysqlSource mysql -> new MysqlFamilyBackend(mysql, limits);
-            case DuckDbSource duck -> new DuckDbBackend(duck, limits);
-            case ClickHouseSource click -> new ClickHouseBackend(click, limits);
+            case SqliteSource sqlite -> new SqliteBackend(sqlite, limits, timeouts);
+            case PostgresqlSource postgres -> new PostgresqlBackend(postgres, limits, timeouts);
+            case MysqlSource mysql -> new MysqlFamilyBackend(mysql, limits, timeouts);
+            case DuckDbSource duck -> new DuckDbBackend(duck, limits, timeouts);
+            case ClickHouseSource click -> new ClickHouseBackend(click, limits, timeouts);
         };
     }
 }

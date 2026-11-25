@@ -176,6 +176,20 @@ public final class SqliteJdbcSessionTest {
         assertEquals("206", committedRows(source));
     }
 
+    @Test(timeout = 15_000) public void expiresAnOwnedSqliteQueryAndRunsTheNextRequest() throws Exception {
+        try (var session = new JdbcSession(fixture(), ResultLimits.DEFAULT, new DatabaseTimeouts(5, 1))) {
+            session.connect();
+            var expired = assertThrows(DatabaseProblem.class, () -> query(session, """
+                    WITH RECURSIVE countup(n) AS (
+                      SELECT 1 UNION ALL SELECT n+1 FROM countup WHERE n < 1000000000
+                    )
+                    SELECT sum(n) FROM countup
+                    """, new QueryRequest()));
+            assertEquals("Database request exceeded its query timeout.", expired.getMessage());
+            assertEquals("42", scalar(session, "SELECT 42"));
+        }
+    }
+
     @Test public void appliesProfileResultLimitsToQueriesCatalogsAndTableSnapshots() throws Exception {
         var source = fixture();
         var writable = new SqliteSource(source.name(), source.database(), source.driver(), true);

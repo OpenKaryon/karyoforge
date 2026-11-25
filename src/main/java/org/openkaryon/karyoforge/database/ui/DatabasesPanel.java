@@ -191,10 +191,10 @@ final class DatabasesPanel extends JPanel implements Disposable {
     private void editLimits() {
         var profile = selectedSource();
         if (profile == null) return;
-        var dialog = new DatabaseResultLimitsDialog(project, profile.limits());
+        var dialog = new DatabaseResultLimitsDialog(project, profile);
         if (!dialog.showAndGet()) return;
         boolean reconnect = selected != null && selected.connected();
-        sources.saveLimits(profile.id(), dialog.limits());
+        sources.saveLimits(profile.id(), dialog.limits(), dialog.timeouts());
         refreshProfiles(profile.id());
         report(reconnect ? "Query limits saved. Reconnect this source to apply them." : "Query limits saved.");
     }

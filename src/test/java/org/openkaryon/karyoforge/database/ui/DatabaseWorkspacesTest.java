@@ -2,6 +2,7 @@ package org.openkaryon.karyoforge.database.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import org.openkaryon.karyoforge.database.core.DatabaseTimeouts;
 import org.openkaryon.karyoforge.database.core.ResultLimits;
 import org.openkaryon.karyoforge.database.core.SqliteSource;
 
@@ -56,11 +57,13 @@ public final class DatabaseWorkspacesTest extends BasePlatformTestCase {
         String current = sources.save(null, source);
         String previous = sources.save(null, source);
         var limits = new ResultLimits(75, 350, 2048, 32, 32, 40);
-        sources.saveLimits(current, limits);
+        var timeouts = new DatabaseTimeouts(9, 6);
+        sources.saveLimits(current, limits, timeouts);
         sources.save(current, new SqliteSource("Renamed", source.database(), source.driver()));
         var reopened = new DatabaseSources();
         reopened.loadState(sources.getState());
         assertEquals(limits, reopened.profiles().stream().filter(profile -> profile.id().equals(current)).findFirst().orElseThrow().limits());
+        assertEquals(timeouts, reopened.profiles().stream().filter(profile -> profile.id().equals(current)).findFirst().orElseThrow().timeouts());
         assertEquals(ResultLimits.DEFAULT,
                 reopened.profiles().stream().filter(profile -> profile.id().equals(previous)).findFirst().orElseThrow().limits());
     }

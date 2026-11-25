@@ -15,20 +15,23 @@ final class SqliteBackend implements JdbcBackend {
             "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "EXPLAIN", "ANALYZE", "REINDEX");
     private final SqliteSource source;
     private final ResultLimits limits;
+    private final DatabaseTimeouts timeouts;
 
-    SqliteBackend(SqliteSource source, ResultLimits limits) {
+    SqliteBackend(SqliteSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
         this.source = source;
         this.limits = limits;
+        this.timeouts = timeouts;
     }
 
     @Override public ResultLimits limits() { return limits; }
+    @Override public DatabaseTimeouts timeouts() { return timeouts; }
 
     @Override public String driverClass() { return "org.sqlite.JDBC"; }
 
     @Override public Connection connect(Driver driver, char[] password) throws SQLException {
         if (!Files.isRegularFile(source.database())) throw new DatabaseProblem("Choose an existing local SQLite database file.");
         var settings = new Properties();
-        settings.setProperty("busy_timeout", "5000");
+        settings.setProperty("busy_timeout", Integer.toString(Math.min(5, timeouts.querySeconds()) * 1000));
         settings.setProperty("enable_load_extension", "false");
         return driver.connect(source.jdbcUrl(), settings);
     }

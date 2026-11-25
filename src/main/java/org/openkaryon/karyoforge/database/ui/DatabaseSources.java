@@ -7,6 +7,7 @@ import com.intellij.openapi.components.Storage;
 import org.jetbrains.annotations.NotNull;
 import org.openkaryon.karyoforge.database.core.ClickHouseSource;
 import org.openkaryon.karyoforge.database.core.DatabaseSource;
+import org.openkaryon.karyoforge.database.core.DatabaseTimeouts;
 import org.openkaryon.karyoforge.database.core.DuckDbSource;
 import org.openkaryon.karyoforge.database.core.MysqlSource;
 import org.openkaryon.karyoforge.database.core.PostgresqlSource;
@@ -31,14 +32,15 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
     synchronized String save(String id, DatabaseSource source) {
         String key = id == null ? UUID.randomUUID().toString() : id;
         var existing = profiles.get(key);
-        profiles.put(key, new Profile(key, source, existing == null ? ResultLimits.DEFAULT : existing.limits()));
+        profiles.put(key, new Profile(key, source, existing == null ? ResultLimits.DEFAULT : existing.limits(),
+                existing == null ? DatabaseTimeouts.DEFAULT : existing.timeouts()));
         return key;
     }
 
     synchronized void remove(String id) { profiles.remove(id); }
 
-    synchronized void saveLimits(String id, ResultLimits limits) {
-        profiles.computeIfPresent(id, (key, old) -> new Profile(key, old.source(), limits));
+    synchronized void saveLimits(String id, ResultLimits limits, DatabaseTimeouts timeouts) {
+        profiles.computeIfPresent(id, (key, old) -> new Profile(key, old.source(), limits, timeouts));
     }
 
     @Override public synchronized @NotNull Snapshot getState() {
@@ -49,7 +51,9 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
             row.name = profile.source().name();
             row.driver = profile.source().driver().toString();
             row.writable = profile.source().writable();
-            if (!profile.limits().equals(ResultLimits.DEFAULT)) row.resultLimits = new LimitsEntry(profile.limits());
+            if (!profile.limits().equals(ResultLimits.DEFAULT) || !profile.timeouts().equals(DatabaseTimeouts.DEFAULT)) {
+                row.resultLimits = new LimitsEntry(profile.limits(), profile.timeouts());
+            }
             switch (profile.source()) {
                 case SqliteSource sqlite -> row.database = sqlite.database().toString();
                 case DuckDbSource duck -> {
@@ -104,15 +108,16 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
                     default -> throw new IllegalArgumentException("Unknown database source.");
                 };
                 ResultLimits limits = entry.resultLimits == null ? ResultLimits.DEFAULT : entry.resultLimits.value();
-                profiles.putIfAbsent(id, new Profile(id, source, limits));
+                var timeouts = entry.resultLimits == null ? DatabaseTimeouts.DEFAULT : entry.resultLimits.timeouts(source);
+                profiles.putIfAbsent(id, new Profile(id, source, limits, timeouts));
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 // A malformed saved profile must not prevent valid profiles from loading.
             }
         }
     }
 
-    record Profile(String id, DatabaseSource source, ResultLimits limits) {
-        Profile(String id, DatabaseSource source) { this(id, source, ResultLimits.DEFAULT); }
+    record Profile(String id, DatabaseSource source, ResultLimits limits, DatabaseTimeouts timeouts) {
+        Profile(String id, DatabaseSource source) { this(id, source, ResultLimits.DEFAULT, DatabaseTimeouts.DEFAULT); }
         @Override public String toString() { return source.name(); }
     }
 
@@ -142,16 +147,29 @@ public final class DatabaseSources implements PersistentStateComponent<DatabaseS
         public int maxCellChars;
         public int maxColumns;
         public int catalogLimit;
+        public int connectSeconds = DatabaseTimeouts.DEFAULT.connectSeconds();
+        public int querySeconds = DatabaseTimeouts.DEFAULT.querySeconds();
 
         public LimitsEntry() {}
 
-        LimitsEntry(ResultLimits limits) {
+        LimitsEntry(ResultLimits limits, DatabaseTimeouts timeouts) {
+            connectSeconds = timeouts.connectSeconds();
+            querySeconds = timeouts.querySeconds();
             pageSize = limits.pageSize();
             maxRows = limits.maxRows();
             maxBytes = limits.maxBytes();
             maxCellChars = limits.maxCellChars();
             maxColumns = limits.maxColumns();
             catalogLimit = limits.catalogLimit();
+        }
+
+        DatabaseTimeouts timeouts(DatabaseSource source) {
+            try {
+                if (querySeconds <= DatabaseTimeouts.maximumQuerySeconds(source)) return new DatabaseTimeouts(connectSeconds, querySeconds);
+            } catch (IllegalArgumentException malformed) {
+                // Keep the profile and load its default timeouts.
+            }
+            return DatabaseTimeouts.DEFAULT;
         }
 
         ResultLimits value() {
