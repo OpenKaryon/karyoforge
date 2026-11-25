@@ -124,7 +124,7 @@ final class MysqlFamilyBackend implements JdbcBackend {
     @Override public List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException {
         var objects = new ArrayList<JdbcSession.SchemaObject>();
         try (var statement = connection.prepareStatement("""
-                SELECT table_schema, table_name, IF(table_type='VIEW','view','table')
+                SELECT table_schema, table_name, IF(table_type='VIEW','view','table'), table_rows
                 FROM information_schema.tables WHERE table_schema=? AND table_type IN ('BASE TABLE','VIEW')
                 ORDER BY table_name LIMIT 2000
                 """)) {
@@ -132,7 +132,8 @@ final class MysqlFamilyBackend implements JdbcBackend {
             statement.setString(1, source.database());
             try (var rows = statement.executeQuery()) {
                 while (rows.next() && objects.size() < CATALOG_LIMIT) {
-                    objects.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1), SqlText.Dialect.MYSQL));
+                    objects.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1),
+                            SqlText.Dialect.MYSQL, JdbcSession.SchemaObject.estimate(rows.getString(4))));
                 }
             }
         }

@@ -159,7 +159,8 @@ final class PostgresqlBackend implements JdbcBackend {
             statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
             try (var rows = statement.executeQuery("""
                     SELECT n.nspname, c.relname,
-                           CASE WHEN c.relkind IN ('v','m') THEN 'view' ELSE 'table' END
+                           CASE WHEN c.relkind IN ('v','m') THEN 'view' ELSE 'table' END,
+                           CASE WHEN c.relkind IN ('r','p') AND c.reltuples >= 0 THEN c.reltuples::bigint END
                     FROM pg_catalog.pg_class c
                     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                     WHERE c.relkind IN ('r','p','v','m','f')
@@ -169,7 +170,8 @@ final class PostgresqlBackend implements JdbcBackend {
                     ORDER BY n.nspname, c.relname LIMIT 2000
                     """)) {
                 while (rows.next() && result.size() < CATALOG_LIMIT) {
-                    result.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1)));
+                    result.add(new JdbcSession.SchemaObject(rows.getString(2), rows.getString(3), rows.getString(1),
+                            SqlText.Dialect.POSTGRESQL, JdbcSession.SchemaObject.estimate(rows.getString(4))));
                 }
             }
         }

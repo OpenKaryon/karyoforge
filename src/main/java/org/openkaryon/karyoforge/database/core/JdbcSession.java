@@ -298,7 +298,21 @@ public final class JdbcSession implements AutoCloseable {
         }
     }
 
-    public record SchemaObject(String name, String type, String schema, SqlText.Dialect dialect) {
+    public record SchemaObject(String name, String type, String schema, SqlText.Dialect dialect, Long estimatedRows) {
+        public SchemaObject(String name, String type, String schema, SqlText.Dialect dialect) {
+            this(name, type, schema, dialect, null);
+        }
+
+        static Long estimate(String value) {
+            if (value == null) return null;
+            try {
+                long count = Long.parseLong(value);
+                return count < 0 ? null : count;
+            } catch (NumberFormatException unavailable) {
+                return null;
+            }
+        }
+
         public SchemaObject(String name, String type) { this(name, type, "main", SqlText.Dialect.SQLITE); }
         public SchemaObject(String name, String type, String schema) { this(name, type, schema, SqlText.Dialect.POSTGRESQL); }
 

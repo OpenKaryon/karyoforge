@@ -66,7 +66,7 @@ final class ClickHouseBackend implements JdbcBackend {
     @Override public List<JdbcSession.SchemaObject> schema(Connection connection) throws SQLException {
         var objects = new ArrayList<JdbcSession.SchemaObject>();
         try (var statement = connection.prepareStatement("""
-                SELECT database,name,if(engine IN ('View','MaterializedView','LiveView','WindowView'),'view','table')
+                SELECT database,name,if(engine IN ('View','MaterializedView','LiveView','WindowView'),'view','table'),total_rows
                 FROM system.tables WHERE database=? AND is_temporary=0 ORDER BY name LIMIT 2000
                 """)) {
             statement.setString(1, source.database());
@@ -74,7 +74,8 @@ final class ClickHouseBackend implements JdbcBackend {
                 while (rows.next() && objects.size() < CATALOG_LIMIT) {
                     String name = rows.getString(2);
                     if (name.length() <= 1024 && name.indexOf('\0') < 0) {
-                        objects.add(new JdbcSession.SchemaObject(name, rows.getString(3), rows.getString(1), SqlText.Dialect.CLICKHOUSE));
+                        objects.add(new JdbcSession.SchemaObject(name, rows.getString(3), rows.getString(1),
+                                SqlText.Dialect.CLICKHOUSE, JdbcSession.SchemaObject.estimate(rows.getString(4))));
                     }
                 }
             }

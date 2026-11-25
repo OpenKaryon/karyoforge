@@ -42,9 +42,12 @@ Results show 200 rows per page. **Next Result Page** continues the active cursor
 The preview is bounded to 10,000 rows, 8 MiB of detached cell text, 256 columns
 and 16,384 characters per cell. Large text and BLOB cells show clipped previews.
 NULL is distinct from empty text, BLOBs appear as hexadecimal, and SQLite
-integers retain their full precision. The catalog shows up to 2,000 tables and
-views. Select an object and choose **Inspect** to see declared column types,
+integers retain their full precision. The catalog groups up to 2,000 tables
+and views by schema. **Filter tables** narrows the loaded catalog. Expand an
+object to load its columns, or choose **Inspect** for declared column types,
 null constraints, primary-key order and hidden/generated columns in **Structure**.
+PostgreSQL, MySQL, MariaDB and ClickHouse show row estimates when their catalogs
+already have them. Browsing uses those statistics without counting table rows.
 The **DDL** tab shows up to 65,536 characters of that object's stored CREATE
 statement. **Stop** cancels the active query or page request. **Disconnect**
 releases the cursor, connection and driver lease.

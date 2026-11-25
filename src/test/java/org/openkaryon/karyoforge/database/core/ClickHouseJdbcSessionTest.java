@@ -17,6 +17,7 @@ public final class ClickHouseJdbcSessionTest {
             var objects = session.schema();
             assertEquals(2, objects.size());
             var table = objects.stream().filter(item -> item.name().equals("samples")).findFirst().orElseThrow();
+            assertEquals(Long.valueOf(205), table.estimatedRows());
             var exact = session.describe(table);
             assertEquals(1, exact.columns().getFirst().keyPosition());
             assertTrue(exact.ddl().contains("CREATE TABLE"));

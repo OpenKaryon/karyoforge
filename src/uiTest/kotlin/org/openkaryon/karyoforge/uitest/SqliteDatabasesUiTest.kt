@@ -4,6 +4,7 @@ import com.intellij.driver.client.Remote
 import com.intellij.driver.sdk.invokeAction
 import com.intellij.driver.sdk.ui.components.common.editor
 import com.intellij.driver.sdk.ui.components.common.ideFrame
+import com.intellij.driver.sdk.ui.components.elements.accessibleTree
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.checkBox
 import com.intellij.driver.sdk.ui.components.elements.comboBox
@@ -53,7 +54,7 @@ class SqliteDatabasesUiTest {
                 button { byVisibleText("Connect") }.click()
                 x { contains(byVisibleText("Connected in read-only mode.")) }
                     .shouldBe("The driver opens the owned source", present, 1.minutes)
-                x { byVisibleText("samples (table)") }.click()
+                accessibleTree { byAccessibleName("Database schema objects") }.clickPath("main", "Tables", "samples (table)")
                 button { byVisibleText("Show Rows") }.click()
                 x { contains(byVisibleText("Page 1 · 200 rows")) }
                     .shouldBe("The first page contains 200 rows", present, 1.minutes)
@@ -140,7 +141,7 @@ class SqliteDatabasesUiTest {
                 button { byVisibleText("Connect") }.click()
                 x { contains(byVisibleText("Connected in read-write mode.")) }
                     .shouldBe("The writable profile connects", present, 1.minutes)
-                x { byVisibleText("samples (table)") }.click()
+                accessibleTree { byAccessibleName("Database schema objects") }.clickPath("main", "Tables", "samples (table)")
                 button { byVisibleText("Open Table") }.click()
                 x { contains(byVisibleText("samples · 200 rows")) }
                     .shouldBe("The first table page opens", present, 1.minutes)

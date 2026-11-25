@@ -7,7 +7,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBList;
+import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
@@ -27,12 +27,15 @@ import org.openkaryon.karyoforge.database.results.FetchedResults;
 import org.openkaryon.karyoforge.database.results.ResultExport;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -48,7 +51,8 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private final DatabaseEditorBridge editorBridge;
     private final Runnable onStateChanged;
     private DatabaseSources.Profile profile;
-    private final JBList<JdbcSession.SchemaObject> schema = new JBList<>();
+    private final DatabaseSchemaTree schema = new DatabaseSchemaTree(this::loadTreeColumns);
+    private final JBTextField filterTables = new JBTextField(16);
     private final JBTextArea sql = new JBTextArea(5, 48);
     private final JBTable table = new JBTable();
     private final JBTable structure = new JBTable();
@@ -112,8 +116,11 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         this.profile = profile;
         this.editorBridge = editorBridge;
         this.onStateChanged = onStateChanged;
-        schema.getAccessibleContext().setAccessibleName("Database schema objects");
-        schema.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        filterTables.getAccessibleContext().setAccessibleName("Filter tables");
+        filterTables.getEmptyText().setText("Filter tables");
+        filterTables.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override protected void textChanged(DocumentEvent event) { schema.filter(filterTables.getText()); }
+        });
         sql.getAccessibleContext().setAccessibleName("SQL statement");
         table.getAccessibleContext().setAccessibleName("Database query results");
         structure.getAccessibleContext().setAccessibleName("Database object columns");
@@ -130,9 +137,9 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setDefaultRenderer(Object.class, literalRenderer());
         table.getTableHeader().setDefaultRenderer(literalRenderer());
-        schema.setCellRenderer(literalListRenderer());
 
         var objectPanel = new JPanel(new BorderLayout());
+        objectPanel.add(filterTables, BorderLayout.NORTH);
         objectPanel.add(new JBScrollPane(schema), BorderLayout.CENTER);
         objectPanel.add(controls(show, openTable, inspect, refresh), BorderLayout.SOUTH);
         var queryPanel = new JPanel(new BorderLayout());
@@ -161,7 +168,16 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         add(explorer, BorderLayout.CENTER);
         add(status, BorderLayout.SOUTH);
 
-        schema.addListSelectionListener(event -> updateControls());
+        schema.addTreeSelectionListener(event -> updateControls());
+        schema.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent event) {
+                var path = schema.getPathForLocation(event.getX(), event.getY());
+                if (event.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(event)
+                        && path != null && path.equals(schema.getSelectionPath()) && openTable.isEnabled()) {
+                    openTable();
+                }
+            }
+        });
         dataGrid.getSelectionModel().addListSelectionListener(event -> updateControls());
         sql.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.CTRL_DOWN_MASK), "runSql");
         sql.getActionMap().put("runSql", new AbstractAction() {
@@ -307,7 +323,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void showRows() {
-        var object = schema.getSelectedValue();
+        var object = schema.selectedObject();
         if (object != null) {
             sql.setText(object.selectSql());
             runSql();
@@ -362,7 +378,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     }
 
     private void openTable() {
-        var object = schema.getSelectedValue();
+        var object = schema.selectedObject();
         if (object == null || !discardTableDraft()) return;
         where.setText("");
         orderBy.setText("");
@@ -524,13 +540,27 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
     private record RowDraft(boolean delete, Map<Integer, TableRowDialog.DraftValue> values) {}
 
     private void inspect() {
-        var object = schema.getSelectedValue();
+        var object = schema.selectedObject();
         if (object == null) return;
         submit("Reading object definition…", null, () -> session.describe(object), this::showDefinition);
     }
 
-    private void showDefinition(TableDefinition object) {
+    private boolean loadTreeColumns(JdbcSession.SchemaObject object) {
+        if (busy || !connected) return false;
+        submit("Reading columns…", null, () -> session.describe(object), definition -> {
+            learnDefinition(definition);
+            report(definition.object().name() + " · " + definition.columns().size() + " columns.");
+        });
+        return true;
+    }
+
+    private void learnDefinition(TableDefinition object) {
         editorBridge.publishDefinition(profile.id(), object);
+        schema.learn(object);
+    }
+
+    private void showDefinition(TableDefinition object) {
+        learnDefinition(object);
         structure.setModel(new AbstractTableModel() {
             private final List<String> headers = List.of("Column", "Declared type", "Declared NOT NULL", "Primary key position", "Storage");
             @Override public int getRowCount() { return object.columns().size(); }
@@ -565,9 +595,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
 
     private void showSchema(List<JdbcSession.SchemaObject> objects) {
         if (connected) editorBridge.publishCatalog(profile.id(), objects);
-        var selected = schema.getSelectedValue();
-        schema.setListData(objects.toArray(JdbcSession.SchemaObject[]::new));
-        if (selected != null) schema.setSelectedValue(selected, false);
+        schema.reset(objects);
     }
 
     private void finishTransaction(boolean commitChanges) {
@@ -776,7 +804,7 @@ final class DatabaseSessionPanel extends JPanel implements Disposable {
         run.setEnabled(!busy && connected);
         explain.setEnabled(run.isEnabled() && activeSource.dialect() != SqlText.Dialect.CLICKHOUSE);
         openConsole.setEnabled(!busy && connected);
-        boolean canBrowse = !busy && connected && schema.getSelectedValue() != null;
+        boolean canBrowse = !busy && connected && schema.selectedObject() != null;
         show.setEnabled(canBrowse);
         inspect.setEnabled(canBrowse);
         openTable.setEnabled(canBrowse);
